@@ -42,4 +42,7 @@ class User < ApplicationRecord
   def name
     email
   end
+
+  # Ensure employee_code is present and unique (case-insensitive)
+  validates :employee_code, presence: true, uniqueness: { case_sensitive: false }
 end
