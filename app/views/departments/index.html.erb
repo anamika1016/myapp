@@ -32,7 +32,7 @@
                   
                   <form action="/departments/import" method="post" enctype="multipart/form-data" class="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
                     <input type="file" name="file" accept=".xlsx,.xls,.csv" required class="border border-gray-300 p-2 rounded-md w-full sm:w-auto">
-                    <input type="submit" value="Upload" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded shadow cursor-pointer">
+                    <input type="submit" value="Upload" class="bg-gray-700 hover:bg-gray-800 text-white font-semibold py-2 px-6 rounded shadow cursor-pointer">
                   </form>
 
                   <a href="/departments/export.xlsx" class="bg-green-500 hover:bg-green-600 text-white px-5 py-2 rounded shadow">Export Departments</a>
@@ -89,7 +89,7 @@
                 <div class="flex items-center justify-between mb-4">
                   <h3 class="text-lg font-semibold text-gray-800">Activities</h3>
                                     <div class="flex gap-2">
-                    <button type="button" id="add-activity" onclick="if(window.departmentManagerInstance && window.departmentManagerInstance.isReady && typeof window.departmentManagerInstance.addActivity === 'function') { window.departmentManagerInstance.addActivity(); } else { console.log('DepartmentManager not ready yet, retrying...'); setTimeout(() => { if(window.departmentManagerInstance && window.departmentManagerInstance.isReady && typeof window.departmentManagerInstance.addActivity === 'function') { window.departmentManagerInstance.addActivity(); } else { console.error('DepartmentManager still not available or not ready'); } }, 100); }" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <button type="button" id="add-activity" onclick="if(window.departmentManagerInstance && window.departmentManagerInstance.isReady && typeof window.departmentManagerInstance.addActivity === 'function') { window.departmentManagerInstance.addActivity(); } else { console.log('DepartmentManager not ready yet, retrying...'); setTimeout(() => { if(window.departmentManagerInstance && window.departmentManagerInstance.isReady && typeof window.departmentManagerInstance.addActivity === 'function') { window.departmentManagerInstance.addActivity(); } else { console.error('DepartmentManager still not available or not ready'); } }, 100); }" class="inline-flex items-center px-4 py-2 bg-gray-700 text-white text-sm font-medium rounded-md hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
                       <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                       </svg>
@@ -136,7 +136,7 @@
                   Cancel
                 </button>
                 
-                <button type="submit" id="submit-button" class="inline-flex items-center px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                <button type="submit" id="submit-button" class="inline-flex items-center px-6 py-2 bg-gray-700 text-white text-sm font-medium rounded-md hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
                   Save Department
                 </button>
               </div>
@@ -217,7 +217,7 @@
                           </span>
                         </td>
                         <td class="px-6 py-4 text-sm font-medium text-gray-900">
-                          <button type="button" class="edit-btn text-blue-600 hover:text-blue-900 mr-4" data-employee-id="<%= data[:employee_id] %>">Edit</button>
+                          <button type="button" class="edit-btn text-gray-700 hover:text-gray-900 mr-4" data-employee-id="<%= data[:employee_id] %>">Edit</button>
                           <div class="flex space-x-2">
                             <button type="button" class="delete-user-btn bg-orange-100 hover:bg-orange-200 text-orange-700 hover:text-orange-800 px-2 py-1 rounded text-xs font-medium border border-orange-300" 
                                     data-department-id="<%= data[:id] %>" 
@@ -260,6 +260,12 @@
 </div>
 
 <script>
+// Check if DepartmentManager class already exists to prevent duplicate declaration
+if (typeof DepartmentManager === 'undefined') {
+  // Initialize variables first
+  window.departmentManagerInstance = null;
+  var isInitializing = false;
+
 class DepartmentManager {
   constructor() {
     console.log('DepartmentManager constructor called');
@@ -795,6 +801,16 @@ class DepartmentManager {
       console.log(`${key}: ${value}`);
     }
     
+    // Debug: Log form data structure for editing
+    if (this.isEditing) {
+      console.log('=== EDITING MODE DEBUG ===');
+      console.log('Editing ID:', this.editingId);
+      console.log('Form method:', document.getElementById('form-method').value);
+      console.log('Department type:', form.querySelector('#department_department_type').value);
+      console.log('Employee reference:', form.querySelector('#department_employee_reference').value);
+      console.log('Number of activities:', form.querySelectorAll('.activity-fields').length);
+    }
+    
     // Also log activities marked for destruction
     const activitiesToDestroy = form.querySelectorAll('input[name*="[_destroy]"][value="true"]');
     console.log('Activities marked for destruction:', activitiesToDestroy.length);
@@ -821,7 +837,7 @@ class DepartmentManager {
         // If editing, use the update_employee_activity_data endpoint
         const editUrl = `/departments/${this.editingId}/update_employee_activity_data`;
         const response = await fetch(editUrl, {
-          method: 'POST', // Always use POST, let Rails handle the method override
+          method: 'PATCH', // Use PATCH method directly
           body: formData,
           headers: {
             'X-CSRF-Token': document.querySelector('input[name="authenticity_token"]')?.value || 
@@ -829,6 +845,15 @@ class DepartmentManager {
             'Accept': 'application/json' // Request JSON response
           }
         });
+        
+        console.log('Edit response status:', response.status);
+        console.log('Edit response headers:', response.headers);
+        
+        // If the custom endpoint fails, try the regular update method
+        if (!response.ok) {
+          console.log('Custom endpoint failed, trying regular update method...');
+          return this.handleRegularUpdate(formData);
+        }
         
         return this.handleResponse(response);
       }
@@ -887,13 +912,19 @@ class DepartmentManager {
         return;
       }
       
-      const response = await fetch(`/departments/${employeeId}/edit_data`, {
+      // Add cache-busting parameter to ensure fresh data
+      const timestamp = Date.now();
+      const response = await fetch(`/departments/${employeeId}/edit_data?t=${timestamp}`, {
         headers: {
           'X-CSRF-Token': csrfToken,
-          'Accept': 'application/json' // Request JSON response
+          'Accept': 'application/json', // Request JSON response
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
         }
       });
       console.log('Edit response status:', response.status);
+      console.log('Edit response headers:', response.headers);
+      
       if (response.ok) {
         const department = await response.json();
         console.log('Department data received:', department);
@@ -906,7 +937,9 @@ class DepartmentManager {
         this.populateForm(department);
       } else {
         console.error('Edit request failed:', response.status, response.statusText);
-        this.showError('Error loading department data');
+        const errorText = await response.text();
+        console.error('Error response body:', errorText);
+        this.showError(`Error loading department data: ${response.status} ${response.statusText}`);
       }
     } catch (error) {
       console.error('Edit error:', error);
@@ -915,6 +948,9 @@ class DepartmentManager {
   }
 
   populateForm(department) {
+    console.log('=== POPULATING FORM ===');
+    console.log('Department data:', department);
+    
     document.getElementById('department_department_type').value = department.department_type || '';
     document.getElementById('department-theme-name').value = department.theme_name || '';
     
@@ -924,6 +960,7 @@ class DepartmentManager {
       // Wait a bit for the dropdown to be populated
       setTimeout(() => {
         document.getElementById('department_employee_reference').value = department.employee_reference || '';
+        console.log('Set employee reference to:', department.employee_reference);
       }, 100);
     }
 
@@ -959,6 +996,13 @@ class DepartmentManager {
         currentActivity.querySelector('input[name*="[id]"]').value = activity.id || '';
 
         console.log(`Activity ${index} populated with ID: ${activity.id}, name: ${activity.activity_name}`);
+        console.log(`Activity ${index} input names:`, {
+          theme_name: currentActivity.querySelector('input[name*="[theme_name]"]').name,
+          activity_name: currentActivity.querySelector('input[name*="[activity_name]"]').name,
+          unit: currentActivity.querySelector('input[name*="[unit]"]').name,
+          weight: currentActivity.querySelector('input[name*="[weight]"]').name,
+          id: currentActivity.querySelector('input[name*="[id]"]').name
+        });
         this.activityIndex++;
       });
       console.log(`Form populated with ${this.activityIndex} activities total`);
@@ -1142,6 +1186,30 @@ class DepartmentManager {
     this.hideSuccess();
   }
 
+  // Handle regular update method as fallback
+  async handleRegularUpdate(formData) {
+    console.log('Using regular update method as fallback...');
+    
+    const csrfToken = document.querySelector('input[name="authenticity_token"]')?.value || 
+                     document.querySelector('meta[name="csrf-token"]')?.content || '';
+    
+    if (!csrfToken) {
+      this.showError('CSRF token not found. Please refresh the page.');
+      return;
+    }
+    
+    const response = await fetch(`/departments/${this.editingId}`, {
+      method: 'PATCH',
+      body: formData,
+      headers: {
+        'X-CSRF-Token': csrfToken,
+        'Accept': 'application/json'
+      }
+    });
+    
+    return this.handleResponse(response);
+  }
+
   // Handle response from form submission
   async handleResponse(response) {
     console.log('Response status:', response.status);
@@ -1230,7 +1298,7 @@ class DepartmentManager {
             </span>
           </td>
           <td class="px-6 py-4 text-sm font-medium">
-            <button type="button" class="edit-btn text-blue-600 hover:text-blue-900 mr-4" data-employee-id="${dept.employee_reference}">Edit</button>
+            <button type="button" class="edit-btn text-gray-700 hover:text-gray-900 mr-4" data-employee-id="${dept.employee_reference}">Edit</button>
             <div class="flex space-x-2">
               <button type="button" class="delete-user-btn bg-orange-100 hover:bg-orange-200 text-orange-700 hover:text-orange-800 px-2 py-1 rounded text-xs font-medium border border-orange-300" 
                       data-department-id="${dept.id}" 
@@ -1300,35 +1368,31 @@ class DepartmentManager {
   destroy() {
     // Remove event listeners if needed
     console.log('DepartmentManager instance destroyed');
-    departmentManagerInstance = null;
+    window.departmentManagerInstance = null;
   }
-}
+} // End of DepartmentManager class
 
-// Initialize only once to prevent duplicate event handlers
-let departmentManagerInstance = null;
-let isInitializing = false;
-
-// Immediate check for activity box
-(function ensureActivityBoxImmediate() {
-  console.log('Immediate check for activity box...');
-  const container = document.getElementById('activities-container');
-  if (container) {
-    console.log('Activities container found with', container.children.length, 'children');
-    if (container.children.length === 0) {
-      console.log('No activities found immediately, will add after initialization...');
-      window.needsDefaultActivity = true;
-    } else {
-      console.log('Default activity already present in HTML, no need to add more');
-      window.needsDefaultActivity = false;
+  // Immediate check for activity box
+  (function ensureActivityBoxImmediate() {
+    console.log('Immediate check for activity box...');
+    const container = document.getElementById('activities-container');
+    if (container) {
+      console.log('Activities container found with', container.children.length, 'children');
+      if (container.children.length === 0) {
+        console.log('No activities found immediately, will add after initialization...');
+        window.needsDefaultActivity = true;
+      } else {
+        console.log('Default activity already present in HTML, no need to add more');
+        window.needsDefaultActivity = false;
+      }
     }
-  }
-})();
+  })();
 
-function initializeDepartmentManager() {
+  function initializeDepartmentManager() {
   console.log('initializeDepartmentManager called');
 
   // Prevent multiple initializations
-  if (departmentManagerInstance || isInitializing) {
+  if (window.departmentManagerInstance || isInitializing) {
     console.log('DepartmentManager already initialized or initializing, skipping...');
     return;
   }
@@ -1374,7 +1438,7 @@ function initializeDepartmentManager() {
       // Initialize DepartmentManager for form handling
     try {
       console.log('Creating DepartmentManager instance...');
-      departmentManagerInstance = new DepartmentManager();
+      window.departmentManagerInstance = new DepartmentManager();
       console.log('DepartmentManager initialized successfully');
 
       // Check if we need to add a default activity immediately
@@ -1390,7 +1454,7 @@ function initializeDepartmentManager() {
       }
       
       // Make DepartmentManager globally accessible for debugging
-      window.departmentManagerInstance = departmentManagerInstance;
+      // window.departmentManagerInstance is already set above
       console.log('DepartmentManager ready and accessible');
       
     } catch (error) {
@@ -1398,34 +1462,29 @@ function initializeDepartmentManager() {
     } finally {
       isInitializing = false;
     }
-}
-
-// Use only one event listener to prevent duplicates
-document.addEventListener('DOMContentLoaded', () => {
-  console.log('DOM Content Loaded event fired');
-  initializeDepartmentManager();
-});
-
-
-
-// Global function to clear employee filter
-function clearEmployeeFilter() {
-  const currentUrl = new URL(window.location);
-  currentUrl.searchParams.delete('employee_id');
-  currentUrl.searchParams.delete('employee_code');
-  window.location.href = currentUrl.toString();
-}
-
-
-
-// For Turbo compatibility, but only if not already initialized
-document.addEventListener('turbo:load', () => {
-  if (!departmentManagerInstance) {
-    initializeDepartmentManager();
   }
-});
 
+  // Use only one event listener to prevent duplicates
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM Content Loaded event fired');
+    initializeDepartmentManager();
+  });
 
+  // Global function to clear employee filter
+  function clearEmployeeFilter() {
+    const currentUrl = new URL(window.location);
+    currentUrl.searchParams.delete('employee_id');
+    currentUrl.searchParams.delete('employee_code');
+    window.location.href = currentUrl.toString();
+  }
+
+  // For Turbo compatibility, but only if not already initialized
+  document.addEventListener('turbo:load', () => {
+    if (!window.departmentManagerInstance) {
+      initializeDepartmentManager();
+    }
+  });
+} // End of if (typeof DepartmentManager === 'undefined')
 
 // Remove turbo:render listener as it's not needed and causes duplicates
 </script>

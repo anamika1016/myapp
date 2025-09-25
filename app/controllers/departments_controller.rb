@@ -34,8 +34,10 @@ class DepartmentsController < ApplicationController
     
     # Set variables needed for the form dropdowns
     @employee_departments = EmployeeDetail.distinct.pluck(:department).compact.reject(&:blank?)
-    @employees = EmployeeDetail.where("employee_name IS NOT NULL AND employee_id IS NOT NULL AND department IS NOT NULL")
-                              .order(:employee_name)
+    # @employees = EmployeeDetail.where("employee_name IS NOT NULL AND employee_id IS NOT NULL AND department IS NOT NULL")
+    #                           .order(:employee_name)
+    @employees = EmployeeDetail.where.not(employee_name: nil, employee_id: nil)
+                           .order(:employee_name)
     
     respond_to do |format|
       format.html
@@ -88,6 +90,11 @@ class DepartmentsController < ApplicationController
   end
 
   def edit_data
+    # Disable caching to ensure fresh data is always returned
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    
     # The frontend is actually trying to edit employee activities, not departments
     # We need to find the employee and their activities based on the department ID
     
@@ -102,19 +109,15 @@ class DepartmentsController < ApplicationController
       if employee
         # FIXED: Get only activities that are specific to this employee
         # Instead of showing all department activities, show only user-specific activities
-        Rails.logger.info "Getting employee-specific activities for employee #{employee.employee_id}"
         
         # Get activities from UserDetail records for this specific employee
         user_details = UserDetail.includes(:activity, :department)
                                 .where(employee_detail_id: employee.id)
                                 .where("activity_id IS NOT NULL")
         
-        Rails.logger.info "Found #{user_details.count} user_details for employee #{employee.employee_id}"
-        
         # Map activities from user_details (employee-specific activities)
         activities = user_details.map do |user_detail|
           activity = user_detail.activity
-          Rails.logger.info "Processing employee-specific activity #{activity.id}: #{activity.activity_name}"
           {
             id: activity.id,
             theme_name: activity.theme_name,
@@ -123,8 +126,6 @@ class DepartmentsController < ApplicationController
             weight: activity.weight
           }
         end.uniq { |activity| activity[:id] } # Remove duplicates
-        
-        Rails.logger.info "Found #{activities.length} employee-specific activities for edit"
         
         employee_name = employee.employee_name
         employee_code = employee.employee_code
@@ -137,7 +138,8 @@ class DepartmentsController < ApplicationController
           employee_name: employee_name,
           employee_code: employee_code,
           employee_display_name: employee ? "#{employee_name} (#{employee_code})" : 'N/A',
-          activities: activities
+          activities: activities,
+          timestamp: Time.current.to_i
         }
       else
         # No employee found for this department
@@ -176,7 +178,8 @@ class DepartmentsController < ApplicationController
           employee_name: employee.employee_name,
           employee_code: employee.employee_code,
           employee_display_name: "#{employee.employee_name} (#{employee.employee_code || employee.employee_id})",
-          activities: activities
+          activities: activities,
+          timestamp: Time.current.to_i
         }
       else
         # Neither department nor employee found
@@ -226,16 +229,25 @@ class DepartmentsController < ApplicationController
             
             activity_id = activity_attrs[:id]
             if activity_id.present?
+              # Update the Activity record with new data
+              activity = Activity.find(activity_id)
+              Rails.logger.info "Updating activity #{activity_id} with new data"
+              activity.update!(
+                theme_name: activity_attrs[:theme_name],
+                activity_name: activity_attrs[:activity_name],
+                unit: activity_attrs[:unit],
+                weight: activity_attrs[:weight]
+              )
+              Rails.logger.info "Updated activity #{activity_id}: theme=#{activity.theme_name}, name=#{activity.activity_name}"
+              
               # Update existing UserDetail record
               user_detail = existing_user_details.find_by(activity_id: activity_id)
               if user_detail
                 Rails.logger.info "Updating existing user_detail for activity #{activity_id}"
-                # UserDetail records don't store theme_name, unit, weight - these are in Activity
-                # So we just ensure the relationship exists
+                # UserDetail relationship already exists, no need to update
               else
                 Rails.logger.info "Creating new user_detail for activity #{activity_id}"
                 # Create new UserDetail record
-                activity = Activity.find(activity_id)
                 department = activity.department
                 UserDetail.create!(
                   employee_detail_id: employee.id,
@@ -431,8 +443,6 @@ class DepartmentsController < ApplicationController
 
   # New action to handle updating employee activity data from the edit form
   def update_employee_activity_data
-    Rails.logger.info "=== update_employee_activity_data method called ==="
-    Rails.logger.info "Received params: #{params.inspect}"
     
     # The ID could be either a department ID or employee ID
     id = params[:id]
@@ -451,26 +461,18 @@ class DepartmentsController < ApplicationController
     end
     
     if department
-      Rails.logger.info "Found department: #{department.id} - #{department.department_type}"
       # Update department activities using the nested attributes structure
       if params[:department] && params[:department][:activities_attributes].present?
-        Rails.logger.info "Activities attributes present: #{params[:department][:activities_attributes].keys}"
-        Rails.logger.info "Total activities in form: #{params[:department][:activities_attributes].keys.length}"
         begin
           ActiveRecord::Base.transaction do
-            Rails.logger.info "Processing #{params[:department][:activities_attributes].keys.length} activities"
-            
             # Get existing activity IDs for this department
             existing_activity_ids = department.activities.pluck(:id)
-            Rails.logger.info "Existing activity IDs: #{existing_activity_ids}"
             
             # Count valid activities first (excluding those marked for destruction)
             valid_activities_count = 0
             activities_to_process = []
             
             params[:department][:activities_attributes].each do |index, activity_attrs|
-              Rails.logger.info "Checking activity #{index}: destroy=#{activity_attrs[:_destroy]}, theme=#{activity_attrs[:theme_name].present?}, name=#{activity_attrs[:activity_name].present?}, unit=#{activity_attrs[:unit].present?}, weight=#{activity_attrs[:weight].present?}"
-              
               # Skip if marked for destruction
               next if activity_attrs[:_destroy] == 'true' || activity_attrs[:_destroy] == true
               
@@ -479,12 +481,8 @@ class DepartmentsController < ApplicationController
                  activity_attrs[:weight].present?
                 valid_activities_count += 1
                 activities_to_process << index
-              else
-                Rails.logger.warn "Activity #{index} has incomplete fields, skipping"
               end
             end
-            
-            Rails.logger.info "Found #{valid_activities_count} valid activities to process: #{activities_to_process}"
             
             if valid_activities_count == 0
               raise "At least one complete activity is required. Please fill in all fields (Theme Name, Activity Name, and Weight) for at least one activity. Unit is optional."
@@ -494,50 +492,35 @@ class DepartmentsController < ApplicationController
             activities_to_delete = []
             params[:department][:activities_attributes].each do |index, activity_attrs|
               if (activity_attrs[:_destroy] == 'true' || activity_attrs[:_destroy] == true) && activity_attrs[:id].present? && activity_attrs[:id] != ""
-                Rails.logger.info "Activity #{index} (ID: #{activity_attrs[:id]}) marked for destruction"
                 activity = department.activities.find_by(id: activity_attrs[:id])
                 if activity
                   activities_to_delete << activity
-                else
-                  Rails.logger.warn "Activity with ID #{activity_attrs[:id]} not found for deletion"
                 end
               end
             end
             
             # Delete activities marked for destruction
             activities_to_delete.each do |activity|
-              Rails.logger.info "Deleting activity #{activity.id} (#{activity.activity_name}) - marked for destruction"
-              
               # First delete dependent user_details records to avoid foreign key constraint violation
               user_details = UserDetail.where(activity_id: activity.id)
               if user_details.any?
-                Rails.logger.info "Found #{user_details.count} user_details for activity #{activity.id}, deleting them first"
                 user_details.destroy_all
               end
               
               # Now delete the activity
-              if activity.destroy
-                Rails.logger.info "Successfully deleted activity #{activity.id}"
-              else
-                Rails.logger.error "Failed to delete activity #{activity.id}: #{activity.errors.full_messages.join(', ')}"
-              end
+              activity.destroy
             end
             
             # Process each activity from the form (only valid ones)
-            Rails.logger.info "Total activities in form: #{params[:department][:activities_attributes].keys.length}"
             params[:department][:activities_attributes].each do |index, activity_attrs|
-              Rails.logger.info "Processing activity #{index}: #{activity_attrs.inspect}"
-              
               # Skip if marked for destruction
               if activity_attrs[:_destroy] == 'true' || activity_attrs[:_destroy] == true
-                Rails.logger.info "Skipping activity #{index} - marked for destruction"
                 next
               end
               
               # Skip if any required field is blank (incomplete activity) - unit is now optional
               if activity_attrs[:theme_name].blank? || activity_attrs[:activity_name].blank? || 
                  activity_attrs[:weight].blank?
-                Rails.logger.info "Skipping incomplete activity #{index} - missing required fields"
                 next
               end
               
@@ -546,7 +529,6 @@ class DepartmentsController < ApplicationController
                 # Update existing activity
                 existing_activity = department.activities.find_by(id: activity_attrs[:id])
                 if existing_activity
-                  Rails.logger.info "Updating existing activity #{existing_activity.id}"
                   existing_activity.update!(
                     theme_name: activity_attrs[:theme_name],
                     activity_name: activity_attrs[:activity_name],
@@ -570,7 +552,6 @@ class DepartmentsController < ApplicationController
                           activity_id: existing_activity.id,
                           employee_detail_id: employee.id
                         )
-                        Rails.logger.info "Created missing UserDetail for existing activity #{existing_activity.id}"
                       end
                     end
                   end
@@ -648,11 +629,13 @@ class DepartmentsController < ApplicationController
         Rails.logger.warn "No activities provided in params"
         Rails.logger.warn "params[:department]: #{params[:department].inspect}"
         Rails.logger.warn "params[:department][:activities_attributes]: #{params[:department]&.dig(:activities_attributes).inspect}"
-        render json: { success: false, message: 'No activities provided' }, status: :unprocessable_entity
+        Rails.logger.warn "All params keys: #{params.keys.inspect}"
+        Rails.logger.warn "Form data structure: #{params.inspect}"
+        render json: { success: false, message: 'No activities provided. Please check the form data structure.' }, status: :unprocessable_entity
       end
     else
       # Try to find employee by ID
-      employee = EmployeeDetail.find_by(employee_id: department_id)
+      employee = EmployeeDetail.find_by(employee_id: id)
       
       if employee
         # This would require a different approach since we're dealing with UserDetail records

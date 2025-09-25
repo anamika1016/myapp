@@ -6,7 +6,7 @@
         <i class="fas fa-exclamation-triangle text-6xl text-red-500 mb-4"></i>
         <h2 class="text-2xl font-bold text-gray-800 mb-4">Employee Detail Not Found</h2>
         <p class="text-gray-600 mb-6">The employee detail you're looking for may have been deleted or doesn't exist.</p>
-        <%= link_to "← Back to Employee List", employee_details_path, class: "inline-flex items-center px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition duration-200" %>
+        <%= link_to "← Back to Employee List", employee_details_path, class: "inline-flex items-center px-6 py-3 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-800 transition duration-200" %>
       </div>
     </div>
   </div>
@@ -43,13 +43,13 @@
             display_months = if params[:quarter].present?
                               case params[:quarter]
                               when 'Q1'
-                                [[:january, 'Jan'], [:february, 'Feb'], [:march, 'Mar']]
-                              when 'Q2'
                                 [[:april, 'Apr'], [:may, 'May'], [:june, 'Jun']]
-                              when 'Q3'
+                              when 'Q2'
                                 [[:july, 'Jul'], [:august, 'Aug'], [:september, 'Sep']]
-                              when 'Q4'
+                              when 'Q3'
                                 [[:october, 'Oct'], [:november, 'Nov'], [:december, 'Dec']]
+                              when 'Q4'
+                                [[:january, 'Jan'], [:february, 'Feb'], [:march, 'Mar']]
                               else
                                 []
                               end
@@ -147,13 +147,13 @@
   <%
     quarter_months = case params[:quarter]
                    when 'Q1'
-                     ['january', 'february', 'march']
-                   when 'Q2'
                      ['april', 'may', 'june']
-                   when 'Q3'
+                   when 'Q2'
                      ['july', 'august', 'september']
-                   when 'Q4'
+                   when 'Q3'
                      ['october', 'november', 'december']
+                   when 'Q4'
+                     ['january', 'february', 'march']
                    else
                      []
                    end
@@ -477,7 +477,7 @@
 
       <div class="flex justify-end gap-2">
         <button type="button" onclick="closeModal()" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
-        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Submit</button>
+        <button type="submit" class="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800">Submit</button>
       </div>
     </form>
   </div>

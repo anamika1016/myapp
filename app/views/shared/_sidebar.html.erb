@@ -106,8 +106,8 @@
     <div class="relative flex flex-col h-full max-h-full">
       <div class="px-6 pt-4 flex items-center">
         <!-- Logo -->
-        <a class="d-inline-block rounded-xl text-xl font-weight-semibold" href="#" aria-label="Preline">
-          <%= image_tag "Screenshot from 2025-07-18 13-28-52.png", alt: "Preline Logo", class: "img-fluid", style: "width: 190px; height: 60px" %>
+        <a class="d-inline-block rounded-xl text-xl font-weight-semibold" href="#" aria-label="PAPL">
+          <%= image_tag "PAPL logo-dark-green.png", alt: "PAPL Logo", class: "img-fluid", style: "width: 200px; height: 60px" %>
         </a>
         <!-- End Logo -->
       </div>
@@ -201,6 +201,17 @@
             </li>
           <% end %>
 
+          <!-- User Profile/Settings - Show for all users -->
+          <li class="hs-accordion" id="users-accordion">
+            <%= link_to settings_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if current_page?(settings_path)} text-base text-gray-800 rounded-lg" do %>
+              <svg class="shrink-0 size-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              </svg>
+              <span class="font-semibold">User Profile</span>
+            <% end %>
+          </li>
+
           <!-- Logout -->
           
         </ul>
@@ -225,10 +236,16 @@
     <div class="flex-shrink-0 border-t border-gray-200 p-4 bg-gray-50">
       <div class="flex items-center space-x-2 text-gray-700 overflow-hidden"> <!-- changed space-x-3 to space-x-2 -->
 
-        <!-- Your SVG avatar -->
-        <%= image_tag "business_female_male_users.svg",
-                      alt: "User Avatar",
-                      class: "h-14 w-14 rounded-full object-cover shadow-sm border border-gray-300" %>  <!-- increased size from h-10 w-10 to h-14 w-14 -->
+        <!-- User Profile Image -->
+        <% if current_user.profile_image.attached? %>
+          <%= image_tag current_user.profile_image,
+                        alt: "User Avatar",
+                        class: "h-14 w-14 rounded-full object-cover shadow-sm border border-gray-300 sidebar-avatar" %>
+        <% else %>
+          <%= image_tag "business_female_male_users.svg",
+                        alt: "User Avatar",
+                        class: "h-14 w-14 rounded-full object-cover shadow-sm border border-gray-300 sidebar-avatar" %>
+        <% end %>
 
         <!-- Email inside fixed width -->
         <div class="flex flex-col overflow-hidden">
@@ -244,32 +261,35 @@
   </div>
   <!-- End Sidebar -->
 
-  <!-- STRONGER UI FIX SCRIPT - Force proper layout -->
+  <!-- PERFORMANCE FIX: Optimized script to prevent double refresh -->
   <script>
-    // Hide body until all resources are loaded
-    document.body.style.visibility = 'hidden';
-    
-    // Function to show content
-    function showContent() {
-      document.body.classList.add('loaded');
-      document.body.style.visibility = 'visible';
-    }
-    
-    // Wait for all resources including CSS
-    if (document.readyState === 'complete') {
-      setTimeout(showContent, 50);
-    } else {
-      window.addEventListener('load', function() {
-        setTimeout(showContent, 50);
-      });
-    }
-    
-    // Fallback - show content after 500ms regardless
-    setTimeout(function() {
-      if (!document.body.classList.contains('loaded')) {
-        showContent();
+    // Only apply loading state if page is not already loaded
+    if (document.readyState === 'loading') {
+      document.body.style.visibility = 'hidden';
+      
+      // Function to show content
+      function showContent() {
+        document.body.classList.add('loaded');
+        document.body.style.visibility = 'visible';
       }
-    }, 500);
+      
+      // Wait for DOM to be ready
+      if (document.readyState === 'interactive' || document.readyState === 'complete') {
+        showContent();
+      } else {
+        document.addEventListener('DOMContentLoaded', showContent);
+      }
+      
+      // Fallback - show content after 200ms (reduced from 500ms)
+      setTimeout(function() {
+        if (!document.body.classList.contains('loaded')) {
+          showContent();
+        }
+      }, 200);
+    } else {
+      // Page is already loaded, just add the loaded class
+      document.body.classList.add('loaded');
+    }
   </script>
 </body>
 </html>

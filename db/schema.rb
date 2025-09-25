@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_25_165201) do
+ActiveRecord::Schema[8.0].define(version: 2025_09_25_052539) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -42,6 +42,34 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_25_165201) do
     t.index ["status"], name: "index_achievements_on_status"
     t.index ["user_detail_id", "month"], name: "index_achievements_on_user_detail_id_and_month"
     t.index ["user_detail_id"], name: "index_achievements_on_user_detail_id"
+  end
+
+  create_table "active_storage_attachments", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "record_type", null: false
+    t.bigint "record_id", null: false
+    t.bigint "blob_id", null: false
+    t.datetime "created_at", null: false
+    t.index ["blob_id"], name: "index_active_storage_attachments_on_blob_id"
+    t.index ["record_type", "record_id", "name", "blob_id"], name: "index_active_storage_attachments_uniqueness", unique: true
+  end
+
+  create_table "active_storage_blobs", force: :cascade do |t|
+    t.string "key", null: false
+    t.string "filename", null: false
+    t.string "content_type"
+    t.text "metadata"
+    t.string "service_name", null: false
+    t.bigint "byte_size", null: false
+    t.string "checksum"
+    t.datetime "created_at", null: false
+    t.index ["key"], name: "index_active_storage_blobs_on_key", unique: true
+  end
+
+  create_table "active_storage_variant_records", force: :cascade do |t|
+    t.bigint "blob_id", null: false
+    t.string "variation_digest", null: false
+    t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
   end
 
   create_table "activities", force: :cascade do |t|
@@ -92,10 +120,9 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_25_165201) do
     t.string "quarter"
     t.boolean "sent"
     t.datetime "sent_at"
+    t.bigint "employee_detail_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.bigint "employee_detail_id", null: false
-    t.index ["employee_detail_id", "quarter"], name: "index_sms_logs_on_employee_detail_id_and_quarter"
     t.index ["employee_detail_id"], name: "index_sms_logs_on_employee_detail_id"
   end
 
@@ -154,6 +181,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_25_165201) do
 
   add_foreign_key "achievement_remarks", "achievements"
   add_foreign_key "achievements", "user_details"
+  add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "activities", "departments"
   add_foreign_key "employee_details", "users"
   add_foreign_key "sms_logs", "employee_details"

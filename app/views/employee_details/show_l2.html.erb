@@ -16,13 +16,13 @@
     # Define months to display based on quarter
     display_months = case params[:quarter]
                      when 'Q1'
-                       [[:january, 'Jan'], [:february, 'Feb'], [:march, 'Mar']]
-                     when 'Q2'
                        [[:april, 'Apr'], [:may, 'May'], [:june, 'Jun']]
-                     when 'Q3'
+                     when 'Q2'
                        [[:july, 'Jul'], [:august, 'Aug'], [:september, 'Sep']]
-                     when 'Q4'
+                     when 'Q3'
                        [[:october, 'Oct'], [:november, 'Nov'], [:december, 'Dec']]
+                     when 'Q4'
+                       [[:january, 'Jan'], [:february, 'Feb'], [:march, 'Mar']]
                      else
                        []
                      end

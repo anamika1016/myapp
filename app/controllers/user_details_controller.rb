@@ -411,7 +411,7 @@ class UserDetailsController < ApplicationController
       @employee_detail = EmployeeDetail.find_by(employee_email: current_user.email)
 
       @user_details = if @employee_detail
-        UserDetail.includes(:department, :activity, :employee_detail)
+        UserDetail.includes(:department, :activity, :employee_detail, achievements: :achievement_remark)
                   .where(employee_detail_id: @employee_detail.id)
                   .limit(100)
       else
@@ -419,7 +419,7 @@ class UserDetailsController < ApplicationController
       end
 
     elsif current_user.role == "hod"
-      @user_details = UserDetail.includes(:department, :activity, :employee_detail)
+      @user_details = UserDetail.includes(:department, :activity, :employee_detail, achievements: :achievement_remark)
                                 .limit(100)
       @employee_detail = nil
     end

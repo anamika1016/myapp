@@ -35,7 +35,7 @@
 
       <%= form_with(model: @employee_detail, url: employee_details_path, local: true, data: { turbo: false }) do |form| %>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          <% [:employee_name, :employee_email, :employee_mobile, :employee_code,
+          <% [:employee_name, :employee_email, :mobile_number, :employee_code,
               :l1_code, :l1_employer_name, :l2_code, :l2_employer_name,:department].each do |field| %>
             <div>
               <%= form.label field, field.to_s.titleize, class: "block text-sm font-semibold text-gray-700 mb-1" %>

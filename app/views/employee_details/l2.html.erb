@@ -28,10 +28,10 @@
               
               # Define quarters
               quarters = {
-                'Q1' => ['january', 'february', 'march'],
-                'Q2' => ['april', 'may', 'june'], 
-                'Q3' => ['july', 'august', 'september'],
-                'Q4' => ['october', 'november', 'december']
+                'Q1' => ['april', 'may', 'june'],
+                'Q2' => ['july', 'august', 'september'], 
+                'Q3' => ['october', 'november', 'december'],
+                'Q4' => ['january', 'february', 'march']
               }
             %>
             
@@ -117,9 +117,9 @@
                 
                 <% status_config = case current_status
                 when "l1_approved"
-                  { color: "bg-yellow-100 text-yellow-800 border-yellow-300", text: "L1 Approved - Ready for L2 Review", icon: "fas fa-clock" }
+                  { color: "bg-green-100 text-green-800 border-green-300", text: "L1 Approved - Ready for L2 Review", icon: "fas fa-clock" }
                 when "l2_approved"
-                  { color: "bg-emerald-100 text-emerald-800 border-emerald-300", text: "L2 Approved", icon: "fas fa-check-double" }
+                  { color: "bg-green-600 text-white border-green-700", text: "L2 Approved", icon: "fas fa-check-double" }
                 when "l2_returned"
                   { color: "bg-orange-100 text-orange-800 border-orange-300", text: "L2 Returned", icon: "fas fa-exclamation-triangle" }
                 else

@@ -5,6 +5,7 @@ class User < ApplicationRecord
          
   has_many :target_submissions
   has_one :employee_detail
+  has_one_attached :profile_image
 
   ROLES = %w[employee hod l1_employer l2_employer]
 

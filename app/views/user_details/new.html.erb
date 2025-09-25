@@ -5,21 +5,27 @@
       <h2 class="mb-4 text-dark">Department Activity Data Entry</h2>   
 
       <div class="excel-upload-section">
-        <%= form_with url: import_user_details_path, method: :post, multipart: true, local: true do |form| %>
-          <div class="upload-area">
+        <div class="upload-panel">
+          <%= form_with url: import_user_details_path, method: :post, multipart: true, local: true do |form| %>
             <%= form.file_field :file, accept: ".xlsx,.xls", style: "display: none;", id: "excel-file-input" %>
             
-            <button type="button" class="choose-file-btn" onclick="document.getElementById('excel-file-input').click()">
-              Choose Excel File
-            </button>
+            <div class="button-group">
+              <div class="left-buttons">
+                <button type="button" class="choose-file-btn" onclick="document.getElementById('excel-file-input').click()">
+                  Choose Excel File
+                </button>
+                
+                <%= form.submit "Upload Excel File", class: "upload-btn", id: "upload-submit" %>
+              </div>
+              
+              <div class="right-buttons">
+                <%= link_to "Export Excel", export_department_activity_data_user_details_path, class: "export-btn", id: "export-btn" %>
+              </div>
+            </div>
             
             <div id="selected-file" class="selected-file"></div>
-          </div>
-
-          <div class="upload-actions">
-            <%= form.submit "Upload Excel File", class: "upload-btn", id: "upload-submit" %>
-          </div>
-        <% end %>
+          <% end %>
+        </div>
       </div>
 
       <!-- Department Selection Form -->
@@ -182,17 +188,6 @@
                 <% end %>
               </div>
             <% end %>
-          </div>
-        </div>
-      <% else %>
-        <div class="card">
-          <div class="card-header bg-gray text-white">
-            <h5 class="mb-0"><i class="fas fa-table me-2"></i>Activities & Monthly Data</h5>
-          </div>
-          <div class="card-body">
-            <div class="alert alert-info">
-              <i class="fas fa-info-circle me-2"></i>Please select both department and employee to view activities.
-            </div>
           </div>
         </div>
       <% end %>
@@ -418,16 +413,52 @@
     border: 1px solid var(--border-gray);
   }
 
-  .upload-area {
-    text-align: center;
-    padding: 40px 20px;
-    border: 2px dashed var(--border-gray);
+  .upload-panel {
+    background: var(--white);
+    border: 1px solid var(--border-gray);
     border-radius: 8px;
-    background: var(--light-gray);
-    margin-bottom: 20px;
+    padding: 20px;
+    text-align: center;
   }
 
-  .choose-file-btn, .upload-btn {
+  .button-group {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .left-buttons {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+  }
+
+  .right-buttons {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+  }
+
+  .choose-file-btn {
+    background: var(--white);
+    color: var(--text-gray);
+    border: 1px solid var(--border-gray);
+    padding: 12px 30px;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-block;
+  }
+
+  .choose-file-btn:hover {
+    background: var(--light-gray);
+    border-color: var(--primary-gray);
+    transform: translateY(-1px);
+  }
+
+  .upload-btn {
     background: var(--primary-gray);
     color: var(--white);
     border: none;
@@ -436,11 +467,32 @@
     font-weight: 500;
     cursor: pointer;
     transition: all 0.3s ease;
+    display: inline-block;
   }
 
-  .choose-file-btn:hover, .upload-btn:hover {
+  .upload-btn:hover {
     background: var(--dark-gray);
     transform: translateY(-1px);
+  }
+
+  .export-btn {
+    background: #28a745;
+    color: var(--white);
+    border: none;
+    padding: 12px 30px;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-block;
+  }
+
+  .export-btn:hover {
+    background: #218838;
+    transform: translateY(-1px);
+    color: var(--white);
+    text-decoration: none;
   }
 
   .selected-file {

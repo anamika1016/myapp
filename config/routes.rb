@@ -27,6 +27,7 @@ Rails.application.routes.draw do
       get :test_sms
       get :clear_sms_tracking
       get :view_sms_logs
+      get :export_department_activity_data
 
     end
   end
@@ -82,6 +83,11 @@ Rails.application.routes.draw do
   root to: 'home#dashboard'  # 👈 now root goes to dashboard
   get 'dashboard', to: 'home#dashboard'
 
+
+  # Settings routes
+  get 'settings', to: 'settings#show'
+  patch 'settings', to: 'settings#update'
+  patch 'settings/password', to: 'settings#update_password'
 
   # Keep your other routes
   devise_scope :user do

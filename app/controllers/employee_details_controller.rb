@@ -106,17 +106,20 @@ class EmployeeDetailsController < ApplicationController
         "L2 Name", "L2 Employee Code", "L2 Remarks", "L2 Percentage"
       ]
 
-      # Define quarters
+      # Define quarters - Fixed sequence as per requirement with display names
       quarters = {
-        'Q1' => ['january', 'february', 'march'],
-        'Q2' => ['april', 'may', 'june'], 
-        'Q3' => ['july', 'august', 'september'],
-        'Q4' => ['october', 'november', 'december']
+        'Q1' => { months: ['april', 'may', 'june'], display: 'Apr-Jun' },
+        'Q2' => { months: ['july', 'august', 'september'], display: 'Jul-Sep' }, 
+        'Q3' => { months: ['october', 'november', 'december'], display: 'Oct-Dec' },
+        'Q4' => { months: ['january', 'february', 'march'], display: 'Jan-Mar' }
       }
 
       # Process each employee and quarter
       @employee_details.each do |emp|
-        quarters.each do |quarter_name, quarter_months|
+        quarters.each do |quarter_name, quarter_data|
+          quarter_months = quarter_data[:months]
+          quarter_display = quarter_data[:display]
+          
           # Get all achievements for this employee in this quarter
           all_quarter_achievements = emp.user_details.flat_map(&:achievements).select { |ach| quarter_months.include?(ach.month) }
           
@@ -157,7 +160,7 @@ class EmployeeDetailsController < ApplicationController
               emp.employee_name || 'N/A',
               emp.employee_code || 'N/A',
               emp.department || 'N/A',
-              quarter_name,
+              quarter_display,
               emp.l1_employer_name || 'N/A',
               emp.l1_code || 'N/A',
               l1_remarks_text.presence || 'N/A',
@@ -221,16 +224,36 @@ class EmployeeDetailsController < ApplicationController
     authorize! :l1, EmployeeDetail
 
     if current_user.hod?
-      @employee_details = EmployeeDetail.includes(user_details: [:activity, :department, :achievements]).all
+      # PERFORMANCE FIX: Optimize includes to preload all necessary associations
+      @employee_details = EmployeeDetail.includes(
+        user_details: [
+          :activity, 
+          :department, 
+          achievements: :achievement_remark
+        ]
+      ).all
     else
+      # PERFORMANCE FIX: Optimize includes to preload all necessary associations
       @employee_details = EmployeeDetail
                             .where(status: ['pending', 'l1_returned', 'l1_approved', 'l2_returned', 'l2_approved'])
                             .where(l1_code: current_user.employee_code)
-                            .includes(user_details: [:activity, :department, :achievements])
+                            .includes(
+                              user_details: [
+                                :activity, 
+                                :department, 
+                                achievements: :achievement_remark
+                              ]
+                            )
     end
 
     # Group employees by quarters for display
     @quarterly_data = group_employees_by_quarters(@employee_details)
+    
+    # Create the data structure expected by the view
+    @quarterly_employee_data = build_quarterly_employee_data(@employee_details)
+    
+    # PERFORMANCE FIX: Pre-calculate summary data to avoid processing in view
+    @summary_data = calculate_summary_data(@employee_details)
   end
 
   # Show employee details with quarterly view
@@ -249,7 +272,7 @@ class EmployeeDetailsController < ApplicationController
     
     # FIXED: Get ALL user details, not just those with achievements
     @user_details = @employee_detail.user_details
-                      .includes(:activity, :department, :achievements)
+                      .includes(:activity, :department, achievements: :achievement_remark)
 
     # If quarter is selected, filter achievements by quarter
     if @selected_quarter.present?
@@ -438,14 +461,27 @@ class EmployeeDetailsController < ApplicationController
 def l2
   if current_user.hod?
     # HOD can see all employee details, but only those with L1+ approved achievements
-    employee_details = EmployeeDetail.includes(user_details: [:activity, :department, :achievements])
-                                   .order(created_at: :desc)
+    # PERFORMANCE FIX: Optimize includes to preload all necessary associations
+    employee_details = EmployeeDetail.includes(
+      user_details: [
+        :activity, 
+        :department, 
+        achievements: :achievement_remark
+      ]
+    ).order(created_at: :desc)
   else
     # L2 managers can only see their assigned employees with L1+ approved achievements
+    # PERFORMANCE FIX: Optimize includes to preload all necessary associations
     employee_details = EmployeeDetail.where("l2_code = ? OR l2_employer_name = ?", 
                                            current_user.employee_code, 
                                            current_user.email)
-                                   .includes(user_details: [:activity, :department, :achievements])
+                                   .includes(
+                                     user_details: [
+                                       :activity, 
+                                       :department, 
+                                       achievements: :achievement_remark
+                                     ]
+                                   )
                                    .order(created_at: :desc)
   end
 
@@ -481,7 +517,7 @@ end
     
     # FIXED: Get ALL user details, not just those with achievements
     @user_details = @employee_detail.user_details
-                      .includes(:activity, :department, :achievements)
+                      .includes(:activity, :department, achievements: :achievement_remark)
 
     # If quarter is selected, filter achievements by quarter
     if @selected_quarter.present?
@@ -633,13 +669,13 @@ end
   def get_quarter_months(quarter)
     case quarter
     when 'Q1'
-      ['january', 'february', 'march']
-    when 'Q2'
       ['april', 'may', 'june']
-    when 'Q3'
+    when 'Q2'
       ['july', 'august', 'september']
-    when 'Q4'
+    when 'Q3'
       ['october', 'november', 'december']
+    when 'Q4'
+      ['january', 'february', 'march']
     else
       []
     end
@@ -683,14 +719,18 @@ end
             overall_status: 'pending'
           }
 
+          # PERFORMANCE FIX: Preload achievements to avoid N+1 queries
           quarter_activities.includes(:achievements, :activity, :department).each do |user_detail|
+            # PERFORMANCE FIX: Create a hash of achievements by month for fast lookup
+            achievements_by_month = user_detail.achievements.index_by(&:month)
+            
             # Check each month in the quarter for targets
             quarter_months.each do |month|
               target_value = get_target_for_month(user_detail, month)
               next unless target_value.present? && target_value.to_s != '0'
               
-              # Find existing achievement for this month
-              achievement = user_detail.achievements.find_by(month: month)
+              # PERFORMANCE FIX: Use in-memory hash lookup instead of database query
+              achievement = achievements_by_month[month]
               
               activity_data = {
                 user_detail: user_detail,
@@ -757,13 +797,16 @@ end
     activities = []
 
     user_details.each do |user_detail|
+      # PERFORMANCE FIX: Create a hash of achievements by month for fast lookup
+      achievements_by_month = user_detail.achievements.index_by(&:month)
+      
       quarter_months.each do |month|
         # Check if there's a target for this month
         target_value = get_target_for_month(user_detail, month)
         next unless target_value.present? && target_value.to_s != '0'
         
-        # Find existing achievement for this month
-        achievement = user_detail.achievements.find_by(month: month)
+        # PERFORMANCE FIX: Use in-memory hash lookup instead of database query
+        achievement = achievements_by_month[month]
         
         # Create activity data regardless of whether achievement exists
         activity_data = {
@@ -833,13 +876,16 @@ end
     approvable_activities = []
 
     user_details.each do |user_detail|
+      # PERFORMANCE FIX: Create a hash of achievements by month for fast lookup
+      achievements_by_month = user_detail.achievements.index_by(&:month)
+      
       quarter_months.each do |month|
         # Check if there's a target for this month
         target_value = get_target_for_month(user_detail, month)
         next unless target_value.present? && target_value.to_s != '0'
         
-        # Find existing achievement for this month
-        achievement = user_detail.achievements.find_by(month: month)
+        # PERFORMANCE FIX: Use in-memory hash lookup instead of database query
+        achievement = achievements_by_month[month]
         
         # Check if this activity can be approved/returned at the specified level
         can_act = case approval_level
@@ -1136,10 +1182,148 @@ def process_quarterly_l2_approval
   end
 end
 
-# Process L2 quarterly return - FIXED
+  # Process L2 quarterly return - FIXED
 def process_quarterly_l2_return
   # This method now delegates to the approval method since it handles both approve and return
   process_quarterly_l2_approval
 end
+
+  # PERFORMANCE FIX: Pre-calculate summary data to avoid processing in view
+  def calculate_summary_data(employee_details)
+    summary_data = {
+      total_quarterly_records: 0,
+      l1_approved_count: 0,
+      l2_approved_count: 0,
+      pending_count: 0,
+      returned_count: 0,
+      submitted_count: 0,
+      employee_quarter_statuses: {}
+    }
+
+    quarters = {
+      'Q1' => ['april', 'may', 'june'],
+      'Q2' => ['july', 'august', 'september'], 
+      'Q3' => ['october', 'november', 'december'],
+      'Q4' => ['january', 'february', 'march']
+    }
+
+    employee_details.each do |emp|
+      quarters.each do |quarter_name, quarter_months|
+        # PERFORMANCE FIX: Use preloaded associations instead of flat_map
+        all_quarter_achievements = emp.user_details.flat_map(&:achievements).select { |ach| quarter_months.include?(ach.month) }
+        
+        next if all_quarter_achievements.empty?
+        
+        summary_data[:total_quarterly_records] += 1
+        
+        # PERFORMANCE FIX: Optimize status calculation
+        quarter_statuses = all_quarter_achievements.map { |ach| ach.status || "pending" }
+        
+        # Check for actual approval data in achievement remarks
+        has_l1_approval = all_quarter_achievements.any? { |ach| ach.achievement_remark&.l1_percentage.present? && ach.achievement_remark&.l1_remarks.present? }
+        has_l2_approval = all_quarter_achievements.any? { |ach| ach.achievement_remark&.l2_percentage.present? && ach.achievement_remark&.l2_remarks.present? }
+        
+        # PERFORMANCE FIX: More efficient status calculation
+        current_status = calculate_quarter_status(quarter_statuses, has_l1_approval, has_l2_approval)
+        
+        # Store status for this employee-quarter combination
+        summary_data[:employee_quarter_statuses]["#{emp.id}_#{quarter_name}"] = current_status
+        
+        # Update counters
+        case current_status
+        when "l1_approved"
+          summary_data[:l1_approved_count] += 1
+        when "l2_approved"
+          summary_data[:l2_approved_count] += 1
+        when "l1_returned", "l2_returned"
+          summary_data[:returned_count] += 1
+        when "submitted"
+          summary_data[:submitted_count] += 1
+        else
+          summary_data[:pending_count] += 1
+        end
+      end
+    end
+
+    summary_data
+  end
+
+  # PERFORMANCE FIX: Optimized status calculation method
+  def calculate_quarter_status(quarter_statuses, has_l1_approval, has_l2_approval)
+    if quarter_statuses.any? { |s| s == "l2_returned" }
+      "l2_returned"
+    elsif quarter_statuses.all? { |s| s == "l2_approved" } || has_l2_approval
+      "l2_approved"
+    elsif quarter_statuses.any? { |s| s == "l1_returned" }
+      "l1_returned"
+    elsif quarter_statuses.all? { |s| s == "l1_approved" } || has_l1_approval
+      "l1_approved"
+    elsif quarter_statuses.any? { |s| s == "submitted" }
+      "submitted"
+    else
+      "pending"
+    end
+  end
+
+  # Build the quarterly employee data structure expected by the view
+  def build_quarterly_employee_data(employee_details)
+    quarterly_employee_data = {}
+    
+    quarters = {
+      'Q1' => ['april', 'may', 'june'],
+      'Q2' => ['july', 'august', 'september'], 
+      'Q3' => ['october', 'november', 'december'],
+      'Q4' => ['january', 'february', 'march']
+    }
+
+    employee_details.each do |emp|
+      quarters.each do |quarter_name, quarter_months|
+        # Get all achievements for this employee in this quarter
+        all_quarter_achievements = emp.user_details.flat_map(&:achievements).select { |ach| quarter_months.include?(ach.month) }
+        
+        # Only include if there are achievements in this quarter
+        if all_quarter_achievements.any?
+          # Calculate quarter status
+          quarter_statuses = all_quarter_achievements.map { |ach| ach.status || "pending" }
+          has_l1_approval = all_quarter_achievements.any? { |ach| ach.achievement_remark&.l1_percentage.present? && ach.achievement_remark&.l1_remarks.present? }
+          has_l2_approval = all_quarter_achievements.any? { |ach| ach.achievement_remark&.l2_percentage.present? && ach.achievement_remark&.l2_remarks.present? }
+          
+          current_status = calculate_quarter_status(quarter_statuses, has_l1_approval, has_l2_approval)
+          status_config = get_status_config(current_status)
+          
+          # Create unique key for this employee-quarter combination
+          key = "#{emp.id}_#{quarter_name}"
+          
+          quarterly_employee_data[key] = {
+            employee: emp,
+            quarter_name: quarter_name,
+            quarter_months: quarter_months,
+            status: current_status,
+            status_config: status_config
+          }
+        end
+      end
+    end
+
+    quarterly_employee_data
+  end
+
+  # Get status configuration for display
+  def get_status_config(status)
+    case status
+    when 'l1_approved'
+      { color: 'bg-green-100 text-green-800 border-green-300', text: 'L1 Approved' }
+    when 'l2_approved'
+      { color: 'bg-green-600 text-white border-green-700', text: 'L2 Approved' }
+    when 'l1_returned'
+      { color: 'bg-red-100 text-red-800 border-red-300', text: 'L1 Returned' }
+    when 'l2_returned'
+      { color: 'bg-orange-100 text-orange-800 border-orange-300', text: 'L2 Returned' }
+    when 'submitted'
+      { color: 'bg-blue-100 text-blue-800 border-blue-300', text: 'Submitted' }
+    else
+      { color: 'bg-yellow-100 text-yellow-800 border-yellow-300', text: 'Pending' }
+    end
+  end
 
 end
