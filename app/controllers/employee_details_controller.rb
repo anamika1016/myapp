@@ -3,7 +3,7 @@ require 'axlsx'
 
 class EmployeeDetailsController < ApplicationController
   before_action :set_employee_detail, only: [:edit, :update, :destroy]
-  load_and_authorize_resource except: [:approve, :return, :l2_approve, :l2_return]
+  load_and_authorize_resource except: [:approve, :return, :l2_approve, :l2_return, :edit_l1, :edit_l2]
   
   def index
     @employee_detail = EmployeeDetail.new
@@ -640,6 +640,106 @@ end
     end
   end
 
+  # Edit L1 remarks and percentage
+  def edit_l1
+    Rails.logger.info "Edit L1 called for employee: #{params[:id]}, user: #{current_user.email}, params: #{params.inspect}"
+    
+    begin
+      @employee_detail = EmployeeDetail.find(params[:id])
+    rescue ActiveRecord::RecordNotFound
+      Rails.logger.error "Employee detail not found: #{params[:id]}"
+      if request.xhr?
+        render json: { success: false, message: "❌ Employee detail not found. The record may have been deleted." }, status: :not_found
+      else
+        redirect_to employee_details_path, alert: "❌ Employee detail not found. The record may have been deleted."
+      end
+      return
+    end
+    
+    # Only HOD can edit L1 data
+    unless current_user.hod?
+      if request.xhr?
+        render json: { success: false, message: "❌ You are not authorized to edit L1 data" }, status: :forbidden
+      else
+        redirect_to root_path, alert: "❌ You are not authorized to edit L1 data."
+      end
+      return
+    end
+    
+    result = process_l1_edit
+    
+    if result[:success]
+      if request.xhr?
+        render json: { 
+          success: true, 
+          message: "✅ Successfully updated L1 data for #{params[:selected_quarter] || 'all quarters'}",
+          percentage: result[:percentage],
+          remarks: result[:remarks]
+        }
+      else
+        redirect_to employee_detail_path(@employee_detail, quarter: params[:selected_quarter]), 
+                    notice: "✅ Successfully updated L1 data for #{params[:selected_quarter] || 'all quarters'}"
+      end
+    else
+      if request.xhr?
+        render json: { success: false, message: result[:message] }, status: :unprocessable_entity
+      else
+        redirect_to employee_detail_path(@employee_detail, quarter: params[:selected_quarter]), 
+                    alert: result[:message]
+      end
+    end
+  end
+
+  # Edit L2 remarks and percentage
+  def edit_l2
+    Rails.logger.info "Edit L2 called for employee: #{params[:id]}, user: #{current_user.email}, params: #{params.inspect}"
+    
+    begin
+      @employee_detail = EmployeeDetail.find(params[:id])
+    rescue ActiveRecord::RecordNotFound
+      Rails.logger.error "Employee detail not found: #{params[:id]}"
+      if request.xhr?
+        render json: { success: false, message: "❌ Employee detail not found. The record may have been deleted." }, status: :not_found
+      else
+        redirect_to employee_details_path, alert: "❌ Employee detail not found. The record may have been deleted."
+      end
+      return
+    end
+    
+    # Only HOD can edit L2 data
+    unless current_user.hod?
+      if request.xhr?
+        render json: { success: false, message: "❌ You are not authorized to edit L2 data" }, status: :forbidden
+      else
+        redirect_to root_path, alert: "❌ You are not authorized to edit L2 data."
+      end
+      return
+    end
+    
+    result = process_l2_edit
+    
+    if result[:success]
+      if request.xhr?
+        render json: { 
+          success: true, 
+          message: "✅ Successfully updated L2 data for #{params[:selected_quarter] || 'all quarters'}",
+          percentage: result[:percentage],
+          remarks: result[:remarks]
+        }
+      else
+        redirect_to show_l2_employee_detail_path(@employee_detail, quarter: params[:selected_quarter]), 
+                    notice: "✅ Successfully updated L2 data for #{params[:selected_quarter] || 'all quarters'}"
+      end
+    else
+      if request.xhr?
+        render json: { success: false, message: result[:message] }, status: :unprocessable_entity
+      else
+        redirect_to show_l2_employee_detail_path(@employee_detail, quarter: params[:selected_quarter]), 
+                    alert: result[:message]
+      end
+    end
+  end
+
   private
 
   def set_employee_detail
@@ -1183,10 +1283,11 @@ def process_quarterly_l2_approval
 end
 
   # Process L2 quarterly return - FIXED
-def process_quarterly_l2_return
-  # This method now delegates to the approval method since it handles both approve and return
-  process_quarterly_l2_approval
-end
+  def process_quarterly_l2_return
+    # This method now delegates to the approval method since it handles both approve and return
+    process_quarterly_l2_approval
+  end
+
 
   # PERFORMANCE FIX: Pre-calculate summary data to avoid processing in view
   def calculate_summary_data(employee_details)
@@ -1323,6 +1424,120 @@ end
       { color: 'bg-blue-100 text-blue-800 border-blue-300', text: 'Submitted' }
     else
       { color: 'bg-yellow-100 text-yellow-800 border-yellow-300', text: 'Pending' }
+    end
+  end
+
+  # Process L1 edit - update L1 remarks and percentage for a quarter
+  def process_l1_edit
+    Rails.logger.info "Processing L1 edit for quarter: #{params[:selected_quarter]}"
+    Rails.logger.info "L1 percentage: #{params[:l1_percentage]}, L1 remarks: #{params[:l1_remarks]}"
+    
+    updated_count = 0
+    
+    if params[:selected_quarter].present?
+      # Update specific quarter
+      quarter_months = get_quarter_months(params[:selected_quarter])
+      Rails.logger.info "Updating L1 data for quarter: #{params[:selected_quarter]}, months: #{quarter_months}"
+      
+      @employee_detail.user_details.each do |detail|
+        quarter_months.each do |month|
+          # Find or create achievement for this month
+          achievement = detail.achievements.find_or_create_by(month: month)
+          achievement.save! if achievement.new_record?
+          
+          # Create or update achievement remark with L1 data
+          remark = achievement.achievement_remark || achievement.build_achievement_remark
+          remark.l1_remarks = params[:l1_remarks] if params[:l1_remarks].present?
+          remark.l1_percentage = params[:l1_percentage] if params[:l1_percentage].present?
+          remark.save!
+          
+          updated_count += 1
+        end
+      end
+    else
+      # Update all quarters
+      @employee_detail.user_details.each do |detail|
+        get_all_quarters.each do |quarter|
+          quarter_months = get_quarter_months(quarter)
+          
+          quarter_months.each do |month|
+            # Find or create achievement for this month
+            achievement = detail.achievements.find_or_create_by(month: month)
+            achievement.save! if achievement.new_record?
+            
+            # Create or update achievement remark with L1 data
+            remark = achievement.achievement_remark || achievement.build_achievement_remark
+            remark.l1_remarks = params[:l1_remarks] if params[:l1_remarks].present?
+            remark.l1_percentage = params[:l1_percentage] if params[:l1_percentage].present?
+            remark.save!
+            
+            updated_count += 1
+          end
+        end
+      end
+    end
+    
+    if updated_count > 0
+      { success: true, count: updated_count, percentage: params[:l1_percentage], remarks: params[:l1_remarks] }
+    else
+      { success: false, message: "❌ No activities found to update for the selected quarter" }
+    end
+  end
+
+  # Process L2 edit - update L2 remarks and percentage for a quarter
+  def process_l2_edit
+    Rails.logger.info "Processing L2 edit for quarter: #{params[:selected_quarter]}"
+    Rails.logger.info "L2 percentage: #{params[:l2_percentage]}, L2 remarks: #{params[:l2_remarks]}"
+    
+    updated_count = 0
+    
+    if params[:selected_quarter].present?
+      # Update specific quarter
+      quarter_months = get_quarter_months(params[:selected_quarter])
+      Rails.logger.info "Updating L2 data for quarter: #{params[:selected_quarter]}, months: #{quarter_months}"
+      
+      @employee_detail.user_details.each do |detail|
+        quarter_months.each do |month|
+          # Find or create achievement for this month
+          achievement = detail.achievements.find_or_create_by(month: month)
+          achievement.save! if achievement.new_record?
+          
+          # Create or update achievement remark with L2 data
+          remark = achievement.achievement_remark || achievement.build_achievement_remark
+          remark.l2_remarks = params[:l2_remarks] if params[:l2_remarks].present?
+          remark.l2_percentage = params[:l2_percentage] if params[:l2_percentage].present?
+          remark.save!
+          
+          updated_count += 1
+        end
+      end
+    else
+      # Update all quarters
+      @employee_detail.user_details.each do |detail|
+        get_all_quarters.each do |quarter|
+          quarter_months = get_quarter_months(quarter)
+          
+          quarter_months.each do |month|
+            # Find or create achievement for this month
+            achievement = detail.achievements.find_or_create_by(month: month)
+            achievement.save! if achievement.new_record?
+            
+            # Create or update achievement remark with L2 data
+            remark = achievement.achievement_remark || achievement.build_achievement_remark
+            remark.l2_remarks = params[:l2_remarks] if params[:l2_remarks].present?
+            remark.l2_percentage = params[:l2_percentage] if params[:l2_percentage].present?
+            remark.save!
+            
+            updated_count += 1
+          end
+        end
+      end
+    end
+    
+    if updated_count > 0
+      { success: true, count: updated_count, percentage: params[:l2_percentage], remarks: params[:l2_remarks] }
+    else
+      { success: false, message: "❌ No activities found to update for the selected quarter" }
     end
   end
 

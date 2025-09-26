@@ -325,23 +325,56 @@
 
         <!-- UNIQUE L1 Remarks - NO DUPLICATES -->
         <div class="space-y-3">
-          <h4 class="text-blue-600 font-semibold text-sm">Quarter Remarks:</h4>
-          <% if unique_l1_remarks.any? %>
-            <div class="bg-white p-4 rounded border max-h-40 overflow-y-auto">
-              <% unique_l1_remarks.each_with_index do |remark, index| %>
-                <div class="text-gray-700 text-sm mb-3 pb-3 <%= 'border-b border-gray-100' unless index == unique_l1_remarks.length - 1 %>">
-                  <div class="flex items-start gap-2">
-                    <span class="bg-blue-100 text-blue-600 text-xs px-2 py-1 rounded font-medium flex-shrink-0">
-                      Remark <%= index + 1 %>
-                    </span>
-                    <span class="text-gray-700"><%= remark %></span>
+          <div class="flex items-center justify-between">
+            <h4 class="text-blue-600 font-semibold text-sm">Quarter Remarks:</h4>
+            <% if current_user.hod? %>
+              <button onclick="editL1Remarks()" class="text-blue-600 hover:text-blue-800 text-xs font-medium">
+                <i class="fas fa-edit mr-1"></i>Edit
+              </button>
+            <% end %>
+          </div>
+          
+          <!-- L1 Display Section -->
+          <div id="l1-display-section">
+            <% if unique_l1_remarks.any? %>
+              <div class="bg-white p-4 rounded border max-h-40 overflow-y-auto" id="l1-remarks-display">
+                <% unique_l1_remarks.each_with_index do |remark, index| %>
+                  <div class="text-gray-700 text-sm mb-3 pb-3 <%= 'border-b border-gray-100' unless index == unique_l1_remarks.length - 1 %>">
+                    <div class="flex items-start gap-2">
+                      <span class="bg-blue-100 text-blue-600 text-xs px-2 py-1 rounded font-medium flex-shrink-0">
+                        Remark <%= index + 1 %>
+                      </span>
+                      <span class="text-gray-700"><%= remark %></span>
+                    </div>
                   </div>
+                <% end %>
+              </div>
+            <% else %>
+              <div class="bg-white p-4 rounded border" id="l1-remarks-container">
+                <p class="text-gray-500 text-sm">No remarks for this quarter</p>
+              </div>
+            <% end %>
+          </div>
+          
+          <!-- L1 Edit Form (Hidden by default) -->
+          <% if current_user.hod? %>
+            <div id="l1-edit-form" class="hidden bg-white p-4 rounded border">
+              <form id="l1-edit-form-content" onsubmit="updateL1Data(event)">
+                <div class="mb-4">
+                  <label for="l1_edit_percentage" class="block text-sm font-medium text-gray-700 mb-1">L1 Percentage:</label>
+                  <input type="number" id="l1_edit_percentage" name="l1_percentage" step="0.1" min="0" max="100" 
+                         value="<%= final_l1_average %>" class="w-full border border-gray-300 rounded-md p-2">
                 </div>
-              <% end %>
-            </div>
-          <% else %>
-            <div class="bg-white p-4 rounded border" id="l1-remarks-container">
-              <p class="text-gray-500 text-sm">No remarks for this quarter</p>
+                <div class="mb-4">
+                  <label for="l1_edit_remarks" class="block text-sm font-medium text-gray-700 mb-1">L1 Remarks:</label>
+                  <textarea id="l1_edit_remarks" name="l1_remarks" rows="3" 
+                            class="w-full border border-gray-300 rounded-md p-2"><%= unique_l1_remarks.join('; ') %></textarea>
+                </div>
+                <div class="flex justify-end gap-2">
+                  <button type="button" onclick="cancelL1Edit()" class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-sm">Cancel</button>
+                  <button type="submit" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">Update</button>
+                </div>
+              </form>
             </div>
           <% end %>
         </div>
@@ -364,23 +397,56 @@
 
         <!-- UNIQUE L2 Remarks - NO DUPLICATES -->
         <div class="space-y-3">
-          <h4 class="text-green-600 font-semibold text-sm">Quarter Remarks:</h4>
-          <% if unique_l2_remarks.any? %>
-            <div class="bg-white p-4 rounded border max-h-40 overflow-y-auto">
-              <% unique_l2_remarks.each_with_index do |remark, index| %>
-                <div class="text-gray-700 text-sm mb-3 pb-3 <%= 'border-b border-gray-100' unless index == unique_l2_remarks.length - 1 %>">
-                  <div class="flex items-start gap-2">
-                    <span class="bg-green-100 text-green-600 text-xs px-2 py-1 rounded font-medium flex-shrink-0">
-                      Remark <%= index + 1 %>
-                    </span>
-                    <span class="text-gray-700"><%= remark %></span>
+          <div class="flex items-center justify-between">
+            <h4 class="text-green-600 font-semibold text-sm">Quarter Remarks:</h4>
+            <% if current_user.hod? %>
+              <button onclick="editL2Remarks()" class="text-green-600 hover:text-green-800 text-xs font-medium">
+                <i class="fas fa-edit mr-1"></i>Edit
+              </button>
+            <% end %>
+          </div>
+          
+          <!-- L2 Display Section -->
+          <div id="l2-display-section">
+            <% if unique_l2_remarks.any? %>
+              <div class="bg-white p-4 rounded border max-h-40 overflow-y-auto" id="l2-remarks-display">
+                <% unique_l2_remarks.each_with_index do |remark, index| %>
+                  <div class="text-gray-700 text-sm mb-3 pb-3 <%= 'border-b border-gray-100' unless index == unique_l2_remarks.length - 1 %>">
+                    <div class="flex items-start gap-2">
+                      <span class="bg-green-100 text-green-600 text-xs px-2 py-1 rounded font-medium flex-shrink-0">
+                        Remark <%= index + 1 %>
+                      </span>
+                      <span class="text-gray-700"><%= remark %></span>
+                    </div>
                   </div>
+                <% end %>
+              </div>
+            <% else %>
+              <div class="bg-white p-4 rounded border" id="l2-remarks-container">
+                <p class="text-gray-500 text-sm">No remarks for this quarter</p>
+              </div>
+            <% end %>
+          </div>
+          
+          <!-- L2 Edit Form (Hidden by default) -->
+          <% if current_user.hod? %>
+            <div id="l2-edit-form" class="hidden bg-white p-4 rounded border">
+              <form id="l2-edit-form-content" onsubmit="updateL2Data(event)">
+                <div class="mb-4">
+                  <label for="l2_edit_percentage" class="block text-sm font-medium text-gray-700 mb-1">L2 Percentage:</label>
+                  <input type="number" id="l2_edit_percentage" name="l2_percentage" step="0.1" min="0" max="100" 
+                         value="<%= final_l2_average %>" class="w-full border border-gray-300 rounded-md p-2">
                 </div>
-              <% end %>
-            </div>
-          <% else %>
-            <div class="bg-white p-4 rounded border" id="l2-remarks-container">
-              <p class="text-gray-500 text-sm">No remarks for this quarter</p>
+                <div class="mb-4">
+                  <label for="l2_edit_remarks" class="block text-sm font-medium text-gray-700 mb-1">L2 Remarks:</label>
+                  <textarea id="l2_edit_remarks" name="l2_remarks" rows="3" 
+                            class="w-full border border-gray-300 rounded-md p-2"><%= unique_l2_remarks.join('; ') %></textarea>
+                </div>
+                <div class="flex justify-end gap-2">
+                  <button type="button" onclick="cancelL2Edit()" class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-sm">Cancel</button>
+                  <button type="submit" class="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm">Update</button>
+                </div>
+              </form>
             </div>
           <% end %>
         </div>
@@ -1030,6 +1096,136 @@
         console.log('Updated L2 remarks display with:', remarks);
       }
     }
+  }
+
+  // L1 Edit Functions
+  function editL1Remarks() {
+    console.log('editL1Remarks called');
+    // Hide the display section
+    const displaySection = document.getElementById('l1-display-section');
+    if (displaySection) {
+      displaySection.style.display = 'none';
+    }
+    
+    // Show the edit form
+    const editForm = document.getElementById('l1-edit-form');
+    if (editForm) {
+      editForm.classList.remove('hidden');
+      editForm.style.display = 'block';
+    }
+  }
+
+  function cancelL1Edit() {
+    console.log('cancelL1Edit called');
+    // Hide the edit form
+    const editForm = document.getElementById('l1-edit-form');
+    if (editForm) {
+      editForm.classList.add('hidden');
+      editForm.style.display = 'none';
+    }
+    
+    // Show the display section
+    const displaySection = document.getElementById('l1-display-section');
+    if (displaySection) {
+      displaySection.style.display = 'block';
+    }
+  }
+
+  function updateL1Data(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    formData.append('action_type', 'edit_l1');
+    formData.append('selected_quarter', '<%= params[:quarter] %>');
+    
+    fetch('<%= edit_l1_employee_detail_path(@employee_detail) %>', {
+      method: 'PATCH',
+      body: formData,
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+      }
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        showStatusMessage(data.message, true);
+        cancelL1Edit();
+        // Update the display with new data
+        updateL1Summary(data.percentage, data.remarks);
+      } else {
+        showStatusMessage(data.message, false);
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      showStatusMessage('An error occurred while updating L1 data', false);
+    });
+  }
+
+  // L2 Edit Functions
+  function editL2Remarks() {
+    console.log('editL2Remarks called');
+    // Hide the display section
+    const displaySection = document.getElementById('l2-display-section');
+    if (displaySection) {
+      displaySection.style.display = 'none';
+    }
+    
+    // Show the edit form
+    const editForm = document.getElementById('l2-edit-form');
+    if (editForm) {
+      editForm.classList.remove('hidden');
+      editForm.style.display = 'block';
+    }
+  }
+
+  function cancelL2Edit() {
+    console.log('cancelL2Edit called');
+    // Hide the edit form
+    const editForm = document.getElementById('l2-edit-form');
+    if (editForm) {
+      editForm.classList.add('hidden');
+      editForm.style.display = 'none';
+    }
+    
+    // Show the display section
+    const displaySection = document.getElementById('l2-display-section');
+    if (displaySection) {
+      displaySection.style.display = 'block';
+    }
+  }
+
+  function updateL2Data(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    formData.append('action_type', 'edit_l2');
+    formData.append('selected_quarter', '<%= params[:quarter] %>');
+    
+    fetch('<%= edit_l2_employee_detail_path(@employee_detail) %>', {
+      method: 'PATCH',
+      body: formData,
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+      }
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        showStatusMessage(data.message, true);
+        cancelL2Edit();
+        // Update the display with new data
+        updateL2Summary(data.percentage, data.remarks);
+      } else {
+        showStatusMessage(data.message, false);
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      showStatusMessage('An error occurred while updating L2 data', false);
+    });
   }
 </script>
 

@@ -46,6 +46,11 @@ class Ability
       ['l1_approved', 'l2_returned'].include?(ed.status)
     end
 
+    # Edit L1 and L2 permissions - Only HOD can edit
+    can [:edit_l1, :edit_l2], EmployeeDetail do |ed|
+      user.hod?
+    end
+
     can :l2, EmployeeDetail do
       # User can access L2 view if they have any L2 assignments
       EmployeeDetail.where("l2_code = ? OR l2_employer_name = ?", user.employee_code, user.email).exists?

@@ -70,6 +70,8 @@ Rails.application.routes.draw do
       patch :return
       patch :l2_approve  # L2 approve
       patch :l2_return  
+      patch :edit_l1  # Edit L1 remarks and percentage
+      patch :edit_l2  # Edit L2 remarks and percentage
       get :show_l2  # This maps to /employee_details/:id/show_l2
     end
   end
