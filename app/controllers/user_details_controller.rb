@@ -9,16 +9,32 @@ class UserDetailsController < ApplicationController
       employee_detail = EmployeeDetail.find_by(employee_email: current_user.email)
 
       @user_details = if employee_detail
-        UserDetail.includes(:department, :activity, :employee_detail)
-                  .where(employee_detail_id: employee_detail.id)
-                  .page(params[:page]).per(50)
+        # Get all user_details for this employee and deduplicate by activity
+        all_details = UserDetail.includes(:department, :activity, :employee_detail)
+                               .where(employee_detail_id: employee_detail.id)
+        
+        # Deduplicate by keeping the most recent record for each activity
+        deduplicated_details = all_details.group_by(&:activity_id).map do |activity_id, records|
+          records.max_by(&:updated_at)
+        end
+        
+        # Convert to ActiveRecord relation for pagination
+        UserDetail.where(id: deduplicated_details.map(&:id)).page(params[:page]).per(50)
       else
         UserDetail.none.page(params[:page]).per(50)
       end
 
     elsif current_user.role == "hod"
-      @user_details = UserDetail.includes(:department, :activity, :employee_detail)
-                                .page(params[:page]).per(50)
+      # Get all user_details and deduplicate by activity and employee
+      all_details = UserDetail.includes(:department, :activity, :employee_detail)
+      
+      # Deduplicate by keeping the most recent record for each activity-employee combination
+      deduplicated_details = all_details.group_by { |detail| [detail.activity_id, detail.employee_detail_id] }.map do |key, records|
+        records.max_by(&:updated_at)
+      end
+      
+      # Convert to ActiveRecord relation for pagination
+      @user_details = UserDetail.where(id: deduplicated_details.map(&:id)).page(params[:page]).per(50)
     end
   end
 
@@ -411,16 +427,32 @@ class UserDetailsController < ApplicationController
       @employee_detail = EmployeeDetail.find_by(employee_email: current_user.email)
 
       @user_details = if @employee_detail
-        UserDetail.includes(:department, :activity, :employee_detail, achievements: :achievement_remark)
-                  .where(employee_detail_id: @employee_detail.id)
-                  .limit(100)
+        # Get all user_details for this employee and deduplicate by activity
+        all_details = UserDetail.includes(:department, :activity, :employee_detail, achievements: :achievement_remark)
+                               .where(employee_detail_id: @employee_detail.id)
+        
+        # Deduplicate by keeping the most recent record for each activity
+        deduplicated_details = all_details.group_by(&:activity_id).map do |activity_id, records|
+          records.max_by(&:updated_at)
+        end
+        
+        # Convert to ActiveRecord relation and limit
+        UserDetail.where(id: deduplicated_details.map(&:id)).limit(100)
       else
         UserDetail.none
       end
 
     elsif current_user.role == "hod"
-      @user_details = UserDetail.includes(:department, :activity, :employee_detail, achievements: :achievement_remark)
-                                .limit(100)
+      # Get all user_details and deduplicate by activity and employee
+      all_details = UserDetail.includes(:department, :activity, :employee_detail, achievements: :achievement_remark)
+      
+      # Deduplicate by keeping the most recent record for each activity-employee combination
+      deduplicated_details = all_details.group_by { |detail| [detail.activity_id, detail.employee_detail_id] }.map do |key, records|
+        records.max_by(&:updated_at)
+      end
+      
+      # Convert to ActiveRecord relation and limit
+      @user_details = UserDetail.where(id: deduplicated_details.map(&:id)).limit(100)
       @employee_detail = nil
     end
   end
@@ -638,7 +670,12 @@ class UserDetailsController < ApplicationController
             theme_name: theme_value.present? ? theme_value : nil
           }
 
-          existing_record = existing_records[activity_id.to_i]
+          # Use find_or_initialize_by to prevent duplicates
+          user_detail_record = UserDetail.find_or_initialize_by(
+            department_id: department_id,
+            activity_id: activity_id,
+            employee_detail_id: employee_detail_id
+          )
 
           # Update Activity metadata (always update to handle clearing values)
           activity = Activity.find(activity_id)
@@ -652,25 +689,17 @@ class UserDetailsController < ApplicationController
             errors << "Failed to update activity metadata for activity #{activity_id}: #{activity.errors.full_messages.join(', ')}"
           end
 
-          if existing_record
-            if existing_record.update(month_data)
-              updated_count += 1
-            else
-              errors << "Failed to update activity #{activity_id}: #{existing_record.errors.full_messages.join(', ')}"
-            end
-          else
-            new_record = UserDetail.new(
-              department_id: department_id,
-              activity_id: activity_id,
-              employee_detail_id: employee_detail_id,
-              **month_data
-            )
-
-            if new_record.save
+          # Update the user_detail record with monthly data
+          user_detail_record.assign_attributes(month_data)
+          
+          if user_detail_record.save
+            if user_detail_record.previously_new_record?
               created_count += 1
             else
-              errors << "Failed to create activity #{activity_id}: #{new_record.errors.full_messages.join(', ')}"
+              updated_count += 1
             end
+          else
+            errors << "Failed to save activity #{activity_id}: #{user_detail_record.errors.full_messages.join(', ')}"
           end
         rescue => e
           errors << "Error processing activity #{activity_id}: #{e.message}"

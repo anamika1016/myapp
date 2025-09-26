@@ -1046,12 +1046,17 @@ class DepartmentsController < ApplicationController
   def get_employee_activities(employee)
     activities_hash = {}
     
-    # Get all user_details for this employee
+    # Get all user_details for this employee and deduplicate
     user_details = UserDetail.includes(:activity, :department)
                             .where(employee_detail_id: employee.id)
                             .where("activity_id IS NOT NULL")
     
-    user_details.each do |user_detail|
+    # Deduplicate by keeping the most recent record for each activity
+    deduplicated_details = user_details.group_by(&:activity_id).map do |activity_id, records|
+      records.max_by(&:updated_at)
+    end
+    
+    deduplicated_details.each do |user_detail|
       activity = user_detail.activity
       department = user_detail.department
       
@@ -1093,12 +1098,17 @@ class DepartmentsController < ApplicationController
                                              .includes(:user_details)
     
     employees_with_activities.each do |employee|
-      # Get activities for this employee
+      # Get activities for this employee and deduplicate
       user_details = UserDetail.includes(:activity, :department)
                               .where(employee_detail_id: employee.id)
                               .where("activity_id IS NOT NULL")
       
-      user_details.each do |user_detail|
+      # Deduplicate by keeping the most recent record for each activity
+      deduplicated_details = user_details.group_by(&:activity_id).map do |activity_id, records|
+        records.max_by(&:updated_at)
+      end
+      
+      deduplicated_details.each do |user_detail|
         activity = user_detail.activity
         department = user_detail.department
         

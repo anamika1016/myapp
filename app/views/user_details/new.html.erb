@@ -5,27 +5,21 @@
       <h2 class="mb-4 text-dark">Department Activity Data Entry</h2>   
 
       <div class="excel-upload-section">
-        <div class="upload-panel">
-          <%= form_with url: import_user_details_path, method: :post, multipart: true, local: true do |form| %>
+        <%= form_with url: import_user_details_path, method: :post, multipart: true, local: true do |form| %>
+          <div class="upload-area">
             <%= form.file_field :file, accept: ".xlsx,.xls", style: "display: none;", id: "excel-file-input" %>
             
-            <div class="button-group">
-              <div class="left-buttons">
-                <button type="button" class="choose-file-btn" onclick="document.getElementById('excel-file-input').click()">
-                  Choose Excel File
-                </button>
-                
-                <%= form.submit "Upload Excel File", class: "upload-btn", id: "upload-submit" %>
-              </div>
-              
-              <div class="right-buttons">
-                <%= link_to "Export Excel", export_department_activity_data_user_details_path, class: "export-btn", id: "export-btn" %>
-              </div>
-            </div>
+            <button type="button" class="choose-file-btn" onclick="document.getElementById('excel-file-input').click()">
+              Choose Excel File
+            </button>
             
             <div id="selected-file" class="selected-file"></div>
-          <% end %>
-        </div>
+          </div>
+
+          <div class="upload-actions">
+            <%= form.submit "Upload Excel File", class: "upload-btn", id: "upload-submit" %>
+          </div>
+        <% end %>
       </div>
 
       <!-- Department Selection Form -->
@@ -98,11 +92,43 @@
           </div>
           <div class="card-body p-0">
             <% 
-              # Use employee-specific activities instead of all department activities
-              activities = @employee_activities || []
+              # Filter activities to show only those with blank target values
+              activities = []
+              if @employee_activities.present?
+                @employee_activities.each do |activity|
+                  # Check if this activity has any existing data with non-blank targets
+                  existing_data = UserDetail.find_by(
+                    department_id: params[:department_id],
+                    activity_id: activity.id,
+                    employee_detail_id: params[:employee_detail_id]
+                  )
+                  
+                  # Only include activities that have no existing data OR have all blank target values
+                  if existing_data.nil?
+                    # No existing data - include this activity
+                    activities << activity
+                  else
+                    # Check if all target values are blank
+                    months = [:april, :may, :june, :july, :august, :september, :october, :november, :december, :january, :february, :march]
+                    all_blank = months.all? do |month|
+                      value = existing_data.send(month)
+                      value.blank? || value.to_s.strip == '' || value.to_s == '0'
+                    end
+                    
+                    # Include only if all targets are blank
+                    activities << activity if all_blank
+                  end
+                end
+              end
             %>
             
             <% if activities.any? %>
+              <div class="alert alert-info m-3">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Showing only activities with blank target values.</strong> 
+                Fill in the data below and click "Save All Data" to update only these activities. 
+                Existing data with filled targets will not be duplicated.
+              </div>
               <%= form_with url: bulk_create_user_details_path, method: :post, local: true, id: 'bulk-form' do |form| %>
                 <%= form.hidden_field :department_id, value: params[:department_id] %>
                 <%= form.hidden_field :employee_detail_id, value: params[:employee_detail_id] %>
@@ -180,11 +206,11 @@
             <% else %>
               <div class="alert alert-info m-3">
                 <i class="fas fa-info-circle me-2"></i>
-                No activities found for this employee. 
                 <% if params[:department_id].blank? || params[:employee_detail_id].blank? %>
                   Please select both department and employee.
                 <% else %>
-                  This employee may not have any activities assigned yet.
+                  No activities with blank target values found for this employee. 
+                  All activities for this employee already have data filled in, or no activities are assigned yet.
                 <% end %>
               </div>
             <% end %>
@@ -413,52 +439,16 @@
     border: 1px solid var(--border-gray);
   }
 
-  .upload-panel {
-    background: var(--white);
-    border: 1px solid var(--border-gray);
-    border-radius: 8px;
-    padding: 20px;
+  .upload-area {
     text-align: center;
-  }
-
-  .button-group {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-  }
-
-  .left-buttons {
-    display: flex;
-    gap: 15px;
-    align-items: center;
-  }
-
-  .right-buttons {
-    display: flex;
-    gap: 15px;
-    align-items: center;
-  }
-
-  .choose-file-btn {
-    background: var(--white);
-    color: var(--text-gray);
-    border: 1px solid var(--border-gray);
-    padding: 12px 30px;
-    border-radius: 6px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: inline-block;
-  }
-
-  .choose-file-btn:hover {
+    padding: 40px 20px;
+    border: 2px dashed var(--border-gray);
+    border-radius: 8px;
     background: var(--light-gray);
-    border-color: var(--primary-gray);
-    transform: translateY(-1px);
+    margin-bottom: 20px;
   }
 
-  .upload-btn {
+  .choose-file-btn, .upload-btn {
     background: var(--primary-gray);
     color: var(--white);
     border: none;
@@ -467,32 +457,11 @@
     font-weight: 500;
     cursor: pointer;
     transition: all 0.3s ease;
-    display: inline-block;
   }
 
-  .upload-btn:hover {
+  .choose-file-btn:hover, .upload-btn:hover {
     background: var(--dark-gray);
     transform: translateY(-1px);
-  }
-
-  .export-btn {
-    background: #28a745;
-    color: var(--white);
-    border: none;
-    padding: 12px 30px;
-    border-radius: 6px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    text-decoration: none;
-    display: inline-block;
-  }
-
-  .export-btn:hover {
-    background: #218838;
-    transform: translateY(-1px);
-    color: var(--white);
-    text-decoration: none;
   }
 
   .selected-file {
