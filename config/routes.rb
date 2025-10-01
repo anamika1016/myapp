@@ -28,6 +28,7 @@ Rails.application.routes.draw do
       get :clear_sms_tracking
       get :view_sms_logs
       get :export_department_activity_data
+      get :submitted_achievements
 
     end
   end

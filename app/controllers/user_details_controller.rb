@@ -2,7 +2,7 @@ class UserDetailsController < ApplicationController
   require 'ostruct'
   require 'set'
   before_action :set_user_detail, only: [:show, :edit, :update, :destroy]
-  load_and_authorize_resource except: [:index, :new, :create, :get_user_detail, :get_activities, :bulk_create, :submit_achievements, :export, :import, :quarterly_edit_all, :update_quarterly_achievements, :test_sms, :view_sms_logs]
+  load_and_authorize_resource except: [:index, :new, :create, :get_user_detail, :get_activities, :bulk_create, :submit_achievements, :export, :import, :quarterly_edit_all, :update_quarterly_achievements, :test_sms, :view_sms_logs, :submitted_achievements]
   
   def index
     if current_user.role == "employee" || current_user.role == "l1_employer" || current_user.role == "l2_employer"
@@ -277,15 +277,7 @@ class UserDetailsController < ApplicationController
           EmployeeDetail.find(emp_id).employee_name
         end.join(', ')
         
-        flash[:notice] = "✅ Successfully updated #{success_count} achievement records across #{updated_activities.count} activities!"
-        if updated_activities.any?
-          if updated_activities.count <= 3
-            flash[:notice] += " Updated activities: #{updated_activities.first(3).join(', ')}"
-          else
-            flash[:notice] += " Updated activities: #{updated_activities.first(3).join(', ')} and #{updated_activities.count - 3} more..."
-          end
-        end
-        flash[:notice] += " Updated achievements for employees: #{affected_employees} are now in 'pending' status and need L1/L2 approval."
+        flash[:notice] = "✅ Updated #{success_count} records. Pending approval."
       else
         flash[:notice] = "No changes were made to the achievements."
       end
@@ -423,6 +415,41 @@ class UserDetailsController < ApplicationController
   end
 
   def get_user_detail
+    if ["employee", "l1_employer", "l2_employer"].include?(current_user.role)
+      @employee_detail = EmployeeDetail.find_by(employee_email: current_user.email)
+
+      @user_details = if @employee_detail
+        # Get all user_details for this employee and deduplicate by activity
+        all_details = UserDetail.includes(:department, :activity, :employee_detail, achievements: :achievement_remark)
+                               .where(employee_detail_id: @employee_detail.id)
+        
+        # Deduplicate by keeping the most recent record for each activity
+        deduplicated_details = all_details.group_by(&:activity_id).map do |activity_id, records|
+          records.max_by(&:updated_at)
+        end
+        
+        # Convert to ActiveRecord relation and limit
+        UserDetail.where(id: deduplicated_details.map(&:id)).limit(100)
+      else
+        UserDetail.none
+      end
+
+    elsif current_user.role == "hod"
+      # Get all user_details and deduplicate by activity and employee
+      all_details = UserDetail.includes(:department, :activity, :employee_detail, achievements: :achievement_remark)
+      
+      # Deduplicate by keeping the most recent record for each activity-employee combination
+      deduplicated_details = all_details.group_by { |detail| [detail.activity_id, detail.employee_detail_id] }.map do |key, records|
+        records.max_by(&:updated_at)
+      end
+      
+      # Convert to ActiveRecord relation and limit
+      @user_details = UserDetail.where(id: deduplicated_details.map(&:id)).limit(100)
+      @employee_detail = nil
+    end
+  end
+
+  def submitted_achievements
     if ["employee", "l1_employer", "l2_employer"].include?(current_user.role)
       @employee_detail = EmployeeDetail.find_by(employee_email: current_user.email)
 
