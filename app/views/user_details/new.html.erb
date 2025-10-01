@@ -134,15 +134,6 @@
               end
             %>
             
-            <!-- Debug information -->
-            <div class="alert alert-info m-3">
-              <strong>Debug Info:</strong><br>
-              Total Activities: <%= @employee_activities&.count || 0 %><br>
-              Activities with Blank Targets: <%= activities.count %><br>
-              Department ID: <%= params[:department_id] %><br>
-              Employee ID: <%= params[:employee_detail_id] %><br>
-              Employee Name: <%= @selected_employee&.employee_name || 'Not Selected' %>
-            </div>
             
             <% if activities.any? %>
               <%= form_with url: bulk_create_user_details_path, method: :post, local: true, id: 'bulk-form' do |form| %>
@@ -232,9 +223,6 @@
                 <i class="fas fa-info-circle me-2"></i>
                 <% if params[:department_id].blank? || params[:employee_detail_id].blank? %>
                   Please select both department and employee.
-                <% else %>
-                  No activities with completely blank targets found for this employee. 
-                  All activities already have some data entered.
                 <% end %>
               </div>
             <% end %>
@@ -745,7 +733,6 @@
     transform: translateY(-1px);
   }
 
-  /* Debug styles to ensure export button is visible */
   #export-btn {
     display: inline-block !important;
     visibility: visible !important;

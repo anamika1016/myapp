@@ -245,7 +245,6 @@ class UserDetailsController < ApplicationController
       # This ensures that only the specific employee's data gets reset to pending
       employee_details_with_changes.each do |employee_detail_id|
         employee_detail = EmployeeDetail.find(employee_detail_id)
-        Rails.logger.info "Setting quarter #{selected_quarter} to pending for employee: #{employee_detail.employee_name} (#{employee_detail.employee_code})"
         
         # Get all achievements for this specific employee in the selected quarter
         employee_achievements = Achievement.joins(:user_detail)
@@ -254,7 +253,6 @@ class UserDetailsController < ApplicationController
         
         # Set status to pending for this employee's achievements only
         updated_count = employee_achievements.update_all(status: 'pending')
-        Rails.logger.info "Updated #{updated_count} achievements to pending status for employee #{employee_detail.employee_name}"
         
         # Also reset approval remarks for this employee's achievements
         employee_achievements.joins(:achievement_remark).each do |achievement|
@@ -266,7 +264,6 @@ class UserDetailsController < ApplicationController
           )
         end
         
-        Rails.logger.info "Reset approval remarks for employee #{employee_detail.employee_name} in quarter #{selected_quarter}"
       end
     end
 
@@ -296,7 +293,6 @@ class UserDetailsController < ApplicationController
 
   # FIXED: Quarterly edit all method
   def quarterly_edit_all
-    Rails.logger.debug "QUARTERLY EDIT ALL - User Role: #{current_user.role}"
     
     if current_user.role == "employee" || current_user.role == "l1_employer" || current_user.role == "l2_employer"
       employee_detail = EmployeeDetail.find_by(employee_email: current_user.email)
@@ -314,7 +310,6 @@ class UserDetailsController < ApplicationController
       @user_details = UserDetail.none
     end
 
-    Rails.logger.debug "Found #{@user_details.count} user details for quarterly editing"
 
     # FIXED: Correct quarter definitions to match the system
     @quarters = [
@@ -400,7 +395,6 @@ class UserDetailsController < ApplicationController
       
       if result[:success]
         flash[:notice] = "✅ Test SMS sent successfully! Message ID: #{result[:message_id]}"
-        Rails.logger.info "Test SMS successful: #{result.inspect}"
       else
         flash[:alert] = "❌ Test SMS failed: #{result[:error]}"
         Rails.logger.error "Test SMS failed: #{result.inspect}"
@@ -491,10 +485,8 @@ class UserDetailsController < ApplicationController
       sms_results = []
       processed_employees = Set.new
 
-      Rails.logger.info "Starting achievement submission with data: #{achievement_data.inspect}"
 
       ActiveRecord::Base.transaction do
-        Rails.logger.info "Database transaction started"
         
         achievement_data.each do |user_detail_id, monthly_data|
           user_detail = UserDetail.find_by(id: user_detail_id)
@@ -555,7 +547,6 @@ class UserDetailsController < ApplicationController
           end
         end
         
-        Rails.logger.info "Database transaction completed successfully"
       end
 
       # Prepare response message
@@ -618,7 +609,6 @@ class UserDetailsController < ApplicationController
   end
   
   def bulk_create
-    Rails.logger.info "=== BULK CREATE DEBUG ==="
     
     department_id = params[:department_id]
     employee_detail_id = params[:employee_detail_id]
@@ -1049,26 +1039,17 @@ class UserDetailsController < ApplicationController
       # Build the API URL
       api_url = "https://sms.yoursmsbox.com/api/sendhttp.php"
       
-      # Log the API call for debugging
-      Rails.logger.info "Sending SMS to L1 manager #{l1_manager.employee_name} (#{l1_mobile}) for employee #{employee_detail.employee_code}"
-      Rails.logger.info "SMS API URL: #{api_url}"
-      Rails.logger.info "SMS Parameters: #{params.inspect}"
       
       # Send SMS using HTTParty (which is already in Gemfile)
       require 'httparty'
       response = HTTParty.get(api_url, query: params)
       
-      # Log the response for debugging
-      Rails.logger.info "SMS API Response Code: #{response.code}"
-      Rails.logger.info "SMS API Response Body: #{response.body}"
       
       if response.success?
         # Parse the JSON response to check if SMS was actually sent
         begin
           response_data = JSON.parse(response.body)
           if response_data["Status"] == "Success" && response_data["Code"] == "000"
-            Rails.logger.info "SMS sent successfully to L1 manager #{l1_manager.employee_name} (#{l1_mobile}) for employee #{employee_detail.employee_code}"
-            Rails.logger.info "Message ID: #{response_data['Message-Id']}"
             return { 
               success: true, 
               message: "SMS sent successfully", 
