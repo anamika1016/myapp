@@ -26,9 +26,6 @@ class EmployeeDetailsController < ApplicationController
   end
 
   def update
-    Rails.logger.info "UPDATE ACTION CALLED with params: #{params.inspect}"
-    Rails.logger.info "Request method: #{request.method}"
-    Rails.logger.info "Request path: #{request.path}"
     
     if @employee_detail.update(employee_detail_params)
       redirect_to employee_details_path, notice: 'Employee updated successfully.'
@@ -286,13 +283,9 @@ class EmployeeDetailsController < ApplicationController
 
   # Quarterly approval - approve all activities for a quarter
   def approve
-    Rails.logger.info "L1 APPROVE ACTION CALLED for employee: #{params[:id]}, user: #{current_user.email}, params: #{params.inspect}"
-    Rails.logger.info "Request method: #{request.method}"
-    Rails.logger.info "Request path: #{request.path}"
     
     begin
       @employee_detail = EmployeeDetail.find(params[:id])
-      Rails.logger.info "Employee detail found: #{@employee_detail.id}, L1 code: #{@employee_detail.l1_code}, L1 employer: #{@employee_detail.l1_employer_name}"
     rescue ActiveRecord::RecordNotFound
       if request.xhr?
         render json: { success: false, message: "❌ Employee detail not found. The record may have been deleted." }, status: :not_found
@@ -374,11 +367,9 @@ class EmployeeDetailsController < ApplicationController
 
   # Quarterly return - return all activities for a quarter
   def return
-    Rails.logger.info "L1 RETURN ACTION CALLED for employee: #{params[:id]}, user: #{current_user.email}, params: #{params.inspect}"
     
     begin
       @employee_detail = EmployeeDetail.find(params[:id])
-      Rails.logger.info "Employee detail found: #{@employee_detail.id}, L1 code: #{@employee_detail.l1_code}, L1 employer: #{@employee_detail.l1_employer_name}"
     rescue ActiveRecord::RecordNotFound
       if request.xhr?
         render json: { success: false, message: "❌ Employee detail not found. The record may have been deleted." }, status: :not_found
@@ -495,8 +486,6 @@ def l2
     end
   end
 
-  Rails.logger.info "L2 Dashboard: Found #{@employee_details.count} employees with L1+ approved achievements"
-  Rails.logger.info "Current user: #{current_user.email}, Employee code: #{current_user.employee_code}"
 end
 
   def show_l2
@@ -531,11 +520,9 @@ end
   end
 
   def l2_approve
-    Rails.logger.info "L2 Approve called for employee: #{params[:id]}, user: #{current_user.email}, params: #{params.inspect}"
     
     begin
       @employee_detail = EmployeeDetail.find(params[:id])
-      Rails.logger.info "Employee detail found: #{@employee_detail.id}, L2 code: #{@employee_detail.l2_code}, L2 employer: #{@employee_detail.l2_employer_name}"
     rescue ActiveRecord::RecordNotFound
       Rails.logger.error "Employee detail not found: #{params[:id]}"
       if request.xhr?
@@ -583,11 +570,9 @@ end
   end
 
   def l2_return
-    Rails.logger.info "L2 Return called for employee: #{params[:id]}, user: #{current_user.email}, params: #{params.inspect}"
     
     begin
       @employee_detail = EmployeeDetail.find(params[:id])
-      Rails.logger.info "Employee detail found: #{@employee_detail.id}, L2 code: #{@employee_detail.l2_code}, L2 employer: #{@employee_detail.l2_employer_name}"
     rescue ActiveRecord::RecordNotFound
       Rails.logger.error "Employee detail not found: #{params[:id]}"
       if request.xhr?
@@ -609,14 +594,11 @@ end
     end
     
     # Add debugging
-    Rails.logger.info "L2 Return called for employee: #{@employee_detail.id}, quarter: #{params[:selected_quarter]}"
-    Rails.logger.info "Params: #{params.inspect}"
     
     # Pass action_type parameter to indicate this is a return action
     params[:action_type] = 'return'
     result = process_quarterly_l2_return
 
-    Rails.logger.info "L2 Return result: #{result.inspect}"
 
     if result[:success]
       if request.xhr? || params[:action_type].present?
@@ -642,7 +624,6 @@ end
 
   # Edit L1 remarks and percentage
   def edit_l1
-    Rails.logger.info "Edit L1 called for employee: #{params[:id]}, user: #{current_user.email}, params: #{params.inspect}"
     
     begin
       @employee_detail = EmployeeDetail.find(params[:id])
@@ -692,7 +673,6 @@ end
 
   # Edit L2 remarks and percentage
   def edit_l2
-    Rails.logger.info "Edit L2 called for employee: #{params[:id]}, user: #{current_user.email}, params: #{params.inspect}"
     
     begin
       @employee_detail = EmployeeDetail.find(params[:id])
@@ -1040,12 +1020,8 @@ end
     if params[:selected_quarter].present?
       # FIXED: Approve/Return specific quarter as a single unit
       quarter_months = get_quarter_months(params[:selected_quarter])
-      Rails.logger.info "Processing L1 #{action_type} for quarter: #{params[:selected_quarter]}, months: #{quarter_months}"
       
       @employee_detail.user_details.each do |detail|
-        Rails.logger.info "Processing user_detail: #{detail.id} for activity: #{detail.activity.activity_name}"
-        Rails.logger.info "Total achievements for this user_detail: #{detail.achievements.count}"
-        Rails.logger.info "Achievements by month: #{detail.achievements.map { |a| "#{a.month}:#{a.status}" }.join(', ')}"
         
         # FIXED: Process the entire quarter as one unit, not month by month
         quarter_achievements = []
@@ -1055,12 +1031,10 @@ end
           # FIXED: Process ALL months in the quarter, not just those with targets
           # This ensures the entire quarter gets approved when L1 approves
           
-          Rails.logger.info "Looking for achievement for month: #{month}"
           
           # Find or create achievement for this month
           achievement = detail.achievements.find_or_create_by(month: month)
           
-          Rails.logger.info "Found/created achievement: #{achievement.inspect}, status: #{achievement.status}"
           
           # Ensure achievement is saved and has an ID
           achievement.save! if achievement.new_record?
@@ -1071,15 +1045,11 @@ end
         
         # FIXED: Now process the entire quarter as one unit
         if quarter_achievements.any?
-          Rails.logger.info "Processing #{quarter_achievements.count} achievements for quarter #{params[:selected_quarter]}"
-          Rails.logger.info "Achievements to process: #{quarter_achievements.map { |a| "#{a.month}:#{a.status}" }.join(', ')}"
-          Rails.logger.info "Action type: #{action_type}, New status: #{new_status}"
           
           # FIXED: Update ALL achievements in the quarter to the same status
           quarter_achievements.each do |achievement|
             old_status = achievement.status
             achievement.update!(status: new_status)
-            Rails.logger.info "Updated #{achievement.month} from #{old_status} to #{new_status}"
             
             # Create or update achievement remark with COMMON remarks for quarter
             remark = achievement.achievement_remark || achievement.build_achievement_remark
@@ -1090,8 +1060,6 @@ end
             approved_count += 1
           end
           
-          Rails.logger.info "Successfully processed quarter #{params[:selected_quarter]} for activity #{detail.activity.activity_name}"
-          Rails.logger.info "All #{quarter_achievements.count} months in quarter #{params[:selected_quarter]} now have status: #{new_status}"
         else
           Rails.logger.warn "No achievements found for quarter #{params[:selected_quarter]} in activity #{detail.activity.activity_name}"
         end
@@ -1154,18 +1122,12 @@ def process_quarterly_l2_approval
   is_approval = action_type.include?('approve')
   new_status = is_approval ? 'l2_approved' : 'l2_returned'
   
-  Rails.logger.info "Processing L2 #{action_type} with status: #{new_status}"
-  Rails.logger.info "Selected quarter: #{params[:selected_quarter]}"
   
   if params[:selected_quarter].present?
     # FIXED: Approve/Return specific quarter as a single unit
     quarter_months = get_quarter_months(params[:selected_quarter])
-    Rails.logger.info "Processing L2 #{action_type} for quarter: #{params[:selected_quarter]}, months: #{quarter_months}"
     
     @employee_detail.user_details.each do |detail|
-      Rails.logger.info "Processing user_detail: #{detail.id} for activity: #{detail.activity.activity_name}"
-      Rails.logger.info "Total achievements for this user_detail: #{detail.achievements.count}"
-      Rails.logger.info "Achievements by month: #{detail.achievements.map { |a| "#{a.month}:#{a.status}" }.join(', ')}"
       
       # FIXED: Process the entire quarter as one unit, not month by month
       quarter_achievements = []
@@ -1175,11 +1137,9 @@ def process_quarterly_l2_approval
         # FIXED: Process ALL months in the quarter, not just those with targets
         # This ensures the entire quarter gets approved when L2 approves
         
-        Rails.logger.info "Looking for achievement for month: #{month}"
         
         # Find or create achievement for this month
         achievement = detail.achievements.find_or_create_by(month: month)
-        Rails.logger.info "Found/created achievement: #{achievement.inspect}, status: #{achievement.status}"
         
         # Ensure achievement is saved and has an ID
         achievement.save! if achievement.new_record?
@@ -1190,8 +1150,6 @@ def process_quarterly_l2_approval
       
       # FIXED: Now process the entire quarter as one unit
       if quarter_achievements.any?
-        Rails.logger.info "Processing #{quarter_achievements.count} achievements for quarter #{params[:selected_quarter]}"
-        Rails.logger.info "Achievements to process: #{quarter_achievements.map { |a| "#{a.month}:#{a.status}" }.join(', ')}"
         
         # Update ALL achievements in the quarter to the same status
         quarter_achievements.each do |achievement|
@@ -1203,7 +1161,6 @@ def process_quarterly_l2_approval
             if eligible_statuses.include?(achievement.status)
               old_status = achievement.status
               achievement.update!(status: new_status)
-              Rails.logger.info "Updated #{achievement.month} from #{old_status} to #{new_status}"
               
               # Create or update achievement remark with COMMON remarks for quarter
               remark = achievement.achievement_remark || achievement.build_achievement_remark
@@ -1213,13 +1170,11 @@ def process_quarterly_l2_approval
               
               approved_count += 1
             else
-              Rails.logger.info "Skipping #{achievement.month} - status #{achievement.status} not eligible for approval"
             end
           else
             # For return, process ALL achievements regardless of current status
             old_status = achievement.status
             achievement.update!(status: new_status)
-            Rails.logger.info "Updated #{achievement.month} from #{old_status} to #{new_status} (return)"
             
             # Create or update achievement remark with COMMON remarks for quarter
             remark = achievement.achievement_remark || achievement.build_achievement_remark
@@ -1231,8 +1186,6 @@ def process_quarterly_l2_approval
           end
         end
         
-        Rails.logger.info "Successfully processed quarter #{params[:selected_quarter]} for activity #{detail.activity.activity_name}"
-        Rails.logger.info "All eligible months in quarter #{params[:selected_quarter]} now have status: #{new_status}"
       else
         Rails.logger.warn "No achievements found for quarter #{params[:selected_quarter]} in activity #{detail.activity.activity_name}"
       end
@@ -1273,7 +1226,6 @@ def process_quarterly_l2_approval
     end
   end
 
-  Rails.logger.info "Final result: #{approved_count} achievements processed"
   if approved_count > 0
     { success: true, count: approved_count }
   else
@@ -1429,15 +1381,12 @@ end
 
   # Process L1 edit - update L1 remarks and percentage for a quarter
   def process_l1_edit
-    Rails.logger.info "Processing L1 edit for quarter: #{params[:selected_quarter]}"
-    Rails.logger.info "L1 percentage: #{params[:l1_percentage]}, L1 remarks: #{params[:l1_remarks]}"
     
     updated_count = 0
     
     if params[:selected_quarter].present?
       # Update specific quarter
       quarter_months = get_quarter_months(params[:selected_quarter])
-      Rails.logger.info "Updating L1 data for quarter: #{params[:selected_quarter]}, months: #{quarter_months}"
       
       @employee_detail.user_details.each do |detail|
         quarter_months.each do |month|
@@ -1486,15 +1435,12 @@ end
 
   # Process L2 edit - update L2 remarks and percentage for a quarter
   def process_l2_edit
-    Rails.logger.info "Processing L2 edit for quarter: #{params[:selected_quarter]}"
-    Rails.logger.info "L2 percentage: #{params[:l2_percentage]}, L2 remarks: #{params[:l2_remarks]}"
     
     updated_count = 0
     
     if params[:selected_quarter].present?
       # Update specific quarter
       quarter_months = get_quarter_months(params[:selected_quarter])
-      Rails.logger.info "Updating L2 data for quarter: #{params[:selected_quarter]}, months: #{quarter_months}"
       
       @employee_detail.user_details.each do |detail|
         quarter_months.each do |month|
