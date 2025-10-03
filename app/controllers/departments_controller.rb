@@ -707,7 +707,8 @@ class DepartmentsController < ApplicationController
   end
 
   def export
-    @departments = Department.includes(:activities).all
+    # Use the same data structure as the index method
+    @employee_activities = get_all_employee_activities
 
     respond_to do |format|
       format.xlsx {

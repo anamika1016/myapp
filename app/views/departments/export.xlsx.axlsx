@@ -4,19 +4,19 @@ wb.add_worksheet(name: "Departments") do |sheet|
   # Updated headers to include Employee Name and proper column mapping
   sheet.add_row ["Department", "Employee Name", "Theme Name", "Activity Name", "Unit", "Weight"]
 
-  @departments.each do |department|
-    # Get employee name from employee_reference
-    employee = EmployeeDetail.find_by(employee_id: department.employee_reference)
-    employee_name = employee&.employee_name || 'N/A'
+  @employee_activities.each do |key, data|
+    # Use the data structure from get_all_employee_activities
+    employee_name = data[:employee_name]
+    department_type = data[:department_type]
     
-    department.activities.each do |activity|
+    data[:activities].each do |activity|
       sheet.add_row [
-        department.department_type,
+        department_type,
         employee_name,
-        activity.theme_name,
-        activity.activity_name,
-        activity.unit,
-        activity.weight
+        activity[:theme_name],
+        activity[:activity_name],
+        activity[:unit],
+        activity[:weight]
       ]
     end
   end
