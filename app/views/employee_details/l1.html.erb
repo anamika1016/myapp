@@ -286,42 +286,82 @@
 </style>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-  const searchInput = document.getElementById('searchInput');
-  const table = document.getElementById('employeeTable');
-  const tbody = table.querySelector('tbody');
-  const rows = Array.from(tbody.querySelectorAll('tr'));
-
-  searchInput.addEventListener('input', function() {
-    const searchTerm = this.value.toLowerCase().trim();
+// Enhanced search functionality with immediate execution and initial search
+(function() {
+  'use strict';
+  
+  let searchInput, table, tbody, rows;
+  let isInitialized = false;
+  
+  function initializeSearch() {
+    try {
+      searchInput = document.getElementById('searchInput');
+      table = document.getElementById('employeeTable');
+      
+      if (!searchInput || !table) {
+        console.log('Search elements not found, retrying...');
+        return false;
+      }
+      
+      tbody = table.querySelector('tbody');
+      if (!tbody) {
+        console.log('Table body not found, retrying...');
+        return false;
+      }
+      
+      rows = Array.from(tbody.querySelectorAll('tr'));
+      if (rows.length === 0) {
+        console.log('No table rows found, retrying...');
+        return false;
+      }
+      
+      console.log('Search initialized successfully with', rows.length, 'rows');
+      return true;
+    } catch (error) {
+      console.error('Error initializing search:', error);
+      return false;
+    }
+  }
+  
+  function performSearch() {
+    if (!searchInput || !rows) return;
     
-    rows.forEach(row => {
-      const cells = row.querySelectorAll('td');
-      let found = false;
-      
-      // Search through all visible text in the row
-      cells.forEach(cell => {
-        const cellText = cell.textContent.toLowerCase();
-        if (cellText.includes(searchTerm)) {
-          found = true;
+    const searchTerm = searchInput.value.toLowerCase().trim();
+    console.log('Performing search for:', searchTerm);
+    
+    rows.forEach((row, index) => {
+      try {
+        const cells = row.querySelectorAll('td');
+        let found = false;
+        
+        // Search through all visible text in the row
+        cells.forEach(cell => {
+          const cellText = cell.textContent.toLowerCase();
+          if (cellText.includes(searchTerm)) {
+            found = true;
+          }
+        });
+        
+        // Show/hide row based on search match
+        if (found || searchTerm === '') {
+          row.style.display = '';
+          row.classList.remove('hidden');
+        } else {
+          row.style.display = 'none';
+          row.classList.add('hidden');
         }
-      });
-      
-      // Show/hide row based on search match
-      if (found || searchTerm === '') {
-        row.style.display = '';
-        row.classList.remove('hidden');
-      } else {
-        row.style.display = 'none';
-        row.classList.add('hidden');
+      } catch (error) {
+        console.error('Error processing row', index, error);
       }
     });
     
     // Update row striping for visible rows
     updateRowStriping();
-  });
+  }
   
   function updateRowStriping() {
+    if (!rows) return;
+    
     let visibleIndex = 0;
     rows.forEach(row => {
       if (row.style.display !== 'none' && !row.classList.contains('hidden')) {
@@ -339,5 +379,80 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
   }
-});
+  
+  function setupSearch() {
+    if (isInitialized) return;
+    
+    if (initializeSearch()) {
+      // Add event listener with immediate response
+      searchInput.addEventListener('input', function() {
+        performSearch();
+      });
+      
+      // Also listen for keyup for immediate response
+      searchInput.addEventListener('keyup', function() {
+        performSearch();
+      });
+      
+      // Perform initial search if there's already text in the search box
+      if (searchInput.value.trim() !== '') {
+        console.log('Performing initial search for existing value:', searchInput.value);
+        performSearch();
+      }
+      
+      isInitialized = true;
+      console.log('Search setup completed');
+    } else {
+      // Retry after a short delay
+      setTimeout(setupSearch, 50);
+    }
+  }
+  
+  // Immediate execution - try right away
+  setupSearch();
+  
+  // Multiple initialization strategies to ensure it works
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupSearch);
+  } else {
+    setupSearch();
+  }
+  
+  // Also try after delays to catch late-loading content
+  setTimeout(setupSearch, 100);
+  setTimeout(setupSearch, 300);
+  setTimeout(setupSearch, 500);
+  setTimeout(setupSearch, 1000);
+  
+  // Re-initialize if elements are added dynamically
+  const observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+      if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+        if (!isInitialized || !searchInput || !table) {
+          isInitialized = false;
+          setupSearch();
+        }
+      }
+    });
+  });
+  
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+  
+  // Force re-initialization after page is fully loaded
+  window.addEventListener('load', function() {
+    setTimeout(function() {
+      if (!isInitialized) {
+        console.log('Force re-initializing search after page load');
+        isInitialized = false;
+        setupSearch();
+      } else if (searchInput && searchInput.value.trim() !== '') {
+        console.log('Re-running search for existing value after page load');
+        performSearch();
+      }
+    }, 100);
+  });
+})();
 </script>
