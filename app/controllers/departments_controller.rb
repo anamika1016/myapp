@@ -26,6 +26,7 @@ class DepartmentsController < ApplicationController
     end
     
     # Debug logging - simplified to avoid database errors
+    Rails.logger.info "Employee activities loaded successfully"
     
     @department = Department.new
     # Only build one activity by default to prevent duplicates
@@ -189,18 +190,22 @@ class DepartmentsController < ApplicationController
 
   # Handle employee-specific activity updates
   def handle_employee_activity_update(employee)
+    Rails.logger.info "=== handle_employee_activity_update called for employee #{employee.employee_id} ==="
     
     if params[:department] && params[:department][:activities_attributes].present?
+      Rails.logger.info "Processing employee activity updates for #{employee.employee_name}"
       
       begin
         ActiveRecord::Base.transaction do
           # Get existing UserDetail records for this employee
           existing_user_details = UserDetail.where(employee_detail_id: employee.id)
+          Rails.logger.info "Found #{existing_user_details.count} existing user_details for employee"
           
           # Process activities marked for destruction (remove from employee)
           activities_to_remove_from_employee = []
           params[:department][:activities_attributes].each do |index, activity_attrs|
             if (activity_attrs[:_destroy] == 'true' || activity_attrs[:_destroy] == true) && activity_attrs[:id].present? && activity_attrs[:id] != ""
+              Rails.logger.info "Activity #{activity_attrs[:id]} marked for removal from employee #{employee.employee_id}"
               activities_to_remove_from_employee << activity_attrs[:id]
             end
           end
@@ -209,6 +214,7 @@ class DepartmentsController < ApplicationController
           activities_to_remove_from_employee.each do |activity_id|
             user_details_to_remove = existing_user_details.where(activity_id: activity_id)
             if user_details_to_remove.any?
+              Rails.logger.info "Removing #{user_details_to_remove.count} user_details for activity #{activity_id} from employee #{employee.employee_id}"
               user_details_to_remove.destroy_all
             end
           end
@@ -225,18 +231,22 @@ class DepartmentsController < ApplicationController
             if activity_id.present?
               # Update the Activity record with new data
               activity = Activity.find(activity_id)
+              Rails.logger.info "Updating activity #{activity_id} with new data"
               activity.update!(
                 theme_name: activity_attrs[:theme_name],
                 activity_name: activity_attrs[:activity_name],
                 unit: activity_attrs[:unit],
                 weight: activity_attrs[:weight]
               )
+              Rails.logger.info "Updated activity #{activity_id}: theme=#{activity.theme_name}, name=#{activity.activity_name}"
               
               # Update existing UserDetail record
               user_detail = existing_user_details.find_by(activity_id: activity_id)
               if user_detail
+                Rails.logger.info "Updating existing user_detail for activity #{activity_id}"
                 # UserDetail relationship already exists, no need to update
               else
+                Rails.logger.info "Creating new user_detail for activity #{activity_id}"
                 # Create new UserDetail record
                 department = activity.department
                 UserDetail.create!(
@@ -248,6 +258,7 @@ class DepartmentsController < ApplicationController
             end
           end
           
+          Rails.logger.info "Successfully updated employee activities for #{employee.employee_name}"
           render json: { success: true, message: 'Employee activities updated successfully!' }
         end
       rescue => e
@@ -274,11 +285,13 @@ class DepartmentsController < ApplicationController
               # First delete dependent user_details records to avoid foreign key constraint violation
               user_details = UserDetail.where(activity_id: activity.id)
               if user_details.any?
+                Rails.logger.info "Found #{user_details.count} user_details for activity #{activity.id}, deleting them first"
                 user_details.destroy_all
               end
               
               # Now delete the activity
               activity.destroy
+              Rails.logger.info "Successfully deleted activity #{activity.id}"
             end
           end
         end
@@ -317,23 +330,33 @@ class DepartmentsController < ApplicationController
   end
 
   def update_employee_activities
+    Rails.logger.info "=== update_employee_activities method called ==="
+    Rails.logger.info "Request method: #{request.method}"
+    Rails.logger.info "Request path: #{request.path}"
+    Rails.logger.info "Request headers: #{request.headers.to_h.select { |k, v| k.start_with?('HTTP_') }}"
     
     employee_id = params[:employee_id]
     
+    Rails.logger.info "Updating activities for employee: #{employee_id}"
+    Rails.logger.info "Received params: #{params.inspect}"
     
     # Find all departments for this employee
     departments = Department.where(employee_reference: employee_id)
+    Rails.logger.info "Found #{departments.count} departments for employee #{employee_id}"
     
     if departments.any?
       begin
         ActiveRecord::Base.transaction do
           # Update each department's activities
           departments.each do |dept|
+            Rails.logger.info "Processing department #{dept.id} with #{dept.activities.count} existing activities"
             
                                       if params[:activities].present?
+               Rails.logger.info "Processing #{params[:activities].count} activities for update"
                
                # Get existing activity IDs for this department
                existing_activity_ids = dept.activities.pluck(:id)
+               Rails.logger.info "Existing activity IDs: #{existing_activity_ids}"
                
                # Find activities that are no longer in the form (deleted by user)
                # We'll need to check by content since the form doesn't send IDs for new activities
@@ -350,20 +373,24 @@ class DepartmentsController < ApplicationController
                  
                  unless activity_still_exists
                    activities_to_delete << existing_activity
+                   Rails.logger.info "Activity #{existing_activity.id} (#{existing_activity.activity_name}) will be deleted"
                  end
                end
                
                # Delete activities that are no longer in the form
                activities_to_delete.each do |activity|
+                 Rails.logger.info "Deleting activity #{activity.id} (#{activity.activity_name})"
                  
                  # First delete dependent user_details records to avoid foreign key constraint violation
                  user_details = UserDetail.where(activity_id: activity.id)
                  if user_details.any?
+                   Rails.logger.info "Found #{user_details.count} user_details for activity #{activity.id}, deleting them first"
                  user_details.destroy_all
                  end
                  
                  # Now delete the activity
                  activity.destroy
+                 Rails.logger.info "Successfully deleted activity #{activity.id}"
                end
                
                # Update or create activities
@@ -378,6 +405,7 @@ class DepartmentsController < ApplicationController
                  
                  if existing_activity
                    # Update existing activity
+                   Rails.logger.info "Updating existing activity #{existing_activity.id}"
                    existing_activity.update!(
                      theme_name: activity_params[:theme_name],
                      activity_name: activity_params[:activity_name],
@@ -386,17 +414,20 @@ class DepartmentsController < ApplicationController
                    )
                  else
                    # Create new activity
+                   Rails.logger.info "Creating new activity for department #{dept.id}"
                    new_activity = dept.activities.create!(
                      theme_name: activity_params[:theme_name],
                      activity_name: activity_params[:activity_name],
                      unit: activity_params[:unit],
                      weight: activity_params[:weight]
                    )
+                   Rails.logger.info "Created new activity #{new_activity.id}"
                  end
                end
              end
           end
           
+          Rails.logger.info "Successfully updated activities for employee #{employee_id}"
           render json: { success: true, message: 'Employee activities updated successfully!' }
         end
       rescue => e
@@ -423,6 +454,7 @@ class DepartmentsController < ApplicationController
     if !department
       employee = EmployeeDetail.find_by(employee_id: id)
       if employee
+        Rails.logger.info "Found employee: #{employee.employee_id} - #{employee.employee_name}"
         handle_employee_activity_update(employee)
         return
       end
@@ -528,12 +560,14 @@ class DepartmentsController < ApplicationController
                 end
               else
                 # Create new activity
+                Rails.logger.info "Creating new activity for department #{department.id}"
                 new_activity = department.activities.create!(
                   theme_name: activity_attrs[:theme_name],
                   activity_name: activity_attrs[:activity_name],
                   unit: activity_attrs[:unit],
                   weight: activity_attrs[:weight]
                 )
+                Rails.logger.info "Created new activity #{new_activity.id}"
                 
                 # Create UserDetail record to link activity to employee
                 if department.employee_reference.present?
@@ -544,6 +578,7 @@ class DepartmentsController < ApplicationController
                       activity_id: new_activity.id,
                       employee_detail_id: employee.id
                     )
+                    Rails.logger.info "Created UserDetail linking activity #{new_activity.id} to employee #{employee.employee_id}"
                   end
                 end
               end
@@ -554,28 +589,36 @@ class DepartmentsController < ApplicationController
               .select { |attrs| attrs[:id].present? && attrs[:id] != "" && attrs[:_destroy] != 'true' && attrs[:_destroy] != true }
               .map { |attrs| attrs[:id].to_i }
             
+            Rails.logger.info "Form activity IDs (not marked for destruction): #{form_activity_ids}"
+            Rails.logger.info "Current department activities: #{department.activities.pluck(:id)}"
             
             activities_to_delete = department.activities.where.not(id: form_activity_ids)
             
             if activities_to_delete.any?
+              Rails.logger.info "Found #{activities_to_delete.count} activities to delete that are no longer in form"
               activities_to_delete.each do |activity|
+                Rails.logger.info "Deleting activity #{activity.id} (#{activity.activity_name}) - no longer in form"
                 
                 # First delete dependent user_details records to avoid foreign key constraint violation
                 user_details = UserDetail.where(activity_id: activity.id)
                 if user_details.any?
+                  Rails.logger.info "Found #{user_details.count} user_details for activity #{activity.id}, deleting them first"
                   user_details.destroy_all
                 end
                 
                 # Now delete the activity
                 if activity.destroy
+                  Rails.logger.info "Successfully deleted activity #{activity.id} that was no longer in form"
                 else
                   Rails.logger.error "Failed to delete activity #{activity.id}: #{activity.errors.full_messages.join(', ')}"
                 end
               end
             else
+              Rails.logger.info "No activities to delete that are no longer in form"
             end
           end
           
+          Rails.logger.info "Successfully updated department activities"
           render json: { success: true, message: 'Department activities updated successfully!' }
         rescue => e
           Rails.logger.error "Error updating department activities: #{e.message}"
@@ -707,8 +750,7 @@ class DepartmentsController < ApplicationController
   end
 
   def export
-    # Use the same data structure as the index method
-    @employee_activities = get_all_employee_activities
+    @departments = Department.includes(:activities).all
 
     respond_to do |format|
       format.xlsx {
@@ -759,6 +801,8 @@ class DepartmentsController < ApplicationController
 
   # New method to delete specific user's activities from a department
   def delete_user_activities_from_department(user_id)
+    Rails.logger.info "=== delete_user_activities_from_department method called ==="
+    Rails.logger.info "Deleting activities for user: #{user_id} from department: #{@department.id}"
     
     begin
       ActiveRecord::Base.transaction do
@@ -766,6 +810,7 @@ class DepartmentsController < ApplicationController
         employee_detail = EmployeeDetail.find_by(employee_id: user_id)
         
         if employee_detail
+          Rails.logger.info "Found employee: #{employee_detail.employee_name}"
           
           # Find all user_details for this specific employee in this department
           user_details = UserDetail.where(
@@ -774,21 +819,26 @@ class DepartmentsController < ApplicationController
           )
           
           user_details_count = user_details.count
+          Rails.logger.info "Found #{user_details_count} user_details for employee #{employee_detail.employee_name} in department #{@department.id}"
           
           if user_details_count > 0
             # Delete the user_details (achievements and achievement_remarks will be deleted automatically due to dependent: :destroy)
             user_details.destroy_all
+            Rails.logger.info "Deleted #{user_details_count} user_details for employee #{employee_detail.employee_name}"
             
             # Check if this was the only employee in this department
             remaining_user_details = UserDetail.where(department_id: @department.id)
             
             if remaining_user_details.count == 0
+              Rails.logger.info "No more user_details in department #{@department.id}, deleting department and activities"
               # If no more user_details, delete the department and activities
               @department.activities.destroy_all
               @department.destroy
             else
+              Rails.logger.info "Department #{@department.id} still has #{remaining_user_details.count} other user_details, keeping department"
             end
           else
+            Rails.logger.info "No user_details found for employee #{employee_detail.employee_name} in department #{@department.id}"
           end
         else
           Rails.logger.error "Employee detail not found for user_id: #{user_id}"
@@ -814,6 +864,7 @@ class DepartmentsController < ApplicationController
       return
     end
     
+    Rails.logger.info "delete_user_activities called with user_id: #{user_id}"
     
     begin
       delete_user_activities_from_department(user_id)
@@ -853,34 +904,43 @@ class DepartmentsController < ApplicationController
   def delete_employee_activities
     employee_id = params[:employee_id]
     
+    Rails.logger.info "=== delete_employee_activities method called ==="
+    Rails.logger.info "Deleting activities for employee: #{employee_id}"
     
     # Find all departments for this employee
     departments = Department.where(employee_reference: employee_id)
+    Rails.logger.info "Found #{departments.count} departments for employee #{employee_id}"
     
     if departments.any?
       begin
         # Delete all activities and departments for this employee
         ActiveRecord::Base.transaction do
           departments.each do |dept|
+            Rails.logger.info "Processing department #{dept.id} with #{dept.activities.count} activities"
             
                        # First, delete all records that reference these activities
            dept.activities.each do |activity|
+             Rails.logger.info "Deleting references for activity #{activity.id}"
              
              # Delete user_details that reference this activity
              # This will automatically delete associated achievements and achievement_remarks due to dependent: :destroy
              user_details = UserDetail.where(activity_id: activity.id)
              user_details_count = user_details.count
+             Rails.logger.info "Found #{user_details_count} user_details for activity #{activity.id}"
              
              # Delete the user_details (achievements and achievement_remarks will be deleted automatically)
              user_details.destroy_all
+             Rails.logger.info "Deleted #{user_details_count} user_details for activity #{activity.id}"
            end
             
             # Now delete the activities
             activities_count = dept.activities.count
             dept.activities.destroy_all
+            Rails.logger.info "Deleted #{activities_count} activities from department #{dept.id}"
             
             # Finally delete the department
             dept.destroy
+            Rails.logger.info "Deleted department #{dept.id}"
           end
         end
         
@@ -896,12 +956,15 @@ class DepartmentsController < ApplicationController
   end
 
   def test_route
+    Rails.logger.info "=== test_route method called ==="
     render json: { success: true, message: 'Test route working!' }
   end
 
   def delete_activity
     activity_id = params[:activity_id]
     
+    Rails.logger.info "=== delete_activity method called ==="
+    Rails.logger.info "Deleting activity: #{activity_id}"
     
     begin
       activity = Activity.find(activity_id)
@@ -910,12 +973,15 @@ class DepartmentsController < ApplicationController
          # First, delete all records that reference this activity
          user_details = UserDetail.where(activity_id: activity_id)
          user_details_count = user_details.count
+         Rails.logger.info "Found #{user_details_count} user_details for activity #{activity_id}"
          
          # Delete the user_details (achievements and achievement_remarks will be deleted automatically due to dependent: :destroy)
          user_details.destroy_all
+         Rails.logger.info "Deleted #{user_details_count} user_details for activity #{activity_id}"
          
          # Now delete the activity
          activity.destroy
+         Rails.logger.info "Deleted activity #{activity_id}"
        end
       
       render json: { success: true, message: 'Activity deleted successfully!' }

@@ -138,9 +138,16 @@ class UserDetailsController < ApplicationController
         # Clear any existing flash messages
         flash.clear
         
-        # Redirect to new_user_detail_path with current filters to maintain context
-        redirect_to new_user_detail_path(department_id: department_id, employee_detail_id: employee_detail_id), 
-                    notice: 'User detail was successfully updated.'
+        # Role-based redirect
+        if current_user.hod?
+          # HOD redirects to new user detail form
+          redirect_to new_user_detail_path(department_id: department_id, employee_detail_id: employee_detail_id), 
+                      notice: 'User detail was successfully updated.'
+        else
+          # Employee/L1/L2 redirects to HOD TARGET FORM (index page)
+          redirect_to user_details_path, 
+                      notice: 'User detail was successfully updated.'
+        end
       else
         @departments = Department.select(:id, :department_type)
         @activities = Activity.select(:id, :activity_name, :unit, :theme_name)
@@ -153,8 +160,14 @@ class UserDetailsController < ApplicationController
       # Clear any existing flash messages
       flash.clear
       
-      redirect_to new_user_detail_path, 
-                  alert: "An error occurred while updating the user detail."
+      # Role-based error redirect
+      if current_user.hod?
+        redirect_to new_user_detail_path, 
+                    alert: "An error occurred while updating the user detail."
+      else
+        redirect_to user_details_path, 
+                    alert: "An error occurred while updating the user detail."
+      end
     end
   end
 
@@ -333,30 +346,55 @@ class UserDetailsController < ApplicationController
         # Clear any existing flash messages
         flash.clear
         
-        # Redirect to new_user_detail_path with current filters to maintain context
-        redirect_to new_user_detail_path(department_id: department_id, employee_detail_id: employee_detail_id), 
-                    notice: "User detail was successfully deleted."
+        # Role-based redirect
+        if current_user.hod?
+          # HOD redirects to new user detail form
+          redirect_to new_user_detail_path(department_id: department_id, employee_detail_id: employee_detail_id), 
+                      notice: "User detail was successfully deleted."
+        else
+          # Employee/L1/L2 redirects to HOD TARGET FORM (index page)
+          redirect_to user_details_path, 
+                      notice: "User detail was successfully deleted."
+        end
       else
         # Clear any existing flash messages
         flash.clear
         
-        redirect_to new_user_detail_path, 
-                    alert: "Failed to delete user detail."
+        # Role-based error redirect
+        if current_user.hod?
+          redirect_to new_user_detail_path, 
+                      alert: "Failed to delete user detail."
+        else
+          redirect_to user_details_path, 
+                      alert: "Failed to delete user detail."
+        end
       end
     rescue ActiveRecord::RecordNotFound
       # Clear any existing flash messages
       flash.clear
       
-      redirect_to new_user_detail_path, 
-                  alert: "User detail not found."
+      # Role-based error redirect
+      if current_user.hod?
+        redirect_to new_user_detail_path, 
+                    alert: "User detail not found."
+      else
+        redirect_to user_details_path, 
+                    alert: "User detail not found."
+      end
     rescue => e
       Rails.logger.error "Error in destroy action: #{e.message}"
       
       # Clear any existing flash messages
       flash.clear
       
-      redirect_to new_user_detail_path, 
-                  alert: "An error occurred while deleting the user detail."
+      # Role-based error redirect
+      if current_user.hod?
+        redirect_to new_user_detail_path, 
+                    alert: "An error occurred while deleting the user detail."
+      else
+        redirect_to user_details_path, 
+                    alert: "An error occurred while deleting the user detail."
+      end
     end
   end
 

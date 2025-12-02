@@ -55,5 +55,13 @@ class Ability
       # User can access L2 view if they have any L2 assignments
       EmployeeDetail.where("l2_code = ? OR l2_employer_name = ?", user.employee_code, user.email).exists?
     end
+
+    # UserDetail permissions
+    if user.employee? || user.l1_employer? || user.l2_employer?
+      # Users can read, edit, update, and destroy their own user details
+      can [:read, :edit, :update, :destroy], UserDetail do |ud|
+        ud.employee_detail&.employee_email == user.email
+      end
+    end
   end
 end
