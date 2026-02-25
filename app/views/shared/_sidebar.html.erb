@@ -250,11 +250,11 @@
         <% if current_user.profile_image.attached? %>
           <%= image_tag current_user.profile_image,
                         alt: "User Avatar",
-                        class: "h-14 w-14 rounded-full object-cover shadow-sm border border-gray-300 sidebar-avatar" %>
+                        class: "h-14 w-14 rounded-lg object-cover shadow-sm border border-gray-300 sidebar-avatar" %>
         <% else %>
           <%= image_tag "business_female_male_users.svg",
                         alt: "User Avatar",
-                        class: "h-14 w-14 rounded-full object-cover shadow-sm border border-gray-300 sidebar-avatar" %>
+                        class: "h-14 w-14 rounded-lg object-cover shadow-sm border border-gray-300 sidebar-avatar" %>
         <% end %>
 
         <!-- Email inside fixed width -->

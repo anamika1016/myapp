@@ -21,7 +21,7 @@
       <div class="flex items-center gap-6">
         <!-- Profile Picture -->
         <div class="relative">
-          <div id="profileImageContainer" class="w-32 h-32 rounded-full overflow-hidden border-4 border-gray-200">
+          <div id="profileImageContainer" class="w-40 h-52 rounded-lg overflow-hidden border-4 border-gray-200 cursor-pointer hover:border-gray-300 transition-colors" onclick="openImageViewer()">
             <% if @user.profile_image.attached? %>
               <%= image_tag @user.profile_image, 
                             alt: "Profile Picture", 
@@ -36,7 +36,7 @@
           </div>
           
           <!-- Camera Icon - Clickable -->
-          <label for="avatarInput" class="absolute bottom-0 right-0 bg-green-500 hover:bg-green-600 hover:scale-110 rounded-full p-3 border-3 border-white cursor-pointer transition-all duration-200 shadow-lg hover:shadow-xl group" title="Click to upload profile picture">
+          <label for="avatarInput" class="absolute bottom-0 right-0 bg-green-500 hover:bg-green-600 hover:scale-110 rounded-lg p-3 border-3 border-white cursor-pointer transition-all duration-200 shadow-lg hover:shadow-xl group" title="Click to upload profile picture">
             <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
               <path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -183,6 +183,26 @@
       Change Password
     </button>
   </div>
+
+  <!-- WhatsApp-like Image Viewer (Contained within page) -->
+  <div id="imageViewerModal" class="hidden bg-white rounded-xl shadow-lg border border-gray-200 p-8 mb-8">
+    <div class="flex items-center justify-between mb-6">
+      <h3 class="text-2xl font-bold text-gray-900">Profile Picture</h3>
+      <!-- Close Button -->
+      <button onclick="closeImageViewer(event)" class="text-gray-500 hover:text-gray-700 transition-colors">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    
+    <!-- Image Container - Square like WhatsApp -->
+    <div class="flex justify-center">
+      <div class="w-96 h-96 bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-300 flex items-center justify-center">
+        <img id="viewerImage" src="" alt="Profile Picture" class="max-w-full max-h-full object-contain">
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -327,4 +347,35 @@ function showMessage(message, type) {
     messageDiv.remove();
   }, 3000);
 }
+
+// WhatsApp-like Image Viewer Functions
+function openImageViewer() {
+  const profileImage = document.getElementById('profileImage');
+  const viewerImage = document.getElementById('viewerImage');
+  const modal = document.getElementById('imageViewerModal');
+  
+  if (profileImage && viewerImage && modal) {
+    viewerImage.src = profileImage.src;
+    modal.classList.remove('hidden');
+    // Smooth scroll to the viewer
+    modal.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+function closeImageViewer(event) {
+  if (event) {
+    event.stopPropagation();
+  }
+  const modal = document.getElementById('imageViewerModal');
+  if (modal) {
+    modal.classList.add('hidden');
+  }
+}
+
+// Close on Escape key
+document.addEventListener('keydown', function(event) {
+  if (event.key === 'Escape') {
+    closeImageViewer();
+  }
+});
 </script>
