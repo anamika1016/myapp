@@ -210,7 +210,18 @@
               <% end %>
             </li>
           <% end %>
+           <li>
+            <%= link_to trainings_path,
+                class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if current_page?(trainings_path)} text-base text-gray-800 rounded-lg" do %>
 
+              <svg class="shrink-0 size-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M12 6v6l4 2" />
+                <circle cx="12" cy="12" r="10" />
+              </svg>
+
+              <span class="font-semibold">TRAININGS</span>
+            <% end %>
+          </li>
           <!-- User Profile/Settings - Show for all users -->
           <li class="hs-accordion" id="users-accordion">
             <%= link_to settings_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if current_page?(settings_path)} text-base text-gray-800 rounded-lg" do %>

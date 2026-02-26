@@ -1,0 +1,45 @@
+
+<div class="mb-4">
+  <%= f.label :title, class: "block text-sm font-medium text-gray-700 mb-1" %>
+  <%= f.text_field :title, class: "w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" %>
+</div>
+
+<div class="mb-4">
+  <%= f.label :description, class: "block text-sm font-medium text-gray-700 mb-1" %>
+  <%= f.text_area :description, rows: 4, class: "w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" %>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+  <div>
+    <%= f.label :duration, "Duration (Minutes)", class: "block text-sm font-medium text-gray-700 mb-1" %>
+    <%= f.number_field :duration, class: "w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" %>
+  </div>
+
+  <div>
+    <%= f.label :month, "Select Month", class: "block text-sm font-medium text-gray-700 mb-1" %>
+    <%= f.select :month,
+          Date::MONTHNAMES.compact.each_with_index.map { |m, i| [m, i+1] },
+          {},
+          class: "w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" %>
+  </div>
+
+  <div>
+    <%= f.label :year, "Select Year", class: "block text-sm font-medium text-gray-700 mb-1" %>
+    <%= f.select :year,
+          (2025..2030).to_a,
+          {},
+          class: "w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" %>
+  </div>
+</div>
+
+<div class="mb-6">
+  <%= f.label :files, "Upload PPT Files", class: "block text-sm font-medium text-gray-700 mb-1" %>
+  <%= f.file_field :files, multiple: true, class: "w-full border border-gray-300 rounded-lg p-2 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition" %>
+  <p class="mt-1 text-sm text-gray-500">You can select multiple files. Existing files will be preserved unless replaced (depends on setup).</p>
+</div>
+
+<div class="flex items-center gap-4">
+  <%= f.submit yield(:button_text),
+        class: "bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-2 rounded-lg transition shadow-md" %>
+  <%= link_to "Cancel", trainings_path, class: "text-gray-600 hover:text-gray-800 transition font-medium" %>
+</div>

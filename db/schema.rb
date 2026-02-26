@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_09_25_052539) do
+ActiveRecord::Schema[8.0].define(version: 2026_02_25_070340) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -140,6 +140,18 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_25_052539) do
     t.index ["user_id"], name: "index_target_submissions_on_user_id"
   end
 
+  create_table "trainings", force: :cascade do |t|
+    t.string "title"
+    t.text "description"
+    t.integer "duration"
+    t.integer "created_by"
+    t.integer "month"
+    t.integer "year"
+    t.boolean "status"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+  end
+
   create_table "user_details", force: :cascade do |t|
     t.bigint "department_id", null: false
     t.bigint "activity_id", null: false
@@ -163,6 +175,20 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_25_052539) do
     t.index ["department_id"], name: "index_user_details_on_department_id"
     t.index ["employee_detail_id"], name: "index_user_details_on_employee_detail_id"
     t.index ["user_id"], name: "index_user_details_on_user_id"
+  end
+
+  create_table "user_training_progresses", force: :cascade do |t|
+    t.bigint "training_id", null: false
+    t.bigint "user_id", null: false
+    t.string "status"
+    t.datetime "started_at"
+    t.datetime "ended_at"
+    t.integer "time_spent"
+    t.string "financial_year"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["training_id"], name: "index_user_training_progresses_on_training_id"
+    t.index ["user_id"], name: "index_user_training_progresses_on_user_id"
   end
 
   create_table "users", force: :cascade do |t|
@@ -193,4 +219,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_25_052539) do
   add_foreign_key "user_details", "departments"
   add_foreign_key "user_details", "employee_details"
   add_foreign_key "user_details", "users"
+  add_foreign_key "user_training_progresses", "trainings"
+  add_foreign_key "user_training_progresses", "users"
 end

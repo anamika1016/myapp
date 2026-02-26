@@ -1,6 +1,17 @@
 # config/routes.rb
 
 Rails.application.routes.draw do
+  resources :trainings do
+    member do
+      post :start
+      post :finish
+      patch :toggle_status
+      get  :preview
+      post :start_training
+      post :complete_training
+      get  :certificate
+    end
+  end
 
   resources :target_submissions do
     member do
@@ -29,7 +40,6 @@ Rails.application.routes.draw do
       get :view_sms_logs
       get :export_department_activity_data
       get :submitted_achievements
-
     end
   end
 
@@ -45,17 +55,17 @@ Rails.application.routes.draw do
       get :export
       delete :delete_employee_activities
     end
-    resources :activities, except: [:show]
+    resources :activities, except: [ :show ]
   end
-  
+
   # Custom route for updating employee activities
-  post 'departments/update_employee_activities', to: 'departments#update_employee_activities'
-  
+  post "departments/update_employee_activities", to: "departments#update_employee_activities"
+
   # Custom route for deleting individual activities
-  delete 'departments/delete_activity/:activity_id', to: 'departments#delete_activity'
-  
+  delete "departments/delete_activity/:activity_id", to: "departments#delete_activity"
+
   # Test route to verify routing is working
-  get 'departments/test_route', to: 'departments#test_route'
+  get "departments/test_route", to: "departments#test_route"
   # This makes the employee list the home page.
 
   resources :employee_details do
@@ -63,14 +73,14 @@ Rails.application.routes.draw do
       get :export_xlsx
       get :export_quarterly_xlsx  # Export quarterly L1 L2 data
       post :import
-      get 'l1'
-      get 'l2'  # ➤ this is your sidebar L1 view
+      get "l1"
+      get "l2"  # ➤ this is your sidebar L1 view
     end
      member do
       patch :approve
       patch :return
       patch :l2_approve  # L2 approve
-      patch :l2_return  
+      patch :l2_return
       patch :edit_l1  # Edit L1 remarks and percentage
       patch :edit_l2  # Edit L2 remarks and percentage
       get :show_l2  # This maps to /employee_details/:id/show_l2
@@ -78,22 +88,22 @@ Rails.application.routes.draw do
   end
 
   devise_for :users, controllers: {
-    sessions: 'users/sessions',
-    registrations: 'users/registrations',
+    sessions: "users/sessions",
+    registrations: "users/registrations",
     passwords: "users/passwords"
-  }  
+  }
   # Add a specific route for the dashboard
-  root to: 'home#dashboard'  # 👈 now root goes to dashboard
-  get 'dashboard', to: 'home#dashboard'
+  root to: "home#dashboard"  # 👈 now root goes to dashboard
+  get "dashboard", to: "home#dashboard"
 
 
   # Settings routes
-  get 'settings', to: 'settings#show'
-  patch 'settings', to: 'settings#update'
-  patch 'settings/password', to: 'settings#update_password'
+  get "settings", to: "settings#show"
+  patch "settings", to: "settings#update"
+  patch "settings/password", to: "settings#update_password"
 
   # Keep your other routes
   devise_scope :user do
-    delete '/users/sign_out', to: 'devise/sessions#destroy'
+    delete "/users/sign_out", to: "devise/sessions#destroy"
   end
 end
