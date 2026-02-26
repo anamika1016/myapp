@@ -1,6 +1,8 @@
 class Training < ApplicationRecord
   has_many_attached :files
   has_many :user_training_progresses, dependent: :destroy
+  has_many :user_training_assignments, dependent: :destroy
+  has_many :assigned_users, through: :user_training_assignments, source: :user
 
   validates :title, presence: true
   validates :duration, presence: true

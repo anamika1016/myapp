@@ -5,7 +5,14 @@ class TrainingsController < ApplicationController
     if current_user.role == "hod"
       @trainings = Training.includes(:user_training_progresses)
     else
-      @trainings = Training.active.includes(:user_training_progresses)
+      # Non-HOD users only see trainings explicitly assigned to them via EmployeeDetail
+      employee = current_user.employee_detail || EmployeeDetail.find_by(employee_email: current_user.email)
+      if employee
+        assigned_ids = employee.user_training_assignments.pluck(:training_id)
+        @trainings = Training.where(id: assigned_ids).includes(:user_training_progresses)
+      else
+        @trainings = Training.none
+      end
     end
 
     # Month & Year filter (separate check better hai)
@@ -179,16 +186,24 @@ class TrainingsController < ApplicationController
 
   def certificate
     @training = Training.find(params[:id])
-    @progress = UserTrainingProgress.find_by(training: @training, user: current_user, status: "completed")
+
+    # If HOD is viewing, they can pass a user_id to see that employee's certificate
+    @target_user = if current_user.hod? && params[:user_id].present?
+                     User.find(params[:user_id])
+    else
+                     current_user
+    end
+
+    @progress = UserTrainingProgress.find_by(training: @training, user: @target_user, status: "completed")
 
     unless @progress
-      redirect_to training_path(@training), alert: "Please complete the training first."
+      redirect_to training_path(@training), alert: "Certificate not found or training not completed."
       return
     end
 
-    # Use employee_name from employee_detail if available, else search by email, else fallback to email
-    @employee_detail = current_user.employee_detail || EmployeeDetail.find_by(employee_email: current_user.email)
-    @user_name = @employee_detail&.employee_name || current_user.email
+    # Use employee_name from employee_detail if available
+    @employee_detail = @target_user.employee_detail || EmployeeDetail.find_by(employee_email: @target_user.email)
+    @user_name = @employee_detail&.employee_name || @target_user.email
     @completion_date = @progress.ended_at&.strftime("%d %b %Y") || Time.current.strftime("%d %b %Y")
 
     respond_to do |format|

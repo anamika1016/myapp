@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_02_25_070340) do
+ActiveRecord::Schema[8.0].define(version: 2026_02_26_104354) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -177,6 +177,18 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_25_070340) do
     t.index ["user_id"], name: "index_user_details_on_user_id"
   end
 
+  create_table "user_training_assignments", force: :cascade do |t|
+    t.bigint "user_id"
+    t.bigint "training_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "employee_detail_id"
+    t.index ["employee_detail_id", "training_id"], name: "index_uta_on_employee_detail_and_training", unique: true
+    t.index ["employee_detail_id"], name: "index_user_training_assignments_on_employee_detail_id"
+    t.index ["training_id"], name: "index_user_training_assignments_on_training_id"
+    t.index ["user_id"], name: "index_user_training_assignments_on_user_id"
+  end
+
   create_table "user_training_progresses", force: :cascade do |t|
     t.bigint "training_id", null: false
     t.bigint "user_id", null: false
@@ -219,6 +231,9 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_25_070340) do
   add_foreign_key "user_details", "departments"
   add_foreign_key "user_details", "employee_details"
   add_foreign_key "user_details", "users"
+  add_foreign_key "user_training_assignments", "employee_details"
+  add_foreign_key "user_training_assignments", "trainings"
+  add_foreign_key "user_training_assignments", "users"
   add_foreign_key "user_training_progresses", "trainings"
   add_foreign_key "user_training_progresses", "users"
 end

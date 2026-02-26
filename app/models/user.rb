@@ -2,10 +2,13 @@ class User < ApplicationRecord
   # Devise modules for authentication
   devise :database_authenticatable, :registerable,
          :recoverable, :rememberable, :validatable
-         
+
   has_many :target_submissions
   has_one :employee_detail
   has_one_attached :profile_image
+  has_many :user_training_assignments, dependent: :destroy
+  has_many :assigned_trainings, through: :user_training_assignments, source: :training
+  has_many :user_training_progresses, dependent: :destroy
 
   ROLES = %w[employee hod l1_employer l2_employer]
 
@@ -18,15 +21,15 @@ class User < ApplicationRecord
 
   # Role helpers
   def employee?
-    role == 'employee'
+    role == "employee"
   end
 
   def hod?
-    role == 'hod'
+    role == "hod"
   end
 
   def l1_employer?
-    role == 'l1_employer'
+    role == "l1_employer"
   end
 
   def l2_employer?
@@ -37,7 +40,7 @@ class User < ApplicationRecord
     conditions = warden_conditions.dup
     login = conditions.delete(:login)
     value = login.strip.downcase # 👈 Also strip and downcase login input
-    where(conditions).where(["lower(email) = :value OR lower(employee_code) = :value", { value: value }]).first
+    where(conditions).where([ "lower(email) = :value OR lower(employee_code) = :value", { value: value } ]).first
   end
 
   def name

@@ -222,6 +222,22 @@
               <span class="font-semibold">TRAININGS</span>
             <% end %>
           </li>
+
+          <% if current_user.hod? %>
+          <li>
+            <%= link_to user_training_assignments_path,
+                class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if current_page?(user_training_assignments_path)} text-base text-gray-800 rounded-lg" do %>
+
+              <svg class="shrink-0 size-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+                <rect x="9" y="3" width="6" height="4" rx="1"/>
+                <path d="M9 12l2 2 4-4"/>
+              </svg>
+
+              <span class="font-semibold">ASSIGN TRAININGS</span>
+            <% end %>
+          </li>
+          <% end %>
           <!-- User Profile/Settings - Show for all users -->
           <li class="hs-accordion" id="users-accordion">
             <%= link_to settings_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if current_page?(settings_path)} text-base text-gray-800 rounded-lg" do %>

@@ -3,6 +3,8 @@ class EmployeeDetail < ApplicationRecord
   has_many :target_submissions, dependent: :destroy
   has_many :sms_logs, dependent: :destroy
   belongs_to :user, optional: true
+  has_many :user_training_assignments, dependent: :destroy
+  has_many :assigned_trainings, through: :user_training_assignments, source: :training
   after_initialize :set_default_status, if: :new_record?
   # belongs_to :department  # only if you have a departments table and department_id column
 
@@ -34,13 +36,13 @@ class EmployeeDetail < ApplicationRecord
   enum :status, {
   pending: "pending",
   l1_approved: "l1_approved",
-  l1_rejected: "l1_returned", 
+  l1_rejected: "l1_returned",
   l2_approved: "l2_approved",
   l2_returned: "l2_returned"
 }
 
 # app/models/employee_detail.rb
-scope :l1_pending_records, -> { where(status: ['pending', 'returned']) }
+scope :l1_pending_records, -> { where(status: [ "pending", "returned" ]) }
 
 
 
