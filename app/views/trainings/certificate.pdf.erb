@@ -35,7 +35,7 @@
 
   /* Branding */
   .logo-top {
-    height: 125px; /* Increased from 160px */
+    height: 130px; /* Increased from 160px */
     /* margin: 2px; */
     width: 30%;
   }
@@ -90,10 +90,11 @@
   }
 
   .topic-display {
-    font-size: 28pt;
+    font-size: 24pt;
     font-weight: bold;
     color: #222;
     margin-bottom: 10px;
+    line-height: 1.2;
   }
 
   .attribution {
@@ -150,7 +151,16 @@
     <div class="name-display"><%= @user_name %></div>
     <div class="green-line"></div>
 
-    <div class="completed-text">has successfully completed <%= @training.title %></div>
+    <div class="completed-text" style="font-size: 16pt; margin-bottom: 25px;">
+      has successfully completed
+      <% if @certificate_type == "monthly" %>
+        <% @month_trainings.each_with_index do |t, i| %>
+          <%= t.title %><%= ", " unless i == @month_trainings.size - 1 %>
+        <% end %>
+      <% else %>
+        <%= @training.title %>
+      <% end %>
+    </div>
     
     
     <div class="attribution">
@@ -164,7 +174,7 @@
       </div>
 
       <div class="footer-id">
-         Certificate ID: PAPL/BHOPAL/HO/<%= Time.current.year %>-<%= (Time.current.year + 1).to_s.last(2) %>/<%= @progress.id %>
+         Certificate ID: PAPL/BHOPAL/HO/<%= Time.current.year %>-<%= (Time.current.year + 1).to_s.last(2) %>/<%= @progress&.id || "M-#{Time.current.to_i}" %>
       </div>
     </div>
   </div>

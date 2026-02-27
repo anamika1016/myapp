@@ -136,73 +136,101 @@
       </div>
     </div>
 
-    <!-- Detailed Progress Table -->
-    <div class="progress-table-wrap">
-      <table class="progress-table">
-        <thead>
-          <tr>
-            <th>Training Title</th>
-            <th>Required Time</th>
-            <th>Status</th>
-            <th>Time Spent</th>
-            <th>Completion Date</th>
-            <th>Materials & Certificate</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% if @assigned_trainings.any? %>
-            <% @assigned_trainings.each do |training| %>
-              <% progress = @progress_map[training.id] %>
-              <tr>
-                <td style="font-weight: 700;"><%= training.title %></td>
-                <td><%= training.duration %> mins</td>
-                <td>
-                  <% if progress&.status == 'completed' %>
-                    <span class="status-badge status-completed">✅ Completed</span>
-                  <% elsif progress&.status == 'started' %>
-                    <span class="status-badge status-started">⏳ In Progress</span>
-                  <% else %>
-                    <span class="status-badge status-pending">⚪ Not Started</span>
-                  <% end %>
-                </td>
-                <td>
-                  <% if progress&.time_spent.present? %>
-                    <span class="time-val">
-                      <%= (progress.time_spent / 60) %>m <%= (progress.time_spent % 60) %>s
-                    </span>
-                  <% else %>
-                    --
-                  <% end %>
-                </td>
-                <td>
-                  <%= progress&.ended_at&.strftime("%d %b %Y %I:%M %p") || "--" %>
-                </td>
-                <td>
-                  <div style="display: flex; align-items: center; gap: 8px;">
-                    <%= link_to training_path(training), target: "_blank", style: "color: #475569; font-weight: 600; font-size: 11.5px; text-decoration: underline;" do %>
-                      View PDF
-                    <% end %>
-                    
-                    <% if progress&.status == 'completed' %>
-                      <span style="color: #e2e8f0;">|</span>
-                      <%= link_to certificate_training_path(training, format: :pdf, user_id: @employee.user_id), target: "_blank", style: "color: #16a34a; font-weight: 700; font-size: 11.5px; text-decoration: none; display: flex; align-items: center; gap: 2px;" do %>
-                        View Certificate
-                      <% end %>
-                    <% end %>
-                  </div>
-                </td>
-              </tr>
+    <!-- Detailed Progress Table Grouped by Month -->
+    <% @assigned_trainings.group_by { |t| [t.year, t.month] }.sort.reverse.each do |(year, month), month_trainings| %>
+      <div style="margin-bottom: 30px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; background: #f8fafc; padding: 10px 20px; border: 1px solid #e8edf3; border-bottom: none; border-radius: 12px 12px 0 0;">
+          <h3 style="font-size: 16px; font-weight: 700; color: #1e293b;">
+            <%= Date::MONTHNAMES[month] %> <%= year %>
+          </h3>
+          
+          <% 
+            total_in_db = Training.where(year: year, month: month)
+            all_done = total_in_db.any? && total_in_db.all? do |t| 
+              prog = @progress_map[t.id]
+              prog&.status == 'completed' && (prog.time_spent.to_i >= (t.duration.to_i * 60))
+            end
+          %>
+          
+          <% if all_done %>
+            <%= link_to monthly_certificate_trainings_path(year: year, month: month, user_id: @employee.user_id, format: :pdf), target: "_blank", style: "background: #16a34a; color: #fff; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; text-decoration: none; display: flex; align-items: center; gap: 5px;" do %>
+               <svg xmlns="http://www.w3.org/2000/svg" style="width:14px;height:14px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+               </svg>
+               Download Monthly Certificate
             <% end %>
           <% else %>
-            <tr>
-              <td colspan="6" style="text-align: center; padding: 40px; color: #94a3b8; font-style: italic;">
-                No trainings assigned to this employee.
-              </td>
-            </tr>
+            <span style="font-size: 11px; font-weight: 600; color: #64748b;">
+              <% 
+                valid_completed = total_in_db.select do |t| 
+                  prog = @progress_map[t.id]
+                  prog&.status == 'completed' && (prog.time_spent.to_i >= (t.duration.to_i * 60))
+                end.size
+              %>
+              <%= valid_completed %> / <%= total_in_db.size %> Total PPTs Completed (with required time)
+            </span>
           <% end %>
-        </tbody>
-      </table>
-    </div>
+        </div>
+
+        <div class="progress-table-wrap" style="border-radius: 0 0 18px 18px;">
+          <table class="progress-table">
+            <thead>
+              <tr>
+                <th style="width: 35%;">Training Title</th>
+                <th style="width: 15%;">Duration</th>
+                <th style="width: 15%;">Status</th>
+                <th style="width: 15%;">Time Spent</th>
+                <th style="width: 20%;">Completion</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% month_trainings.each do |training| %>
+                <% progress = @progress_map[training.id] %>
+                <tr>
+                  <td style="font-weight: 700;">
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                      <%= training.title %>
+                      <%= link_to training_path(training), target: "_blank", style: "color: #64748b; font-size: 11px; font-weight: 600; text-decoration: underline;" do %>
+                        View Materials (PDF)
+                      <% end %>
+                    </div>
+                  </td>
+                  <td><%= training.duration %> mins</td>
+                  <td>
+                    <% if progress&.status == 'completed' %>
+                      <span class="status-badge status-completed">✅ Done</span>
+                    <% elsif progress&.status == 'started' %>
+                      <span class="status-badge status-started">⏳ Doing</span>
+                    <% else %>
+                      <span class="status-badge status-pending">⚪ Pending</span>
+                    <% end %>
+                  </td>
+                  <td>
+                    <% if progress&.time_spent.present? %>
+                      <span class="time-val"><%= (progress.time_spent / 60) %>m <%= (progress.time_spent % 60) %>s</span>
+                    <% else %>
+                      --
+                    <% end %>
+                  </td>
+                  <td>
+                    <div style="font-size: 11px; color: #475569;">
+                      <%= progress&.ended_at&.strftime("%d %b %Y") || "--" %>
+                      <div style="font-size: 10px; color: #94a3b8;"><%= progress&.ended_at&.strftime("%I:%M %p") if progress&.ended_at %></div>
+                    </div>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    <% end %>
+
+    <% if @assigned_trainings.empty? %>
+      <div class="progress-table-wrap" style="padding: 60px; text-align: center; color: #94a3b8; font-style: italic;">
+        No trainings assigned to this employee.
+      </div>
+    <% end %>
 
   </div>
 </div>

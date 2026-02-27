@@ -186,29 +186,72 @@ class TrainingsController < ApplicationController
 
   def certificate
     @training = Training.find(params[:id])
-
-    # If HOD is viewing, they can pass a user_id to see that employee's certificate
-    @target_user = if current_user.hod? && params[:user_id].present?
-                     User.find(params[:user_id])
-    else
-                     current_user
-    end
-
+    @target_user = (current_user.hod? && params[:user_id].present?) ? User.find(params[:user_id]) : current_user
     @progress = UserTrainingProgress.find_by(training: @training, user: @target_user, status: "completed")
 
     unless @progress
-      redirect_to training_path(@training), alert: "Certificate not found or training not completed."
+      redirect_to trainings_path, alert: "Certificate not found or training not completed."
       return
     end
 
-    # Use employee_name from employee_detail if available
     @employee_detail = @target_user.employee_detail || EmployeeDetail.find_by(employee_email: @target_user.email)
     @user_name = @employee_detail&.employee_name || @target_user.email
     @completion_date = @progress.ended_at&.strftime("%d %b %Y") || Time.current.strftime("%d %b %Y")
+    @certificate_type = "single"
+    @display_title = @training.title
 
+    render_certificate
+  end
+
+  def monthly_certificate
+    @year  = params[:year].to_i
+    @month = params[:month].to_i
+    @target_user = (current_user.hod? && params[:user_id].present?) ? User.find(params[:user_id]) : current_user
+
+    # 1. Find ALL trainings that exist for this MONTH/YEAR (the curriculum)
+    @month_trainings = Training.where(month: @month, year: @year)
+    employee = @target_user.employee_detail || EmployeeDetail.find_by(employee_email: @target_user.email)
+
+    if @month_trainings.empty?
+      redirect_to trainings_path, alert: "No active trainings found for this month."
+      return
+    end
+
+    # 2. Check if ALL are completed AND meet duration requirements
+    all_progress = UserTrainingProgress.where(user: @target_user, training_id: @month_trainings.pluck(:id))
+
+    # Map progress for quick check
+    progress_map = all_progress.index_by(&:training_id)
+
+    valid_completions = @month_trainings.all? do |t|
+      p = progress_map[t.id]
+      # Status must be completed AND time_spent (seconds) >= duration (minutes) * 60
+      p&.status == "completed" && (p.time_spent.to_i >= (t.duration.to_i * 60))
+    end
+
+    unless valid_completions
+      redirect_to trainings_path, alert: "Please complete all trainings for #{Date::MONTHNAMES[@month]} #{@year} and spend the required time on each to get the certificate."
+      return
+    end
+
+    @employee_detail = employee
+    @user_name = @employee_detail&.employee_name || @target_user.email
+    last_progress = all_progress.order(ended_at: :desc).first
+    @completion_date = last_progress&.ended_at&.strftime("%d %b %Y") || Time.current.strftime("%d %b %Y")
+
+    @certificate_type = "monthly"
+    @month_name = Date::MONTHNAMES[@month]
+    @display_title = "#{@month_name} #{@year} Training Program"
+
+    render_certificate
+  end
+
+  private
+
+  def render_certificate
     respond_to do |format|
       format.pdf do
-        render pdf: "Certificate_#{@training.title}",
+        render pdf: "Certificate_#{@display_title}",
                template: "trainings/certificate",
                layout: "pdf",
                orientation: "Landscape",

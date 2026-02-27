@@ -17,6 +17,9 @@ Rails.application.routes.draw do
       post :complete_training
       get  :certificate
     end
+    collection do
+      get "monthly_certificate/:year/:month", to: "trainings#monthly_certificate", as: :monthly_certificate
+    end
   end
 
   resources :target_submissions do
