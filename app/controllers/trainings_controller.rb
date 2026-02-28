@@ -114,8 +114,26 @@ class TrainingsController < ApplicationController
 
     render json: {
       status: @progress.status,
-      started_at: @progress.started_at
+      started_at: @progress.started_at,
+      time_spent: @progress.time_spent.to_i
     }
+  end
+
+  # POST /trainings/:id/update_progress
+  # Called by JS periodically or on visibilitychange/unload to save running time
+  def update_progress
+    @training = Training.find(params[:id])
+    @progress = UserTrainingProgress.find_or_initialize_by(
+      training: @training,
+      user: current_user
+    )
+
+    if @progress.status == "started" && params[:time_spent].present?
+      @progress.time_spent = params[:time_spent].to_i
+      @progress.save!
+    end
+
+    head :ok
   end
 
   # POST /trainings/:id/complete_training

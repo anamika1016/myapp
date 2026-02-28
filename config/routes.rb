@@ -14,6 +14,7 @@ Rails.application.routes.draw do
       patch :toggle_status
       get  :preview
       post :start_training
+      post :update_progress
       post :complete_training
       get  :certificate
     end

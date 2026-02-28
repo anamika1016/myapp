@@ -185,10 +185,6 @@
         <% @trainings.group_by { |t| [t.year, t.month] }.sort.reverse.each do |(year, month), month_trainings| %>
           <div class="month-group" style="margin-bottom: 40px;">
             <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 20px;">
-              <h3 style="font-family: 'Playfair Display', serif; font-size: 22px; color: #111;">
-                <%= Date::MONTHNAMES[month] %> <%= year %>
-              </h3>
-              
               <%# Check if ALL trainings in DB for this month are completed AND meet duration %>
               <% 
                 total_in_db = Training.where(year: year, month: month)
@@ -199,24 +195,38 @@
                 end
               %>
               
-              <% if all_done %>
-                <%= link_to monthly_certificate_trainings_path(year: year, month: month, format: :pdf), target: "_blank", class: "btn-edit", style: "background: #16a34a; color: #fff; border: none; padding: 8px 16px; font-size: 13px; display: flex; align-items: center; gap: 6px;" do %>
-                  <svg xmlns="http://www.w3.org/2000/svg" style="width:16px;height:16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Download <%= Date::MONTHNAMES[month] %> Certificate
+              <div style="display: flex; align-items: center; gap: 16px;">
+                <h3 style="font-family: 'Playfair Display', serif; font-size: 22px; color: #111; margin: 0;">
+                  <%= Date::MONTHNAMES[month] %> <%= year %>
+                </h3>
+
+                <% if all_done %>
+                  <%= link_to monthly_certificate_trainings_path(year: year, month: month, format: :pdf), target: "_blank", class: "btn-edit", style: "background: #16a34a; color: #fff; border: none; padding: 6px 14px; font-size: 12px; display: flex; align-items: center; gap: 6px; border-radius: 8px;" do %>
+                    <svg xmlns="http://www.w3.org/2000/svg" style="width:14px;height:14px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Download <%= Date::MONTHNAMES[month] %> Certificate
+                  <% end %>
                 <% end %>
-              <% else %>
-                <span style="font-size: 12px; color: #64748b; font-weight: 600;">
-                  <% 
-                    valid_completed = total_in_db.select do |t| 
-                      prog = t.user_training_progresses.find { |p| p.user_id == current_user.id }
-                      prog&.status == "completed" && (prog.time_spent.to_i >= (t.duration.to_i * 60))
-                    end.size
-                  %>
-                  <%= valid_completed %> / <%= total_in_db.size %> Total PPTs Completed (with required time)
-                </span>
-              <% end %>
+              </div>
+              
+              <div>
+                <% if all_done %>
+                  <span style="font-size: 12px; color: #16a34a; font-weight: 700; background: #f0fdf4; padding: 4px 10px; border-radius: 6px; border: 1px solid #bbf7d0;">
+                    All PPTs Completed
+                  </span>
+                <% else %>
+                  <span style="font-size: 12px; color: #64748b; font-weight: 600;">
+                    <% 
+                      valid_completed = total_in_db.select do |t| 
+                        prog = t.user_training_progresses.find { |p| p.user_id == current_user.id }
+                        prog&.status == "completed" && (prog.time_spent.to_i >= (t.duration.to_i * 60))
+                      end.size
+                    %>
+                    <%= valid_completed %> / <%= total_in_db.size %> Total PPTs Completed (with required time)
+                  </span>
+                <% end %>
+              </div>
             </div>
 
             <div class="cards-grid">

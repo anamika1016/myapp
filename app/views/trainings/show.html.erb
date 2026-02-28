@@ -113,9 +113,20 @@
 <script>
   (function() {
     let timerInterval;
+    let handleUnloadFn;
+    let toggleTimerFn;
 
     function initTimer() {
       if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+      if (handleUnloadFn) {
+        window.removeEventListener("beforeunload", handleUnloadFn);
+        document.removeEventListener("turbo:before-visit", handleUnloadFn);
+        handleUnloadFn = null;
+      }
+      if (toggleTimerFn) {
+        document.removeEventListener("visibilitychange", toggleTimerFn);
+        toggleTimerFn = null;
+      }
 
       const container = document.querySelector('.main-content');
       if (!container || !container.dataset.trainingId) return;
@@ -126,9 +137,13 @@
       const timerDisplay    = document.getElementById('timer-display');
       const completeBtn     = document.getElementById('complete-btn');
       const actionBar       = document.getElementById('action-bar');
+      const csrfMeta        = document.querySelector('meta[name="csrf-token"]');
+      const csrfToken       = csrfMeta ? csrfMeta.content : '';
 
       if (!timerDisplay) return;
       let secondsSpent = 0;
+      let isTracking = true;
+      let lastSaveTime = 0;
 
       // Reveal action bar when last file card is visible
       if (actionBar) {
@@ -150,19 +165,77 @@
         }
       }
 
+      function updateDisplay() {
+        const m = Math.floor(secondsSpent / 60).toString().padStart(2,'0');
+        const s = (secondsSpent % 60).toString().padStart(2,'0');
+        timerDisplay.innerHTML = `⏳ ${m}:${s}`;
+        if (secondsSpent >= requiredDuration) enableCompleteButton();
+      }
+
+      function saveProgress(isUnloading) {
+        if (status === 'completed') return;
+        // Don't save if there isn't any meaningful progression since last save
+        if (secondsSpent === lastSaveTime && !isUnloading) return;
+        
+        const payload = JSON.stringify({ time_spent: secondsSpent });
+        const url = `/trainings/${trainingId}/update_progress`;
+        
+        fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+          body: payload,
+          keepalive: true // Crucial for beforeunload
+        }).catch(err => console.debug("Progress save error:", err));
+        
+        lastSaveTime = secondsSpent;
+      }
+
+      toggleTimerFn = function() {
+        if (document.hidden) {
+          isTracking = false;
+          saveProgress(true); // Save progress immediately when hiding tab
+        } else {
+          isTracking = true;
+        }
+      };
+
+      handleUnloadFn = function() {
+        if (timerInterval) {
+          saveProgress(true);
+          clearInterval(timerInterval);
+          timerInterval = null;
+        }
+      };
+
       if (status !== 'completed') {
         fetch(`/trainings/${trainingId}/start_training`, {
           method: 'POST',
-          headers: { 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content, 'Accept': 'application/json' }
+          headers: { 'X-CSRF-Token': csrfToken, 'Accept': 'application/json' }
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (data.time_spent && !isNaN(data.time_spent)) {
+             secondsSpent = parseInt(data.time_spent, 10);
+             lastSaveTime = secondsSpent;
+             updateDisplay();
+          }
         });
 
         timerInterval = setInterval(() => {
-          secondsSpent++;
-          const m = Math.floor(secondsSpent / 60).toString().padStart(2,'0');
-          const s = (secondsSpent % 60).toString().padStart(2,'0');
-          timerDisplay.innerHTML = `⏳ ${m}:${s}`;
-          if (secondsSpent >= requiredDuration) enableCompleteButton();
+          if (isTracking && !document.hidden) {
+             secondsSpent++;
+             updateDisplay();
+
+             // Auto save every 15 seconds
+             if (secondsSpent - lastSaveTime >= 15) {
+               saveProgress(false);
+             }
+          }
         }, 1000);
+
+        document.addEventListener("visibilitychange", toggleTimerFn);
+        window.addEventListener("beforeunload", handleUnloadFn);
+        document.addEventListener("turbo:before-visit", handleUnloadFn);
       }
 
       function enableCompleteButton() {
@@ -175,13 +248,28 @@
 
       if (completeBtn) {
         completeBtn.onclick = function () {
-          clearInterval(timerInterval);
+          if (timerInterval) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+          }
+          if (handleUnloadFn) {
+            window.removeEventListener("beforeunload", handleUnloadFn);
+            document.removeEventListener("turbo:before-visit", handleUnloadFn);
+          }
+          if (toggleTimerFn) {
+            document.removeEventListener("visibilitychange", toggleTimerFn);
+          }
+          
           fetch(`/trainings/${trainingId}/complete_training`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content, 'Accept': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken, 'Accept': 'application/json' },
             body: JSON.stringify({ time_spent: secondsSpent })
           }).then(r => r.json()).then(data => {
-            if (data.status === 'completed') { alert('Training completed successfully!'); window.location.reload(); }
+            if (data.status === 'completed') { 
+              alert('Training completed successfully!'); 
+              // Clear URL state back to standard training path if on specific file/tab manually
+              window.location.reload(); 
+            }
           });
         };
       }

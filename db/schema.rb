@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_02_26_104354) do
+ActiveRecord::Schema[8.0].define(version: 2026_02_27_061335) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -113,6 +113,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_26_104354) do
     t.text "l2_remarks"
     t.float "l2_percentage"
     t.string "mobile_number"
+    t.boolean "assignments_managed", default: false
     t.index ["user_id"], name: "index_employee_details_on_user_id"
   end
 
