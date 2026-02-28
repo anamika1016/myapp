@@ -101,6 +101,14 @@
                 <%= mins %>m <%= secs %>s
               </span>
             </div>
+            <% if training.has_assessment %>
+            <div class="progress-row-item">
+              <span class="progress-label">Assessment Score:</span>
+              <span class="progress-val font-semibold text-green-700">
+                <%= progress.score.present? ? progress.score : '0' %> / <%= training.training_questions.count %>
+              </span>
+            </div>
+            <% end %>
             <div class="progress-row-item">
               <span class="progress-label">Financial Year:</span>
               <span class="progress-val"><%= progress.financial_year %></span>

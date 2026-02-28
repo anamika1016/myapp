@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_02_27_061335) do
+ActiveRecord::Schema[8.0].define(version: 2026_02_28_095215) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -141,6 +141,19 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_27_061335) do
     t.index ["user_id"], name: "index_target_submissions_on_user_id"
   end
 
+  create_table "training_questions", force: :cascade do |t|
+    t.bigint "training_id", null: false
+    t.text "question"
+    t.string "option_a"
+    t.string "option_b"
+    t.string "option_c"
+    t.string "option_d"
+    t.string "correct_answer"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["training_id"], name: "index_training_questions_on_training_id"
+  end
+
   create_table "trainings", force: :cascade do |t|
     t.string "title"
     t.text "description"
@@ -151,6 +164,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_27_061335) do
     t.boolean "status"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.boolean "has_assessment"
   end
 
   create_table "user_details", force: :cascade do |t|
@@ -200,6 +214,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_27_061335) do
     t.string "financial_year"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "score"
     t.index ["training_id"], name: "index_user_training_progresses_on_training_id"
     t.index ["user_id"], name: "index_user_training_progresses_on_user_id"
   end
@@ -228,6 +243,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_27_061335) do
   add_foreign_key "target_submissions", "employee_details"
   add_foreign_key "target_submissions", "user_details"
   add_foreign_key "target_submissions", "users"
+  add_foreign_key "training_questions", "trainings"
   add_foreign_key "user_details", "activities"
   add_foreign_key "user_details", "departments"
   add_foreign_key "user_details", "employee_details"

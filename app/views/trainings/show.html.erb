@@ -99,9 +99,15 @@
             ✕ Close
           <% end %>
           <% if current_user.role == "employee" && @progress&.status != 'completed' %>
-            <button id="complete-btn" disabled class="btn-complete btn-complete--disabled">
-              Complete Training
-            </button>
+            <% if @training.has_assessment %>
+              <button id="complete-btn" disabled class="btn-complete btn-complete--disabled" data-assessment-url="<%= assessment_training_path(@training) %>">
+                Take Assessment
+              </button>
+            <% else %>
+              <button id="complete-btn" disabled class="btn-complete btn-complete--disabled">
+                Complete Training
+              </button>
+            <% end %>
           <% end %>
         </div>
       </div>
@@ -243,7 +249,11 @@
         completeBtn.disabled = false;
         completeBtn.classList.remove('btn-complete--disabled');
         completeBtn.classList.add('btn-complete--ready');
-        completeBtn.innerHTML = '✅ Complete Training';
+        if (completeBtn.dataset.assessmentUrl) {
+          completeBtn.innerHTML = '📝 Take Assessment';
+        } else {
+          completeBtn.innerHTML = '✅ Complete Training';
+        }
       }
 
       if (completeBtn) {
@@ -260,17 +270,28 @@
             document.removeEventListener("visibilitychange", toggleTimerFn);
           }
           
-          fetch(`/trainings/${trainingId}/complete_training`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken, 'Accept': 'application/json' },
-            body: JSON.stringify({ time_spent: secondsSpent })
-          }).then(r => r.json()).then(data => {
-            if (data.status === 'completed') { 
-              alert('Training completed successfully!'); 
-              // Clear URL state back to standard training path if on specific file/tab manually
-              window.location.reload(); 
-            }
-          });
+          if (completeBtn.dataset.assessmentUrl) {
+            // Assessment Flow
+            fetch(`/trainings/${trainingId}/update_progress`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken, 'Accept': 'application/json' },
+              body: JSON.stringify({ time_spent: secondsSpent })
+            }).then(() => {
+              window.location.href = completeBtn.dataset.assessmentUrl;
+            });
+          } else {
+            // Normal Flow
+            fetch(`/trainings/${trainingId}/complete_training`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken, 'Accept': 'application/json' },
+              body: JSON.stringify({ time_spent: secondsSpent })
+            }).then(r => r.json()).then(data => {
+              if (data.status === 'completed') { 
+                alert('Training completed successfully!'); 
+                window.location.reload(); 
+              }
+            });
+          }
         };
       }
     }

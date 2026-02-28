@@ -46,6 +46,9 @@ class TrainingsController < ApplicationController
     end
 
     if @training.update(update_params)
+      if @training.has_assessment && params[:excel_file].present?
+        import_questions_from_excel(@training, params[:excel_file])
+      end
       redirect_to trainings_path, notice: "Training updated successfully"
     else
       render :edit, status: :unprocessable_entity
@@ -73,6 +76,9 @@ class TrainingsController < ApplicationController
     @training.created_by = current_user.id
 
     if @training.save
+      if @training.has_assessment && params[:excel_file].present?
+        import_questions_from_excel(@training, params[:excel_file])
+      end
       redirect_to trainings_path, notice: "Training uploaded successfully"
     else
       render :new, status: :unprocessable_entity
@@ -264,30 +270,126 @@ class TrainingsController < ApplicationController
     render_certificate
   end
 
+  def assessment
+    @training = Training.find(params[:id])
+    @questions = @training.training_questions
+    @progress = UserTrainingProgress.find_or_initialize_by(
+      training: @training,
+      user: current_user
+    )
+
+    # Optional: check if already completed
+    if @progress.status == "completed"
+      redirect_to trainings_path, notice: "You have already completed this training."
+    end
+  end
+
+  def submit_assessment
+    @training = Training.find(params[:id])
+    @questions = @training.training_questions
+    @progress = UserTrainingProgress.find_or_initialize_by(
+      training: @training,
+      user: current_user
+    )
+
+    if @progress.status == "completed"
+      redirect_to trainings_path, notice: "You have already completed this training."
+      return
+    end
+
+    @score = 0
+    @total = @questions.count
+    @results = []
+
+    if params[:answers].present?
+      @questions.each do |q|
+        user_answer = params[:answers][q.id.to_s]&.strip
+        correct_answer = q.correct_answer&.strip
+
+        # safely handle nil comparison
+        is_correct = user_answer.present? && correct_answer.present? && user_answer.downcase == correct_answer.downcase
+
+        if is_correct
+          @score += 1
+        end
+
+        @results << {
+          question: q.question,
+          user_answer: user_answer,
+          correct_answer: correct_answer,
+          is_correct: is_correct
+        }
+      end
+    end
+
+    unless @progress.status == "completed"
+      @progress.status     = "completed"
+      @progress.started_at ||= Time.current
+      @progress.ended_at   = Time.current
+      @progress.financial_year = financial_year_for(@training.month, @training.year)
+      @progress.score = @score
+      @progress.save!
+    end
+
+    if @total == 0 || !@training.has_assessment
+      redirect_to trainings_path, notice: "Training completed successfully. Your certificate is ready!"
+    else
+      render :assessment_result
+    end
+  end
+
   private
 
   def render_certificate
-    respond_to do |format|
-      format.pdf do
-        render pdf: "Certificate_#{@display_title}",
-               template: "trainings/certificate",
-               layout: "pdf",
-               orientation: "Landscape",
-               page_size: "A4",
-               margin: { top: 0, bottom: 0, left: 0, right: 0 },
-               no_background: false,
-               print_media_type: true,
-               disable_smart_shrinking: true,
-               zoom: 1
-      end
-    end
+    render pdf: "Certificate_#{@display_title}",
+           template: "trainings/certificate",
+           formats: [ :pdf ],
+           layout: "pdf",
+           orientation: "Landscape",
+           page_size: "A4",
+           margin: { top: 0, bottom: 0, left: 0, right: 0 },
+           no_background: false,
+           print_media_type: true,
+           disable_smart_shrinking: true,
+           zoom: 1
   end
 
   private
 
   def training_params
     params.require(:training)
-          .permit(:title, :description, :duration, :month, :year, :status, files: [])
+          .permit(:title, :description, :duration, :month, :year, :status, :has_assessment, files: [],
+                 training_questions_attributes: [ :id, :question, :option_a, :option_b, :option_c, :option_d, :correct_answer, :_destroy ])
+  end
+
+  def import_questions_from_excel(training, file)
+    require "roo"
+    spreadsheet = Roo::Spreadsheet.open(file.path)
+    header = spreadsheet.row(1)
+
+    (2..spreadsheet.last_row).each do |i|
+      row = Hash[[ header, spreadsheet.row(i) ].transpose]
+
+      q_text = row.keys.find { |k| k.to_s.downcase.include?("question") } || header[0]
+      opt_a = row.keys.find { |k| k.to_s.downcase.include?("option a") || k.to_s.downcase == "a" || k.to_s.downcase == "option_a" } || header[1]
+      opt_b = row.keys.find { |k| k.to_s.downcase.include?("option b") || k.to_s.downcase == "b" || k.to_s.downcase == "option_b" } || header[2]
+      opt_c = row.keys.find { |k| k.to_s.downcase.include?("option c") || k.to_s.downcase == "c" || k.to_s.downcase == "option_c" } || header[3]
+      opt_d = row.keys.find { |k| k.to_s.downcase.include?("option d") || k.to_s.downcase == "d" || k.to_s.downcase == "option_d" } || header[4]
+      ans = row.keys.find { |k| k.to_s.downcase.include?("answer") } || header[5]
+
+      next unless row[q_text].present?
+
+      training.training_questions.create(
+        question: row[q_text],
+        option_a: row[opt_a],
+        option_b: row[opt_b],
+        option_c: row[opt_c],
+        option_d: row[opt_d],
+        correct_answer: row[ans]
+      )
+    end
+  rescue StandardError => e
+    Rails.logger.error "Excel Import Failed: #{e.message}"
   end
 
   # Returns financial year string like "2025-26" based on training month & year

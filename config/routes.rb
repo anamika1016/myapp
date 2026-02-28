@@ -18,6 +18,8 @@ Rails.application.routes.draw do
       post :update_progress
       post :complete_training
       get  :certificate
+      get  :assessment
+      post :submit_assessment
     end
     collection do
       get "monthly_certificate/:year/:month", to: "trainings#monthly_certificate", as: :monthly_certificate
