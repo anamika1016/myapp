@@ -9,6 +9,15 @@ class UserTrainingAssignmentsController < ApplicationController
                                .order(:employee_name)
   end
 
+  def export_xlsx
+    @employees = EmployeeDetail.includes(:user, user_training_assignments: :training, user: { user_training_progresses: :training }).order(:employee_name)
+    respond_to do |format|
+      format.xlsx {
+        response.headers["Content-Disposition"] = "attachment; filename=Employee_Training_Data_#{Date.today}.xlsx"
+      }
+    end
+  end
+
   # GET /user_training_assignments/:employee_detail_id
   # Shows detailed progress for a specific employee
   def show

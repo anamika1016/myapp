@@ -113,19 +113,56 @@
           Click on an employee to assign specific monthly PPTs they can view. Total Employees: <%= @employees.count %>
         </p>
       </div>
+      <div>
+        <%= link_to export_xlsx_user_training_assignments_path(format: :xlsx), 
+                    class: "btn-assign", 
+                    style: "display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; padding: 10px 18px;" do %>
+          <svg xmlns="http://www.w3.org/2000/svg" style="width:18px;height:18px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          Export All Excel
+        <% end %>
+      </div>
     </div>
 
     <!-- Statistics Section -->
     <% 
-      total_trainings_count = Training.count
+      selected_month = params[:stat_month].present? ? params[:stat_month].to_i : nil
+      selected_year  = params[:stat_year].present? ? params[:stat_year].to_i : nil
+      selected_training_id = params[:stat_training_id].present? ? params[:stat_training_id].to_i : nil
+
+      # Fetch metadata for quick filtering in memory
+      trainings_meta = Training.pluck(:id, :month, :year).map { |id, m, y| { id: id, month: m, year: y } }
+      
+      # Filter the trainings base on selections
+      if selected_month
+        trainings_meta.select! { |t| t[:month] == selected_month }
+      end
+      if selected_year
+        trainings_meta.select! { |t| t[:year] == selected_year }
+      end
+      if selected_training_id
+        trainings_meta.select! { |t| t[:id] == selected_training_id }
+      end
+
+      matching_training_ids = trainings_meta.map { |t| t[:id] }
+      total_trainings_count = matching_training_ids.size
+
       total_users_count = @employees.size
       total_completed_count = 0
       total_assigned_count = 0
       
       @employees.each do |emp|
-        total_assigned_count += emp.user_training_assignments.size
+        # Filter assigned trainings by the matching set
+        assigned = emp.user_training_assignments.select { |a| matching_training_ids.include?(a.training_id) }
+        total_assigned_count += assigned.size
+        
         if emp.user
-          total_completed_count += emp.user.user_training_progresses.select { |p| p.status == "completed" }.size
+          # Filter completed progresses by the matching set
+          completed = emp.user.user_training_progresses.select do |p| 
+            p.status == "completed" && matching_training_ids.include?(p.training_id)
+          end
+          total_completed_count += completed.size
         end
       end
       
@@ -187,12 +224,36 @@
       </div>
     </div>
 
-    <!-- Search bar -->
-    <div class="search-bar">
-      <svg xmlns="http://www.w3.org/2000/svg" style="width:16px;height:16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/>
-      </svg>
-      <input type="text" id="userSearch" placeholder="Search by name, email or code..." onkeyup="filterUsers()" />
+    <!-- Controls (Filter & Search) -->
+    <div style="display: flex; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; align-items: center;">
+      <!-- Search bar -->
+      <div class="search-bar" style="margin-top: 0; min-width: 320px;">
+        <svg xmlns="http://www.w3.org/2000/svg" style="width:16px;height:16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/>
+        </svg>
+        <input type="text" id="userSearch" placeholder="Search by name, email or code..." onkeyup="filterUsers()" />
+      </div>
+
+      <!-- Filters -->
+      <%= form_with url: user_training_assignments_path, method: :get, local: true, style: "display: flex; align-items: center; gap: 10px; flex-wrap: wrap;" do |f| %>
+        <%= select_tag :stat_month,
+              options_for_select(Date::MONTHNAMES.compact.each_with_index.map { |m,i| [m,i+1] }, params[:stat_month]),
+              include_blank: "All Months",
+              onchange: "this.form.submit();",
+              style: "border: 1px solid #e2e8f0; padding: 10px 16px; border-radius: 14px; font-size: 13px; font-weight: 600; outline: none; background: #fff; min-width: 140px; font-family: 'DM Sans', sans-serif; cursor: pointer; color: #111;" %>
+
+        <%= select_tag :stat_year,
+              options_for_select((2025..2030).to_a, params[:stat_year]),
+              include_blank: "All Years",
+              onchange: "this.form.submit();",
+              style: "border: 1px solid #e2e8f0; padding: 10px 16px; border-radius: 14px; font-size: 13px; font-weight: 600; outline: none; background: #fff; min-width: 120px; font-family: 'DM Sans', sans-serif; cursor: pointer; color: #111;" %>
+
+        <%= select_tag :stat_training_id,
+              options_from_collection_for_select(Training.order(:title), :id, :title, params[:stat_training_id]),
+              include_blank: "All Training Titles",
+              onchange: "this.form.submit();",
+              style: "border: 1px solid #e2e8f0; padding: 10px 16px; border-radius: 14px; font-size: 13px; font-weight: 600; outline: none; background: #fff; min-width: 180px; font-family: 'DM Sans', sans-serif; cursor: pointer; color: #111;" %>
+      <% end %>
     </div>
 
     <!-- Employee Cards -->

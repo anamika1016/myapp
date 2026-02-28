@@ -2,10 +2,11 @@
 
 Rails.application.routes.draw do
   # User-wise training assignment routes (HOD only)
-  get  "user_training_assignments",                              to: "user_training_assignments#index",  as: :user_training_assignments
-  get  "user_training_assignments/:employee_detail_id",         to: "user_training_assignments#show",   as: :user_training_assignment
-  get  "user_training_assignments/:employee_detail_id/edit",    to: "user_training_assignments#edit",   as: :edit_user_training_assignment
-  patch "user_training_assignments/:employee_detail_id",        to: "user_training_assignments#update", as: :update_user_training_assignment
+  resources :user_training_assignments, only: [ :index, :show, :edit, :update ], param: :employee_detail_id do
+    collection do
+      get :export_xlsx
+    end
+  end
 
   resources :trainings do
     member do
