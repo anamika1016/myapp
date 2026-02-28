@@ -1,10 +1,10 @@
-require 'roo'
-require 'axlsx'
+require "roo"
+require "axlsx"
 
 class EmployeeDetailsController < ApplicationController
-  before_action :set_employee_detail, only: [:edit, :update, :destroy]
-  load_and_authorize_resource except: [:approve, :return, :l2_approve, :l2_return, :edit_l1, :edit_l2]
-  
+  before_action :set_employee_detail, only: [ :edit, :update, :destroy ]
+  load_and_authorize_resource except: [ :approve, :return, :l2_approve, :l2_return, :edit_l1, :edit_l2 ]
+
   def index
     @employee_detail = EmployeeDetail.new
     @q = EmployeeDetail.ransack(params[:q])
@@ -17,18 +17,17 @@ class EmployeeDetailsController < ApplicationController
 
     @q = EmployeeDetail.ransack(params[:q])
     if @employee_detail.save
-      redirect_to employee_details_path, notice: 'Employee created successfully.'
+      redirect_to employee_details_path, notice: "Employee created successfully."
     else
       @employee_details = @q.result.order(created_at: :desc).page(params[:page]).per(10)
-      flash.now[:alert] = 'Failed to create employee.'
+      flash.now[:alert] = "Failed to create employee."
       render :index, status: :unprocessable_entity
     end
   end
 
   def update
-    
     if @employee_detail.update(employee_detail_params)
-      redirect_to employee_details_path, notice: 'Employee updated successfully.'
+      redirect_to employee_details_path, notice: "Employee updated successfully."
     else
       render :edit, status: :unprocessable_entity
     end
@@ -37,21 +36,21 @@ class EmployeeDetailsController < ApplicationController
   def destroy
     begin
       @employee_detail.destroy
-      
+
       # Check if the request came from L2 view and redirect appropriately
-      if request.referer&.include?('/employee_details/l2')
-        redirect_to l2_employee_details_path, notice: 'Employee deleted successfully.'
+      if request.referer&.include?("/employee_details/l2")
+        redirect_to l2_employee_details_path, notice: "Employee deleted successfully."
       else
-        redirect_to employee_details_path, notice: 'Employee deleted successfully.'
+        redirect_to employee_details_path, notice: "Employee deleted successfully."
       end
     rescue => e
       Rails.logger.error "Error deleting employee detail: #{e.message}"
-      
+
       # Check if the request came from L2 view and redirect appropriately
-      if request.referer&.include?('/employee_details/l2')
-        redirect_to l2_employee_details_path, alert: 'Failed to delete employee. Please try again.'
+      if request.referer&.include?("/employee_details/l2")
+        redirect_to l2_employee_details_path, alert: "Failed to delete employee. Please try again."
       else
-        redirect_to employee_details_path, alert: 'Failed to delete employee. Please try again.'
+        redirect_to employee_details_path, alert: "Failed to delete employee. Please try again."
       end
     end
   end
@@ -84,14 +83,14 @@ class EmployeeDetailsController < ApplicationController
       end
     end
 
-    tempfile = Tempfile.new(["employee_details", ".xlsx"])
+    tempfile = Tempfile.new([ "employee_details", ".xlsx" ])
     package.serialize(tempfile.path)
     send_file tempfile.path, filename: "employee_details.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   end
 
   def export_quarterly_xlsx
-    @employee_details = EmployeeDetail.includes(user_details: [:activity, :department, :achievements]).all
-    
+    @employee_details = EmployeeDetail.includes(user_details: [ :activity, :department, :achievements ]).all
+
     package = Axlsx::Package.new
     workbook = package.workbook
 
@@ -105,10 +104,10 @@ class EmployeeDetailsController < ApplicationController
 
       # Define quarters - Fixed sequence as per requirement with display names
       quarters = {
-        'Q1' => { months: ['april', 'may', 'june'], display: 'Apr-Jun' },
-        'Q2' => { months: ['july', 'august', 'september'], display: 'Jul-Sep' }, 
-        'Q3' => { months: ['october', 'november', 'december'], display: 'Oct-Dec' },
-        'Q4' => { months: ['january', 'february', 'march'], display: 'Jan-Mar' }
+        "Q1" => { months: [ "april", "may", "june" ], display: "Apr-Jun" },
+        "Q2" => { months: [ "july", "august", "september" ], display: "Jul-Sep" },
+        "Q3" => { months: [ "october", "november", "december" ], display: "Oct-Dec" },
+        "Q4" => { months: [ "january", "february", "march" ], display: "Jan-Mar" }
       }
 
       # Process each employee and quarter
@@ -116,10 +115,10 @@ class EmployeeDetailsController < ApplicationController
         quarters.each do |quarter_name, quarter_data|
           quarter_months = quarter_data[:months]
           quarter_display = quarter_data[:display]
-          
+
           # Get all achievements for this employee in this quarter
           all_quarter_achievements = emp.user_details.flat_map(&:achievements).select { |ach| quarter_months.include?(ach.month) }
-          
+
           # Only add row if there are achievements in this quarter
           if all_quarter_achievements.any?
             # Get L1 and L2 data from achievement remarks
@@ -127,7 +126,7 @@ class EmployeeDetailsController < ApplicationController
             l1_percentages = []
             l2_remarks = []
             l2_percentages = []
-            
+
             all_quarter_achievements.each do |achievement|
               if achievement.achievement_remark.present?
                 if achievement.achievement_remark.l1_remarks.present?
@@ -144,35 +143,35 @@ class EmployeeDetailsController < ApplicationController
                 end
               end
             end
-            
+
             # Calculate averages
             l1_avg = l1_percentages.any? ? (l1_percentages.sum / l1_percentages.size).round(1) : 0.0
             l2_avg = l2_percentages.any? ? (l2_percentages.sum / l2_percentages.size).round(1) : 0.0
-            
+
             # Join remarks with semicolons
-            l1_remarks_text = l1_remarks.uniq.join('; ')
-            l2_remarks_text = l2_remarks.uniq.join('; ')
-            
+            l1_remarks_text = l1_remarks.uniq.join("; ")
+            l2_remarks_text = l2_remarks.uniq.join("; ")
+
             sheet.add_row [
-              emp.employee_name || 'N/A',
-              emp.employee_code || 'N/A',
-              emp.department || 'N/A',
+              emp.employee_name || "N/A",
+              emp.employee_code || "N/A",
+              emp.department || "N/A",
               quarter_display,
-              emp.l1_employer_name || 'N/A',
-              emp.l1_code || 'N/A',
-              l1_remarks_text.presence || 'N/A',
-              l1_avg > 0 ? "#{l1_avg}%" : 'N/A',
-              emp.l2_employer_name || 'N/A',
-              emp.l2_code || 'N/A',
-              l2_remarks_text.presence || 'N/A',
-              l2_avg > 0 ? "#{l2_avg}%" : 'N/A'
+              emp.l1_employer_name || "N/A",
+              emp.l1_code || "N/A",
+              l1_remarks_text.presence || "N/A",
+              l1_avg > 0 ? "#{l1_avg}%" : "N/A",
+              emp.l2_employer_name || "N/A",
+              emp.l2_code || "N/A",
+              l2_remarks_text.presence || "N/A",
+              l2_avg > 0 ? "#{l2_avg}%" : "N/A"
             ]
           end
         end
       end
     end
 
-    tempfile = Tempfile.new(["quarterly_l1_l2_data", ".xlsx"])
+    tempfile = Tempfile.new([ "quarterly_l1_l2_data", ".xlsx" ])
     package.serialize(tempfile.path)
     send_file tempfile.path, filename: "quarterly_l1_l2_data.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   end
@@ -181,7 +180,7 @@ class EmployeeDetailsController < ApplicationController
     file = params[:file]
 
     if file.nil?
-      redirect_to employee_details_path, alert: 'Please upload a file.'
+      redirect_to employee_details_path, alert: "Please upload a file."
       return
     end
 
@@ -202,7 +201,7 @@ class EmployeeDetailsController < ApplicationController
     }
 
     (2..spreadsheet.last_row).each do |i|
-      row = Hash[[header, spreadsheet.row(i)].transpose]
+      row = Hash[[ header, spreadsheet.row(i) ].transpose]
       mapped_row = row.transform_keys { |key| header_map[key] }.compact
 
       begin
@@ -224,20 +223,20 @@ class EmployeeDetailsController < ApplicationController
       # PERFORMANCE FIX: Optimize includes to preload all necessary associations
       @employee_details = EmployeeDetail.includes(
         user_details: [
-          :activity, 
-          :department, 
+          :activity,
+          :department,
           achievements: :achievement_remark
         ]
       ).all
     else
       # PERFORMANCE FIX: Optimize includes to preload all necessary associations
       @employee_details = EmployeeDetail
-                            .where(status: ['pending', 'l1_returned', 'l1_approved', 'l2_returned', 'l2_approved'])
+                            .where(status: [ "pending", "l1_returned", "l1_approved", "l2_returned", "l2_approved" ])
                             .where(l1_code: current_user.employee_code)
                             .includes(
                               user_details: [
-                                :activity, 
-                                :department, 
+                                :activity,
+                                :department,
                                 achievements: :achievement_remark
                               ]
                             )
@@ -245,28 +244,28 @@ class EmployeeDetailsController < ApplicationController
 
     # Group employees by quarters for display
     @quarterly_data = group_employees_by_quarters(@employee_details)
-    
+
     # Create the data structure expected by the view
     @quarterly_employee_data = build_quarterly_employee_data(@employee_details)
-    
+
     # PERFORMANCE FIX: Pre-calculate summary data to avoid processing in view
     @summary_data = calculate_summary_data(@employee_details)
   end
 
   # Show employee details with quarterly view
-  def show    
+  def show
     begin
       @employee_detail = EmployeeDetail.find(params[:id])
     rescue ActiveRecord::RecordNotFound
       redirect_to employee_details_path, alert: "❌ Employee detail not found. The record may have been deleted."
       return
     end
-    
+
     authorize! :read, @employee_detail
-    
+
     @user_detail_id = params[:user_detail_id]
     @selected_quarter = params[:quarter]
-    
+
     # FIXED: Get ALL user details, not just those with achievements
     @user_details = @employee_detail.user_details
                       .includes(:activity, :department, achievements: :achievement_remark)
@@ -283,7 +282,6 @@ class EmployeeDetailsController < ApplicationController
 
   # Quarterly approval - approve all activities for a quarter
   def approve
-    
     begin
       @employee_detail = EmployeeDetail.find(params[:id])
     rescue ActiveRecord::RecordNotFound
@@ -308,19 +306,19 @@ class EmployeeDetailsController < ApplicationController
     if can_act_as_l1?(@employee_detail)
       Rails.logger.debug "PROCESSING L1 QUARTERLY APPROVAL"
       # Pass action_type parameter to indicate this is an approval action
-      params[:action_type] = 'approve'
+      params[:action_type] = "approve"
       result = process_quarterly_l1_approval
-      
+
       if result[:success]
         if request.xhr? || params[:action_type].present?
-          render json: { 
-            success: true, 
-            count: result[:count], 
+          render json: {
+            success: true,
+            count: result[:count],
             message: "✅ Successfully approved #{result[:count]} activities for #{params[:selected_quarter] || 'all quarters'} by L1",
-            updated_status: 'l1_approved'
+            updated_status: "l1_approved"
           }
         else
-          redirect_to employee_detail_path(@employee_detail, quarter: params[:selected_quarter]), 
+          redirect_to employee_detail_path(@employee_detail, quarter: params[:selected_quarter]),
                       notice: "✅ Successfully approved #{result[:count]} activities for #{params[:selected_quarter] || 'all quarters'} by L1"
         end
       else
@@ -330,22 +328,22 @@ class EmployeeDetailsController < ApplicationController
           redirect_back fallback_location: root_path, alert: result[:message]
         end
       end
-    
+
     elsif can_act_as_l2?(@employee_detail)
       Rails.logger.debug "PROCESSING L2 QUARTERLY APPROVAL"
       # Pass action_type parameter to indicate this is an approval action
-      params[:action_type] = 'approve'
+      params[:action_type] = "approve"
       result = process_quarterly_l2_approval
-      
+
       if result[:success]
         if request.xhr? || params[:action_type].present?
-          render json: { 
-            success: true, 
-            count: result[:count], 
-            message: "✅ Successfully approved #{result[:count]} activities for #{params[:selected_quarter] || 'all quarters'} by L2" 
+          render json: {
+            success: true,
+            count: result[:count],
+            message: "✅ Successfully approved #{result[:count]} activities for #{params[:selected_quarter] || 'all quarters'} by L2"
           }
         else
-          redirect_to employee_detail_path(@employee_detail, quarter: params[:selected_quarter]), 
+          redirect_to employee_detail_path(@employee_detail, quarter: params[:selected_quarter]),
                       notice: "✅ Successfully approved #{result[:count]} activities for #{params[:selected_quarter] || 'all quarters'} by L2"
         end
       else
@@ -367,7 +365,6 @@ class EmployeeDetailsController < ApplicationController
 
   # Quarterly return - return all activities for a quarter
   def return
-    
     begin
       @employee_detail = EmployeeDetail.find(params[:id])
     rescue ActiveRecord::RecordNotFound
@@ -378,7 +375,7 @@ class EmployeeDetailsController < ApplicationController
       end
       return
     end
-    
+
     # Skip authorization check for AJAX requests to prevent CanCan errors
     if request.xhr? || params[:action_type].present?
       # For AJAX requests, we'll handle authorization in the processing method
@@ -388,23 +385,23 @@ class EmployeeDetailsController < ApplicationController
         return
       end
     end
-    
+
     if can_act_as_l1?(@employee_detail)
       Rails.logger.debug "PROCESSING L1 QUARTERLY RETURN"
       # Pass action_type parameter to indicate this is a return action
-      params[:action_type] = 'return'
+      params[:action_type] = "return"
       result = process_quarterly_l1_return
-      
+
       if result[:success]
         if request.xhr? || params[:action_type].present?
-          render json: { 
-            success: true, 
-            count: result[:count], 
+          render json: {
+            success: true,
+            count: result[:count],
             message: "⚠️ Successfully returned #{result[:count]} activities for #{params[:selected_quarter] || 'all quarters'} by L1",
-            updated_status: 'l1_returned'
+            updated_status: "l1_returned"
           }
         else
-          redirect_to employee_detail_path(@employee_detail, quarter: params[:selected_quarter]), 
+          redirect_to employee_detail_path(@employee_detail, quarter: params[:selected_quarter]),
                       alert: "⚠️ Successfully returned #{result[:count]} activities for #{params[:selected_quarter] || 'all quarters'} by L1"
         end
       else
@@ -418,18 +415,18 @@ class EmployeeDetailsController < ApplicationController
     elsif can_act_as_l2?(@employee_detail)
       Rails.logger.debug "PROCESSING L2 QUARTERLY RETURN"
       # Pass action_type parameter to indicate this is a return action
-      params[:action_type] = 'return'
+      params[:action_type] = "return"
       result = process_quarterly_l2_return
-      
+
       if result[:success]
         if request.xhr? || params[:action_type].present?
-          render json: { 
-            success: true, 
-            count: result[:count], 
-            message: "⚠️ Successfully returned #{result[:count]} activities for #{params[:selected_quarter] || 'all quarters'} by L2" 
+          render json: {
+            success: true,
+            count: result[:count],
+            message: "⚠️ Successfully returned #{result[:count]} activities for #{params[:selected_quarter] || 'all quarters'} by L2"
           }
         else
-          redirect_to employee_detail_path(@employee_detail, quarter: params[:selected_quarter]), 
+          redirect_to employee_detail_path(@employee_detail, quarter: params[:selected_quarter]),
                       alert: "⚠️ Successfully returned #{result[:count]} activities for #{params[:selected_quarter] || 'all quarters'} by L2"
         end
       else
@@ -455,21 +452,21 @@ def l2
     # PERFORMANCE FIX: Optimize includes to preload all necessary associations
     employee_details = EmployeeDetail.includes(
       user_details: [
-        :activity, 
-        :department, 
+        :activity,
+        :department,
         achievements: :achievement_remark
       ]
     ).order(created_at: :desc)
   else
     # L2 managers can only see their assigned employees with L1+ approved achievements
     # PERFORMANCE FIX: Optimize includes to preload all necessary associations
-    employee_details = EmployeeDetail.where("l2_code = ? OR l2_employer_name = ?", 
-                                           current_user.employee_code, 
+    employee_details = EmployeeDetail.where("l2_code = ? OR l2_employer_name = ?",
+                                           current_user.employee_code,
                                            current_user.email)
                                    .includes(
                                      user_details: [
-                                       :activity, 
-                                       :department, 
+                                       :activity,
+                                       :department,
                                        achievements: :achievement_remark
                                      ]
                                    )
@@ -481,11 +478,10 @@ def l2
     emp.user_details.any? do |ud|
       ud.achievements.any? do |achievement|
         # Only show records with L1 approved, L2 approved, or L2 returned status
-        ['l1_approved', 'l2_approved', 'l2_returned'].include?(achievement.status)
+        [ "l1_approved", "l2_approved", "l2_returned" ].include?(achievement.status)
       end
     end
   end
-
 end
 
   def show_l2
@@ -495,15 +491,15 @@ end
       redirect_to employee_details_path, alert: "❌ Employee detail not found. The record may have been deleted."
       return
     end
-    
+
     unless current_user.hod? || can_act_as_l2?(@employee_detail)
       redirect_to root_path, alert: "❌ You are not authorized to access this page."
       return
     end
-    
+
     @user_detail_id = params[:user_detail_id]
     @selected_quarter = params[:quarter]
-    
+
     # FIXED: Get ALL user details, not just those with achievements
     @user_details = @employee_detail.user_details
                       .includes(:activity, :department, achievements: :achievement_remark)
@@ -520,7 +516,6 @@ end
   end
 
   def l2_approve
-    
     begin
       @employee_detail = EmployeeDetail.find(params[:id])
     rescue ActiveRecord::RecordNotFound
@@ -532,7 +527,7 @@ end
       end
       return
     end
-    
+
     # Skip authorization check for AJAX requests to prevent CanCan errors
     if request.xhr? || params[:action_type].present?
       # For AJAX requests, we'll handle authorization in the processing method
@@ -544,33 +539,32 @@ end
     end
 
     # Pass action_type parameter to indicate this is an approval action
-    params[:action_type] = 'approve'
+    params[:action_type] = "approve"
     result = process_quarterly_l2_approval
 
     if result[:success]
       if request.xhr? || params[:action_type].present?
-        render json: { 
-          success: true, 
-          count: result[:count], 
+        render json: {
+          success: true,
+          count: result[:count],
           message: "✅ Successfully approved #{result[:count]} activities for #{params[:selected_quarter] || 'all quarters'} by L2",
-          updated_status: 'l2_approved'
+          updated_status: "l2_approved"
         }
       else
-        redirect_to show_l2_employee_detail_path(@employee_detail, quarter: params[:selected_quarter]), 
+        redirect_to show_l2_employee_detail_path(@employee_detail, quarter: params[:selected_quarter]),
                     notice: "✅ Successfully approved #{result[:count]} activities for #{params[:selected_quarter] || 'all quarters'} by L2"
       end
     else
       if request.xhr? || params[:action_type].present?
         render json: { success: false, message: result[:message] }, status: :unprocessable_entity
       else
-        redirect_to show_l2_employee_detail_path(@employee_detail, quarter: params[:selected_quarter]), 
+        redirect_to show_l2_employee_detail_path(@employee_detail, quarter: params[:selected_quarter]),
                     alert: result[:message]
       end
     end
   end
 
   def l2_return
-    
     begin
       @employee_detail = EmployeeDetail.find(params[:id])
     rescue ActiveRecord::RecordNotFound
@@ -592,31 +586,31 @@ end
         return
       end
     end
-    
+
     # Add debugging
-    
+
     # Pass action_type parameter to indicate this is a return action
-    params[:action_type] = 'return'
+    params[:action_type] = "return"
     result = process_quarterly_l2_return
 
 
     if result[:success]
       if request.xhr? || params[:action_type].present?
-        render json: { 
-          success: true, 
-          count: result[:count], 
+        render json: {
+          success: true,
+          count: result[:count],
           message: "⚠️ Successfully returned #{result[:count]} activities for #{params[:selected_quarter] || 'all quarters'} by L2",
-          updated_status: 'l2_returned'
+          updated_status: "l2_returned"
         }
       else
-        redirect_to show_l2_employee_detail_path(@employee_detail, quarter: params[:selected_quarter]), 
+        redirect_to show_l2_employee_detail_path(@employee_detail, quarter: params[:selected_quarter]),
                     notice: "⚠️ Successfully returned #{result[:count]} activities for #{params[:selected_quarter] || 'all quarters'} by L2"
       end
     else
       if request.xhr? || params[:action_type].present?
         render json: { success: false, message: result[:message] }, status: :unprocessable_entity
       else
-        redirect_to show_l2_employee_detail_path(@employee_detail, quarter: params[:selected_quarter]), 
+        redirect_to show_l2_employee_detail_path(@employee_detail, quarter: params[:selected_quarter]),
                     alert: result[:message]
       end
     end
@@ -624,7 +618,6 @@ end
 
   # Edit L1 remarks and percentage
   def edit_l1
-    
     begin
       @employee_detail = EmployeeDetail.find(params[:id])
     rescue ActiveRecord::RecordNotFound
@@ -636,7 +629,7 @@ end
       end
       return
     end
-    
+
     # Only HOD can edit L1 data
     unless current_user.hod?
       if request.xhr?
@@ -646,26 +639,26 @@ end
       end
       return
     end
-    
+
     result = process_l1_edit
-    
+
     if result[:success]
       if request.xhr?
-        render json: { 
-          success: true, 
+        render json: {
+          success: true,
           message: "✅ Successfully updated L1 data for #{params[:selected_quarter] || 'all quarters'}",
           percentage: result[:percentage],
           remarks: result[:remarks]
         }
       else
-        redirect_to employee_detail_path(@employee_detail, quarter: params[:selected_quarter]), 
+        redirect_to employee_detail_path(@employee_detail, quarter: params[:selected_quarter]),
                     notice: "✅ Successfully updated L1 data for #{params[:selected_quarter] || 'all quarters'}"
       end
     else
       if request.xhr?
         render json: { success: false, message: result[:message] }, status: :unprocessable_entity
       else
-        redirect_to employee_detail_path(@employee_detail, quarter: params[:selected_quarter]), 
+        redirect_to employee_detail_path(@employee_detail, quarter: params[:selected_quarter]),
                     alert: result[:message]
       end
     end
@@ -673,7 +666,6 @@ end
 
   # Edit L2 remarks and percentage
   def edit_l2
-    
     begin
       @employee_detail = EmployeeDetail.find(params[:id])
     rescue ActiveRecord::RecordNotFound
@@ -685,7 +677,7 @@ end
       end
       return
     end
-    
+
     # Only HOD can edit L2 data
     unless current_user.hod?
       if request.xhr?
@@ -695,26 +687,26 @@ end
       end
       return
     end
-    
+
     result = process_l2_edit
-    
+
     if result[:success]
       if request.xhr?
-        render json: { 
-          success: true, 
+        render json: {
+          success: true,
           message: "✅ Successfully updated L2 data for #{params[:selected_quarter] || 'all quarters'}",
           percentage: result[:percentage],
           remarks: result[:remarks]
         }
       else
-        redirect_to show_l2_employee_detail_path(@employee_detail, quarter: params[:selected_quarter]), 
+        redirect_to show_l2_employee_detail_path(@employee_detail, quarter: params[:selected_quarter]),
                     notice: "✅ Successfully updated L2 data for #{params[:selected_quarter] || 'all quarters'}"
       end
     else
       if request.xhr?
         render json: { success: false, message: result[:message] }, status: :unprocessable_entity
       else
-        redirect_to show_l2_employee_detail_path(@employee_detail, quarter: params[:selected_quarter]), 
+        redirect_to show_l2_employee_detail_path(@employee_detail, quarter: params[:selected_quarter]),
                     alert: result[:message]
       end
     end
@@ -729,46 +721,46 @@ end
   def employee_detail_params
     params.require(:employee_detail).permit(
       :employee_id, :employee_name, :employee_email, :employee_code, :mobile_number,
-      :l1_code, :l1_employer_name, :l2_code, :l2_employer_name, 
+      :l1_code, :l1_employer_name, :l2_code, :l2_employer_name,
       :post, :department, :l1_remarks, :l1_percentage, :l2_remarks, :l2_percentage
     )
   end
 
   def can_act_as_l1?(employee_detail)
-    current_user.hod? || 
+    current_user.hod? ||
     current_user.employee_code == employee_detail.l1_code ||
     current_user.email == employee_detail.l1_employer_name
   end
 
   def can_act_as_l2?(employee_detail)
-    current_user.hod? || 
+    current_user.hod? ||
     current_user.employee_code == employee_detail.l2_code ||
     current_user.email == employee_detail.l2_employer_name
   end
 
   def get_quarter_months(quarter)
     case quarter
-    when 'Q1'
-      ['april', 'may', 'june']
-    when 'Q2'
-      ['july', 'august', 'september']
-    when 'Q3'
-      ['october', 'november', 'december']
-    when 'Q4'
-      ['january', 'february', 'march']
+    when "Q1"
+      [ "april", "may", "june" ]
+    when "Q2"
+      [ "july", "august", "september" ]
+    when "Q3"
+      [ "october", "november", "december" ]
+    when "Q4"
+      [ "january", "february", "march" ]
     else
       []
     end
   end
 
   def get_all_quarters
-    ['Q1', 'Q2', 'Q3', 'Q4']
+    [ "Q1", "Q2", "Q3", "Q4" ]
   end
 
   # Group employees by quarters based on their activities (FIXED to show ALL activities)
   def group_employees_by_quarters(employee_details)
     quarterly_data = {}
-    
+
     get_all_quarters.each do |quarter|
       quarterly_data[quarter] = {
         employees: [],
@@ -782,7 +774,7 @@ end
     employee_details.each do |employee|
       get_all_quarters.each do |quarter|
         quarter_months = get_quarter_months(quarter)
-        
+
         # FIXED: Get ALL activities for this quarter, not just those with achievements
         quarter_activities = employee.user_details
                                     .where(activity_id: Activity.joins(:department)
@@ -796,22 +788,22 @@ end
             total_count: 0,
             pending_count: 0,
             approved_count: 0,
-            overall_status: 'pending'
+            overall_status: "pending"
           }
 
           # PERFORMANCE FIX: Preload achievements to avoid N+1 queries
           quarter_activities.includes(:achievements, :activity, :department).each do |user_detail|
             # PERFORMANCE FIX: Create a hash of achievements by month for fast lookup
             achievements_by_month = user_detail.achievements.index_by(&:month)
-            
+
             # Check each month in the quarter for targets
             quarter_months.each do |month|
               target_value = get_target_for_month(user_detail, month)
-              next unless target_value.present? && target_value.to_s != '0'
-              
+              next unless target_value.present? && target_value.to_s != "0"
+
               # PERFORMANCE FIX: Use in-memory hash lookup instead of database query
               achievement = achievements_by_month[month]
-              
+
               activity_data = {
                 user_detail: user_detail,
                 achievement: achievement,
@@ -819,16 +811,16 @@ end
                 activity_name: user_detail.activity&.activity_name,
                 department: user_detail.department&.department_type,
                 target: target_value,
-                achievement_value: achievement&.achievement || '',
-                status: achievement&.status || 'pending',
+                achievement_value: achievement&.achievement || "",
+                status: achievement&.status || "pending",
                 has_target: true
               }
 
               employee_quarter_data[:activities] << activity_data
               employee_quarter_data[:total_count] += 1
-              
+
               case achievement&.status
-              when 'l1_approved', 'l2_approved'
+              when "l1_approved", "l2_approved"
                 employee_quarter_data[:approved_count] += 1
               else
                 employee_quarter_data[:pending_count] += 1
@@ -838,9 +830,9 @@ end
 
           # Determine overall status for this employee in this quarter
           if employee_quarter_data[:approved_count] == employee_quarter_data[:total_count] && employee_quarter_data[:total_count] > 0
-            employee_quarter_data[:overall_status] = 'approved'
+            employee_quarter_data[:overall_status] = "approved"
           elsif employee_quarter_data[:pending_count] > 0
-            employee_quarter_data[:overall_status] = 'pending'
+            employee_quarter_data[:overall_status] = "pending"
           end
 
           quarterly_data[quarter][:employees] << employee_quarter_data
@@ -863,7 +855,7 @@ end
   # Get all quarterly activities grouped by quarter - FIXED to show ALL activities
   def get_all_quarterly_activities(user_details)
     all_activities = {}
-    
+
     get_all_quarters.each do |quarter|
       all_activities[quarter] = get_quarterly_activities(user_details, quarter)
     end
@@ -879,15 +871,15 @@ end
     user_details.each do |user_detail|
       # PERFORMANCE FIX: Create a hash of achievements by month for fast lookup
       achievements_by_month = user_detail.achievements.index_by(&:month)
-      
+
       quarter_months.each do |month|
         # Check if there's a target for this month
         target_value = get_target_for_month(user_detail, month)
-        next unless target_value.present? && target_value.to_s != '0'
-        
+        next unless target_value.present? && target_value.to_s != "0"
+
         # PERFORMANCE FIX: Use in-memory hash lookup instead of database query
         achievement = achievements_by_month[month]
-        
+
         # Create activity data regardless of whether achievement exists
         activity_data = {
           user_detail: user_detail,
@@ -896,9 +888,9 @@ end
           activity_name: user_detail.activity&.activity_name,
           department: user_detail.department&.department_type,
           target: target_value,
-          achievement_value: achievement&.achievement || '',
-          status: achievement&.status || 'pending',
-          employee_remarks: achievement&.employee_remarks || '',
+          achievement_value: achievement&.achievement || "",
+          status: achievement&.status || "pending",
+          employee_remarks: achievement&.employee_remarks || "",
           has_target: true,
           can_approve: can_approve_activity?(achievement),
           can_return: can_return_activity?(achievement)
@@ -908,77 +900,77 @@ end
       end
     end
 
-    activities.sort_by { |a| [a[:month], a[:activity_name]] }
+    activities.sort_by { |a| [ a[:month], a[:activity_name] ] }
   end
 
   # Helper method to check if an activity can be approved
   def can_approve_activity?(achievement)
     return false unless achievement
-    ['pending', 'l1_returned', 'l2_returned'].include?(achievement.status)
+    [ "pending", "l1_returned", "l2_returned" ].include?(achievement.status)
   end
 
   # Helper method to check if an activity can be returned
   def can_return_activity?(achievement)
     return false unless achievement
-    ['pending', 'l1_approved', 'l2_approved'].include?(achievement.status)
+    [ "pending", "l1_approved", "l2_approved" ].include?(achievement.status)
   end
 
   # Helper method to get overall quarter status
   def get_quarter_overall_status(activities)
-    return 'no_data' if activities.empty?
-    
+    return "no_data" if activities.empty?
+
     statuses = activities.map { |a| a[:status] }
-    
+
     # FIXED: L2 statuses should take highest priority
     # If ANY activity has L2 approved, the quarter is L2 approved
-    if statuses.include?('l2_approved')
-      'l2_approved'
+    if statuses.include?("l2_approved")
+      "l2_approved"
     # If ANY activity has L2 returned, the quarter is L2 returned
-    elsif statuses.include?('l2_returned')
-      'l2_returned'
+    elsif statuses.include?("l2_returned")
+      "l2_returned"
     # If ALL activities are L1 approved, the quarter is L1 approved
-    elsif statuses.all? { |s| ['l1_approved'].include?(s) }
-      'l1_approved'
+    elsif statuses.all? { |s| [ "l1_approved" ].include?(s) }
+      "l1_approved"
     # If ANY activity has L1 returned, the quarter is L1 returned
-    elsif statuses.any? { |s| ['l1_returned'].include?(s) }
-      'l1_returned'
+    elsif statuses.any? { |s| [ "l1_returned" ].include?(s) }
+      "l1_returned"
     # If ANY activity has submitted status, the quarter is submitted
-    elsif statuses.any? { |s| ['submitted'].include?(s) }
-      'submitted'
+    elsif statuses.any? { |s| [ "submitted" ].include?(s) }
+      "submitted"
     else
-      'pending'
+      "pending"
     end
   end
 
   # Get all activities that can be approved/returned for a specific quarter
-  def get_approvable_activities_for_quarter(user_details, quarter, approval_level = 'l1')
+  def get_approvable_activities_for_quarter(user_details, quarter, approval_level = "l1")
     quarter_months = get_quarter_months(quarter)
     approvable_activities = []
 
     user_details.each do |user_detail|
       # PERFORMANCE FIX: Create a hash of achievements by month for fast lookup
       achievements_by_month = user_detail.achievements.index_by(&:month)
-      
+
       quarter_months.each do |month|
         # Check if there's a target for this month
         target_value = get_target_for_month(user_detail, month)
-        next unless target_value.present? && target_value.to_s != '0'
-        
+        next unless target_value.present? && target_value.to_s != "0"
+
         # PERFORMANCE FIX: Use in-memory hash lookup instead of database query
         achievement = achievements_by_month[month]
-        
+
         # Check if this activity can be approved/returned at the specified level
         can_act = case approval_level
-        when 'l1'
+        when "l1"
           can_approve_activity?(achievement) || can_return_activity?(achievement)
-        when 'l2'
-          achievement && ['l1_approved', 'l2_returned'].include?(achievement.status)
+        when "l2"
+          achievement && [ "l1_approved", "l2_returned" ].include?(achievement.status)
         else
           false
         end
-        
+
         next unless can_act
-        
+
         approvable_activities << {
           user_detail: user_detail,
           achievement: achievement,
@@ -986,16 +978,16 @@ end
           activity_name: user_detail.activity&.activity_name,
           department: user_detail.department&.department_type,
           target: target_value,
-          achievement_value: achievement&.achievement || '',
-          status: achievement&.status || 'pending',
-          employee_remarks: achievement&.employee_remarks || '',
+          achievement_value: achievement&.achievement || "",
+          status: achievement&.status || "pending",
+          employee_remarks: achievement&.employee_remarks || "",
           can_approve: can_approve_activity?(achievement),
           can_return: can_return_activity?(achievement)
         }
       end
     end
 
-    approvable_activities.sort_by { |a| [a[:month], a[:activity_name]] }
+    approvable_activities.sort_by { |a| [ a[:month], a[:activity_name] ] }
   end
 
   # Get target value for a specific month
@@ -1009,57 +1001,56 @@ end
     unless can_act_as_l1?(@employee_detail)
       return { success: false, message: "❌ You are not authorized to perform L1 actions on this record" }
     end
-    
+
     approved_count = 0
-    
+
     # Determine if this is an approval or return action
-    action_type = params[:action_type] || 'approve'
-    is_approval = action_type.include?('approve')
-    new_status = is_approval ? 'l1_approved' : 'l1_returned'
-    
+    action_type = params[:action_type] || "approve"
+    is_approval = action_type.include?("approve")
+    new_status = is_approval ? "l1_approved" : "l1_returned"
+
     if params[:selected_quarter].present?
       # FIXED: Approve/Return specific quarter as a single unit
       quarter_months = get_quarter_months(params[:selected_quarter])
-      
+
       @employee_detail.user_details.each do |detail|
-        
         # FIXED: Process the entire quarter as one unit, not month by month
         quarter_achievements = []
-        
+
         # First, collect all achievements for this quarter
         quarter_months.each do |month|
           # FIXED: Process ALL months in the quarter, not just those with targets
           # This ensures the entire quarter gets approved when L1 approves
-          
-          
+
+
           # Find or create achievement for this month
           achievement = detail.achievements.find_or_create_by(month: month)
-          
-          
+
+
           # Ensure achievement is saved and has an ID
           achievement.save! if achievement.new_record?
-          
+
           # Add to quarter achievements list
           quarter_achievements << achievement
         end
-        
+
         # FIXED: Now process the entire quarter as one unit
         if quarter_achievements.any?
-          
+
           # FIXED: Update ALL achievements in the quarter to the same status
           quarter_achievements.each do |achievement|
             old_status = achievement.status
             achievement.update!(status: new_status)
-            
+
             # Create or update achievement remark with COMMON remarks for quarter
             remark = achievement.achievement_remark || achievement.build_achievement_remark
             remark.l1_remarks = params[:remarks] if params[:remarks].present?
             remark.l1_percentage = params[:percentage] if params[:percentage].present?
             remark.save!
-            
+
             approved_count += 1
           end
-          
+
         else
           Rails.logger.warn "No achievements found for quarter #{params[:selected_quarter]} in activity #{detail.activity.activity_name}"
         end
@@ -1069,25 +1060,25 @@ end
       @employee_detail.user_details.each do |detail|
         get_all_quarters.each do |quarter|
           quarter_months = get_quarter_months(quarter)
-          
+
           quarter_months.each do |month|
             # FIXED: Process ALL months in the quarter, not just those with targets
             # This ensures the entire quarter gets approved when processing all quarters
-            
+
             # Find or create achievement for this month
             achievement = detail.achievements.find_or_create_by(month: month)
-            
+
             # Ensure achievement is saved and has an ID
             achievement.save! if achievement.new_record?
-            
+
             # Update achievement status
             achievement.update!(status: new_status)
-            
+
             remark = achievement.achievement_remark || achievement.build_achievement_remark
             remark.l1_remarks = params[:remarks] if params[:remarks].present?
             remark.l1_percentage = params[:percentage] if params[:percentage].present?
             remark.save!
-            
+
             approved_count += 1
           end
         end
@@ -1097,7 +1088,7 @@ end
     if approved_count > 0
       { success: true, count: approved_count }
     else
-      action_text = is_approval ? 'approve' : 'return'
+      action_text = is_approval ? "approve" : "return"
       { success: false, message: "❌ No activities found to #{action_text} for the selected quarter" }
     end
   end
@@ -1114,60 +1105,59 @@ def process_quarterly_l2_approval
   unless current_user.hod? || can_act_as_l2?(@employee_detail)
     return { success: false, message: "❌ You are not authorized to perform L2 actions on this record" }
   end
-  
+
   approved_count = 0
-  
+
   # Determine if this is an approval or return action
-  action_type = params[:action_type] || 'approve'
-  is_approval = action_type.include?('approve')
-  new_status = is_approval ? 'l2_approved' : 'l2_returned'
-  
-  
+  action_type = params[:action_type] || "approve"
+  is_approval = action_type.include?("approve")
+  new_status = is_approval ? "l2_approved" : "l2_returned"
+
+
   if params[:selected_quarter].present?
     # FIXED: Approve/Return specific quarter as a single unit
     quarter_months = get_quarter_months(params[:selected_quarter])
-    
+
     @employee_detail.user_details.each do |detail|
-      
       # FIXED: Process the entire quarter as one unit, not month by month
       quarter_achievements = []
-      
+
       # First, collect all achievements for this quarter
       quarter_months.each do |month|
         # FIXED: Process ALL months in the quarter, not just those with targets
         # This ensures the entire quarter gets approved when L2 approves
-        
-        
+
+
         # Find or create achievement for this month
         achievement = detail.achievements.find_or_create_by(month: month)
-        
+
         # Ensure achievement is saved and has an ID
         achievement.save! if achievement.new_record?
-        
+
         # Add to quarter achievements list
         quarter_achievements << achievement
       end
-      
+
       # FIXED: Now process the entire quarter as one unit
       if quarter_achievements.any?
-        
+
         # Update ALL achievements in the quarter to the same status
         quarter_achievements.each do |achievement|
           # For L2 return, we should be able to return L1 approved achievements
           # For L2 approve, we need L1 approved or L2 returned achievements
           if is_approval
             # For approval, check eligibility
-            eligible_statuses = ['l1_approved', 'l2_returned']
+            eligible_statuses = [ "l1_approved", "l2_returned" ]
             if eligible_statuses.include?(achievement.status)
               old_status = achievement.status
               achievement.update!(status: new_status)
-              
+
               # Create or update achievement remark with COMMON remarks for quarter
               remark = achievement.achievement_remark || achievement.build_achievement_remark
-              remark.l2_remarks = params[:l2_remarks] || params[:remarks] if (params[:l2_remarks].present? || params[:remarks].present?)
-              remark.l2_percentage = params[:l2_percentage] || params[:percentage] if (params[:l2_percentage].present? || params[:percentage].present?)
+              remark.l2_remarks = params[:l2_remarks] || params[:remarks] if params[:l2_remarks].present? || params[:remarks].present?
+              remark.l2_percentage = params[:l2_percentage] || params[:percentage] if params[:l2_percentage].present? || params[:percentage].present?
               remark.save!
-              
+
               approved_count += 1
             else
             end
@@ -1175,17 +1165,17 @@ def process_quarterly_l2_approval
             # For return, process ALL achievements regardless of current status
             old_status = achievement.status
             achievement.update!(status: new_status)
-            
+
             # Create or update achievement remark with COMMON remarks for quarter
             remark = achievement.achievement_remark || achievement.build_achievement_remark
-            remark.l2_remarks = params[:l2_remarks] || params[:remarks] if (params[:l2_remarks].present? || params[:remarks].present?)
-            remark.l2_percentage = params[:l2_percentage] || params[:percentage] if (params[:l2_percentage].present? || params[:percentage].present?)
+            remark.l2_remarks = params[:l2_remarks] || params[:remarks] if params[:l2_remarks].present? || params[:remarks].present?
+            remark.l2_percentage = params[:l2_percentage] || params[:percentage] if params[:l2_percentage].present? || params[:percentage].present?
             remark.save!
-            
+
             approved_count += 1
           end
         end
-        
+
       else
         Rails.logger.warn "No achievements found for quarter #{params[:selected_quarter]} in activity #{detail.activity.activity_name}"
       end
@@ -1195,30 +1185,30 @@ def process_quarterly_l2_approval
     @employee_detail.user_details.each do |detail|
       get_all_quarters.each do |quarter|
         quarter_months = get_quarter_months(quarter)
-        
+
         quarter_months.each do |month|
           # FIXED: Process ALL months in the quarter, not just those with targets
           # This ensures the entire quarter gets approved when processing all quarters
-          
+
           # Find or create achievement for this month
           achievement = detail.achievements.find_or_create_by(month: month)
-          
+
           # Ensure achievement is saved and has an ID
           achievement.save! if achievement.new_record?
-          
+
           # For L2 return, we should be able to return L1 approved achievements
           # For L2 approve, we need L1 approved or L2 returned achievements
-          eligible_statuses = is_approval ? ['l1_approved', 'l2_returned'] : ['l1_approved']
-          
+          eligible_statuses = is_approval ? [ "l1_approved", "l2_returned" ] : [ "l1_approved" ]
+
           if eligible_statuses.include?(achievement.status)
             # Update achievement status
             achievement.update!(status: new_status)
-            
+
             remark = achievement.achievement_remark || achievement.build_achievement_remark
-            remark.l2_remarks = params[:l2_remarks] || params[:remarks] if (params[:l2_remarks].present? || params[:remarks].present?)
-            remark.l2_percentage = params[:l2_percentage] || params[:percentage] if (params[:l2_percentage].present? || params[:percentage].present?)
+            remark.l2_remarks = params[:l2_remarks] || params[:remarks] if params[:l2_remarks].present? || params[:remarks].present?
+            remark.l2_percentage = params[:l2_percentage] || params[:percentage] if params[:l2_percentage].present? || params[:percentage].present?
             remark.save!
-            
+
             approved_count += 1
           end
         end
@@ -1229,7 +1219,7 @@ def process_quarterly_l2_approval
   if approved_count > 0
     { success: true, count: approved_count }
   else
-    action_text = is_approval ? 'approve' : 'return'
+    action_text = is_approval ? "approve" : "return"
     { success: false, message: "❌ No L1 approved activities found to #{action_text} for the selected quarter" }
   end
 end
@@ -1254,34 +1244,34 @@ end
     }
 
     quarters = {
-      'Q1' => ['april', 'may', 'june'],
-      'Q2' => ['july', 'august', 'september'], 
-      'Q3' => ['october', 'november', 'december'],
-      'Q4' => ['january', 'february', 'march']
+      "Q1" => [ "april", "may", "june" ],
+      "Q2" => [ "july", "august", "september" ],
+      "Q3" => [ "october", "november", "december" ],
+      "Q4" => [ "january", "february", "march" ]
     }
 
     employee_details.each do |emp|
       quarters.each do |quarter_name, quarter_months|
         # PERFORMANCE FIX: Use preloaded associations instead of flat_map
         all_quarter_achievements = emp.user_details.flat_map(&:achievements).select { |ach| quarter_months.include?(ach.month) }
-        
+
         next if all_quarter_achievements.empty?
-        
+
         summary_data[:total_quarterly_records] += 1
-        
+
         # PERFORMANCE FIX: Optimize status calculation
         quarter_statuses = all_quarter_achievements.map { |ach| ach.status || "pending" }
-        
+
         # Check for actual approval data in achievement remarks
         has_l1_approval = all_quarter_achievements.any? { |ach| ach.achievement_remark&.l1_percentage.present? && ach.achievement_remark&.l1_remarks.present? }
         has_l2_approval = all_quarter_achievements.any? { |ach| ach.achievement_remark&.l2_percentage.present? && ach.achievement_remark&.l2_remarks.present? }
-        
+
         # PERFORMANCE FIX: More efficient status calculation
         current_status = calculate_quarter_status(quarter_statuses, has_l1_approval, has_l2_approval)
-        
+
         # Store status for this employee-quarter combination
         summary_data[:employee_quarter_statuses]["#{emp.id}_#{quarter_name}"] = current_status
-        
+
         # Update counters
         case current_status
         when "l1_approved"
@@ -1321,32 +1311,32 @@ end
   # Build the quarterly employee data structure expected by the view
   def build_quarterly_employee_data(employee_details)
     quarterly_employee_data = {}
-    
+
     quarters = {
-      'Q1' => ['april', 'may', 'june'],
-      'Q2' => ['july', 'august', 'september'], 
-      'Q3' => ['october', 'november', 'december'],
-      'Q4' => ['january', 'february', 'march']
+      "Q1" => [ "april", "may", "june" ],
+      "Q2" => [ "july", "august", "september" ],
+      "Q3" => [ "october", "november", "december" ],
+      "Q4" => [ "january", "february", "march" ]
     }
 
     employee_details.each do |emp|
       quarters.each do |quarter_name, quarter_months|
         # Get all achievements for this employee in this quarter
         all_quarter_achievements = emp.user_details.flat_map(&:achievements).select { |ach| quarter_months.include?(ach.month) }
-        
+
         # Only include if there are achievements in this quarter
         if all_quarter_achievements.any?
           # Calculate quarter status
           quarter_statuses = all_quarter_achievements.map { |ach| ach.status || "pending" }
           has_l1_approval = all_quarter_achievements.any? { |ach| ach.achievement_remark&.l1_percentage.present? && ach.achievement_remark&.l1_remarks.present? }
           has_l2_approval = all_quarter_achievements.any? { |ach| ach.achievement_remark&.l2_percentage.present? && ach.achievement_remark&.l2_remarks.present? }
-          
+
           current_status = calculate_quarter_status(quarter_statuses, has_l1_approval, has_l2_approval)
           status_config = get_status_config(current_status)
-          
+
           # Create unique key for this employee-quarter combination
           key = "#{emp.id}_#{quarter_name}"
-          
+
           quarterly_employee_data[key] = {
             employee: emp,
             quarter_name: quarter_name,
@@ -1364,42 +1354,41 @@ end
   # Get status configuration for display
   def get_status_config(status)
     case status
-    when 'l1_approved'
-      { color: 'bg-green-100 text-green-800 border-green-300', text: 'L1 Approved' }
-    when 'l2_approved'
-      { color: 'bg-green-600 text-white border-green-700', text: 'L2 Approved' }
-    when 'l1_returned'
-      { color: 'bg-red-100 text-red-800 border-red-300', text: 'L1 Returned' }
-    when 'l2_returned'
-      { color: 'bg-orange-100 text-orange-800 border-orange-300', text: 'L2 Returned' }
-    when 'submitted'
-      { color: 'bg-blue-100 text-blue-800 border-blue-300', text: 'Submitted' }
+    when "l1_approved"
+      { color: "bg-green-100 text-green-800 border-green-300", text: "L1 Approved" }
+    when "l2_approved"
+      { color: "bg-green-600 text-white border-green-700", text: "L2 Approved" }
+    when "l1_returned"
+      { color: "bg-red-100 text-red-800 border-red-300", text: "L1 Returned" }
+    when "l2_returned"
+      { color: "bg-orange-100 text-orange-800 border-orange-300", text: "L2 Returned" }
+    when "submitted"
+      { color: "bg-blue-100 text-blue-800 border-blue-300", text: "Submitted" }
     else
-      { color: 'bg-yellow-100 text-yellow-800 border-yellow-300', text: 'Pending' }
+      { color: "bg-yellow-100 text-yellow-800 border-yellow-300", text: "Pending" }
     end
   end
 
   # Process L1 edit - update L1 remarks and percentage for a quarter
   def process_l1_edit
-    
     updated_count = 0
-    
+
     if params[:selected_quarter].present?
       # Update specific quarter
       quarter_months = get_quarter_months(params[:selected_quarter])
-      
+
       @employee_detail.user_details.each do |detail|
         quarter_months.each do |month|
           # Find or create achievement for this month
           achievement = detail.achievements.find_or_create_by(month: month)
           achievement.save! if achievement.new_record?
-          
+
           # Create or update achievement remark with L1 data
           remark = achievement.achievement_remark || achievement.build_achievement_remark
           remark.l1_remarks = params[:l1_remarks] if params[:l1_remarks].present?
           remark.l1_percentage = params[:l1_percentage] if params[:l1_percentage].present?
           remark.save!
-          
+
           updated_count += 1
         end
       end
@@ -1408,24 +1397,24 @@ end
       @employee_detail.user_details.each do |detail|
         get_all_quarters.each do |quarter|
           quarter_months = get_quarter_months(quarter)
-          
+
           quarter_months.each do |month|
             # Find or create achievement for this month
             achievement = detail.achievements.find_or_create_by(month: month)
             achievement.save! if achievement.new_record?
-            
+
             # Create or update achievement remark with L1 data
             remark = achievement.achievement_remark || achievement.build_achievement_remark
             remark.l1_remarks = params[:l1_remarks] if params[:l1_remarks].present?
             remark.l1_percentage = params[:l1_percentage] if params[:l1_percentage].present?
             remark.save!
-            
+
             updated_count += 1
           end
         end
       end
     end
-    
+
     if updated_count > 0
       { success: true, count: updated_count, percentage: params[:l1_percentage], remarks: params[:l1_remarks] }
     else
@@ -1435,25 +1424,24 @@ end
 
   # Process L2 edit - update L2 remarks and percentage for a quarter
   def process_l2_edit
-    
     updated_count = 0
-    
+
     if params[:selected_quarter].present?
       # Update specific quarter
       quarter_months = get_quarter_months(params[:selected_quarter])
-      
+
       @employee_detail.user_details.each do |detail|
         quarter_months.each do |month|
           # Find or create achievement for this month
           achievement = detail.achievements.find_or_create_by(month: month)
           achievement.save! if achievement.new_record?
-          
+
           # Create or update achievement remark with L2 data
           remark = achievement.achievement_remark || achievement.build_achievement_remark
           remark.l2_remarks = params[:l2_remarks] if params[:l2_remarks].present?
           remark.l2_percentage = params[:l2_percentage] if params[:l2_percentage].present?
           remark.save!
-          
+
           updated_count += 1
         end
       end
@@ -1462,29 +1450,28 @@ end
       @employee_detail.user_details.each do |detail|
         get_all_quarters.each do |quarter|
           quarter_months = get_quarter_months(quarter)
-          
+
           quarter_months.each do |month|
             # Find or create achievement for this month
             achievement = detail.achievements.find_or_create_by(month: month)
             achievement.save! if achievement.new_record?
-            
+
             # Create or update achievement remark with L2 data
             remark = achievement.achievement_remark || achievement.build_achievement_remark
             remark.l2_remarks = params[:l2_remarks] if params[:l2_remarks].present?
             remark.l2_percentage = params[:l2_percentage] if params[:l2_percentage].present?
             remark.save!
-            
+
             updated_count += 1
           end
         end
       end
     end
-    
+
     if updated_count > 0
       { success: true, count: updated_count, percentage: params[:l2_percentage], remarks: params[:l2_remarks] }
     else
       { success: false, message: "❌ No activities found to update for the selected quarter" }
     end
   end
-
 end

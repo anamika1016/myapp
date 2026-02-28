@@ -17,11 +17,11 @@ Rails.application.configure do
   config.assets.debug = true
   config.assets.digest = false
   config.assets.raise_runtime_errors = true
-  
+
   # Allow specific hosts for development
   config.hosts << "139.59.8.73"
   config.hosts << "139.59.8.73:3002"
-  
+
   # Enable/disable Action Controller caching. By default Action Controller caching is disabled.
   # Run rails dev:cache to toggle Action Controller caching.
   if Rails.root.join("tmp/caching-dev.txt").exist?
@@ -34,16 +34,16 @@ Rails.application.configure do
 
   # Change to :null_store to avoid any caching.
   config.cache_store = :memory_store
-  config.action_mailer.default_url_options = { host: 'localhost', port: 3000 }
+  config.action_mailer.default_url_options = { host: "localhost", port: 3000 }
   config.action_mailer.delivery_method = :letter_opener
   config.action_mailer.perform_deliveries = true
-  config.action_mailer.default_url_options = { host: 'localhost', port: 3000 }
+  config.action_mailer.default_url_options = { host: "localhost", port: 3000 }
 
 
   # Store uploaded files on the local file system (see config/storage.yml for options).
   config.active_storage.service = :local
   config.active_storage.resolve_model_to_route = :rails_storage_proxy
-  
+
 
   # Don't care if the mailer can't send.
   config.action_mailer.raise_delivery_errors = false

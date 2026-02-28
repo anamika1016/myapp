@@ -2,7 +2,7 @@ package = Axlsx::Package.new
 workbook = package.workbook
 
 workbook.add_worksheet(name: "Employees") do |sheet|
-  sheet.add_row ["Employee ID", "Name", "Email", "Employee Code", "L1 Code", "L1 Name", "L2 Code", "L2 Name", "Post", "Department"]
+  sheet.add_row [ "Employee ID", "Name", "Email", "Employee Code", "L1 Code", "L1 Name", "L2 Code", "L2 Name", "Post", "Department" ]
   @employee_details.each do |emp|
     sheet.add_row [
       emp.employee_id,
@@ -20,7 +20,7 @@ workbook.add_worksheet(name: "Employees") do |sheet|
 end
 
 # Set response headers and render file
-tempfile = Tempfile.new(["employee_details", ".xlsx"])
+tempfile = Tempfile.new([ "employee_details", ".xlsx" ])
 package.serialize(tempfile.path)
 
 send_file tempfile.path, filename: "employee_details.xlsx", type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

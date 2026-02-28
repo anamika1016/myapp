@@ -9,8 +9,8 @@ class SettingsController < ApplicationController
   def update
     if @user.update(user_params)
       if request.xhr?
-        render json: { 
-          success: true, 
+        render json: {
+          success: true,
           message: "Profile updated successfully!",
           avatar_url: @user.profile_image.attached? ? url_for(@user.profile_image) : nil
         }
@@ -20,9 +20,9 @@ class SettingsController < ApplicationController
       end
     else
       if request.xhr?
-        render json: { 
-          success: false, 
-          errors: @user.errors.full_messages 
+        render json: {
+          success: false,
+          errors: @user.errors.full_messages
         }
       else
         flash[:alert] = "Failed to update profile: #{@user.errors.full_messages.join(', ')}"

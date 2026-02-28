@@ -1,9 +1,9 @@
 class UserDetailsController < ApplicationController
-  require 'ostruct'
-  require 'set'
-  before_action :set_user_detail, only: [:show, :edit, :update, :destroy]
-  load_and_authorize_resource except: [:index, :new, :create, :get_user_detail, :get_activities, :bulk_create, :submit_achievements, :export, :import, :quarterly_edit_all, :update_quarterly_achievements, :test_sms, :view_sms_logs, :submitted_achievements]
-  
+  require "ostruct"
+  require "set"
+  before_action :set_user_detail, only: [ :show, :edit, :update, :destroy ]
+  load_and_authorize_resource except: [ :index, :new, :create, :get_user_detail, :get_activities, :bulk_create, :submit_achievements, :export, :import, :quarterly_edit_all, :update_quarterly_achievements, :test_sms, :view_sms_logs, :submitted_achievements ]
+
   def index
     if current_user.role == "employee" || current_user.role == "l1_employer" || current_user.role == "l2_employer"
       employee_detail = EmployeeDetail.find_by(employee_email: current_user.email)
@@ -12,12 +12,12 @@ class UserDetailsController < ApplicationController
         # Get all user_details for this employee and deduplicate by activity
         all_details = UserDetail.includes(:department, :activity, :employee_detail)
                                .where(employee_detail_id: employee_detail.id)
-        
+
         # Deduplicate by keeping the most recent record for each activity
         deduplicated_details = all_details.group_by(&:activity_id).map do |activity_id, records|
           records.max_by(&:updated_at)
         end
-        
+
         # Convert to ActiveRecord relation for pagination
         UserDetail.where(id: deduplicated_details.map(&:id)).page(params[:page]).per(50)
       else
@@ -27,12 +27,12 @@ class UserDetailsController < ApplicationController
     elsif current_user.role == "hod"
       # Get all user_details and deduplicate by activity and employee
       all_details = UserDetail.includes(:department, :activity, :employee_detail)
-      
+
       # Deduplicate by keeping the most recent record for each activity-employee combination
-      deduplicated_details = all_details.group_by { |detail| [detail.activity_id, detail.employee_detail_id] }.map do |key, records|
+      deduplicated_details = all_details.group_by { |detail| [ detail.activity_id, detail.employee_detail_id ] }.map do |key, records|
         records.max_by(&:updated_at)
       end
-      
+
       # Convert to ActiveRecord relation for pagination
       @user_details = UserDetail.where(id: deduplicated_details.map(&:id)).page(params[:page]).per(50)
     end
@@ -42,7 +42,7 @@ class UserDetailsController < ApplicationController
     @user_detail = UserDetail.new
 
     # Load unique departments
-    @departments = Department.select('DISTINCT ON (department_type) id, department_type')
+    @departments = Department.select("DISTINCT ON (department_type) id, department_type")
 
     # Filter employees based on selected department
     if params[:department_id].present?
@@ -76,7 +76,7 @@ class UserDetailsController < ApplicationController
       begin
         # Get the department
         selected_department = Department.find(params[:department_id])
-        
+
         # Get activities that have existing user_details for this specific employee
         # This ensures only activities relevant to the selected employee are shown
         @employee_activities = UserDetail.includes(:activity)
@@ -84,12 +84,12 @@ class UserDetailsController < ApplicationController
                                        .where.not(activity_id: nil)
                                        .map(&:activity)
                                        .uniq
-        
+
         # If no existing activities found, show all department activities (for new entries)
         if @employee_activities.empty?
           @employee_activities = selected_department.activities
         end
-        
+
         # FIXED: Only load user_details when BOTH department and employee are selected
         # This prevents showing all data when only one filter is applied
         @user_details = UserDetail.includes(:department, :activity, :employee_detail)
@@ -113,40 +113,40 @@ class UserDetailsController < ApplicationController
 
   def create
     @user_detail = UserDetail.new(user_detail_params)
-    
+
     if @user_detail.save
-      redirect_to new_user_detail_path, notice: 'User detail was successfully created.'
+      redirect_to new_user_detail_path, notice: "User detail was successfully created."
     else
       load_form_data
       render :new
     end
   end
-  
+
   def edit
     @departments = Department.select(:id, :department_type)
     @activities = Activity.select(:id, :activity_name, :unit, :theme_name)
                          .where(department_id: @user_detail.department_id)
   end
-  
+
   def update
     begin
       # Store the current context before update
       department_id = @user_detail.department_id
       employee_detail_id = @user_detail.employee_detail_id
-      
+
       if @user_detail.update(user_detail_params)
         # Clear any existing flash messages
         flash.clear
-        
+
         # Role-based redirect
         if current_user.hod?
           # HOD redirects to new user detail form
-          redirect_to new_user_detail_path(department_id: department_id, employee_detail_id: employee_detail_id), 
-                      notice: 'User detail was successfully updated.'
+          redirect_to new_user_detail_path(department_id: department_id, employee_detail_id: employee_detail_id),
+                      notice: "User detail was successfully updated."
         else
           # Employee/L1/L2 redirects to HOD TARGET FORM (index page)
-          redirect_to user_details_path, 
-                      notice: 'User detail was successfully updated.'
+          redirect_to user_details_path,
+                      notice: "User detail was successfully updated."
         end
       else
         @departments = Department.select(:id, :department_type)
@@ -156,16 +156,16 @@ class UserDetailsController < ApplicationController
       end
     rescue => e
       Rails.logger.error "Error in update action: #{e.message}"
-      
+
       # Clear any existing flash messages
       flash.clear
-      
+
       # Role-based error redirect
       if current_user.hod?
-        redirect_to new_user_detail_path, 
+        redirect_to new_user_detail_path,
                     alert: "An error occurred while updating the user detail."
       else
-        redirect_to user_details_path, 
+        redirect_to user_details_path,
                     alert: "An error occurred while updating the user detail."
       end
     end
@@ -188,14 +188,14 @@ class UserDetailsController < ApplicationController
 
     # Define quarter months to limit updates to selected quarter only
     quarter_months = case selected_quarter
-    when 'Q1'
-      ['april', 'may', 'june']
-    when 'Q2'
-      ['july', 'august', 'september']
-    when 'Q3'
-      ['october', 'november', 'december']
-    when 'Q4'
-      ['january', 'february', 'march']
+    when "Q1"
+      [ "april", "may", "june" ]
+    when "Q2"
+      [ "july", "august", "september" ]
+    when "Q3"
+      [ "october", "november", "december" ]
+    when "Q4"
+      [ "january", "february", "march" ]
     else
       []
     end
@@ -209,11 +209,11 @@ class UserDetailsController < ApplicationController
         next unless user_detail
 
         activity_updated = false
-        
+
         monthly_data.each do |month, values|
           # IMPORTANT: Only process months that belong to the selected quarter
           next unless quarter_months.include?(month)
-          
+
           achievement_value = values[:achievement]
           employee_remarks = values[:employee_remarks]
 
@@ -222,18 +222,18 @@ class UserDetailsController < ApplicationController
 
           # Find or initialize achievement
           achievement = Achievement.find_or_initialize_by(
-            user_detail: user_detail, 
+            user_detail: user_detail,
             month: month
           )
-          
+
           # Store old values for comparison
           old_achievement = achievement.achievement
           old_remarks = achievement.employee_remarks
-          
+
           # Update values
           achievement.achievement = achievement_value.present? ? achievement_value : nil
           achievement.employee_remarks = employee_remarks.present? ? employee_remarks : nil
-          
+
           # Save if there are changes
           if achievement.achievement != old_achievement || achievement.employee_remarks != old_remarks
             if achievement.save
@@ -247,7 +247,7 @@ class UserDetailsController < ApplicationController
             end
           end
         end
-        
+
         if activity_updated
           activity_name = "#{user_detail.employee_detail&.employee_name} - #{user_detail.activity.activity_name}"
           updated_activities << activity_name
@@ -258,15 +258,15 @@ class UserDetailsController < ApplicationController
       # This ensures that only the specific employee's data gets reset to pending
       employee_details_with_changes.each do |employee_detail_id|
         employee_detail = EmployeeDetail.find(employee_detail_id)
-        
+
         # Get all achievements for this specific employee in the selected quarter
         employee_achievements = Achievement.joins(:user_detail)
                                         .where(user_details: { employee_detail_id: employee_detail_id })
                                         .where(month: quarter_months)
-        
+
         # Set status to pending for this employee's achievements only
-        updated_count = employee_achievements.update_all(status: 'pending')
-        
+        updated_count = employee_achievements.update_all(status: "pending")
+
         # Also reset approval remarks for this employee's achievements
         employee_achievements.joins(:achievement_remark).each do |achievement|
           achievement.achievement_remark.update(
@@ -276,7 +276,6 @@ class UserDetailsController < ApplicationController
             l2_percentage: nil
           )
         end
-        
       end
     end
 
@@ -285,8 +284,8 @@ class UserDetailsController < ApplicationController
       if success_count > 0
         affected_employees = employee_details_with_changes.map do |emp_id|
           EmployeeDetail.find(emp_id).employee_name
-        end.join(', ')
-        
+        end.join(", ")
+
         flash[:notice] = "✅ Updated #{success_count} records. Pending approval."
       else
         flash[:notice] = "No changes were made to the achievements."
@@ -295,30 +294,29 @@ class UserDetailsController < ApplicationController
       flash[:alert] = "⚠️ Some updates failed: #{errors.first(2).join('; ')}"
       flash[:alert] += " and #{errors.count - 2} more errors..." if errors.count > 2
     end
-    
+
     redirect_to quarterly_edit_all_user_details_path
-    
+
     rescue => e
       Rails.logger.error "Quarterly update error: #{e.message}\n#{e.backtrace.join("\n")}"
       flash[:alert] = "❌ An error occurred while updating achievements: #{e.message}"
       redirect_to quarterly_edit_all_user_details_path
-  end 
+  end
 
   # FIXED: Quarterly edit all method
   def quarterly_edit_all
-    
     if current_user.role == "employee" || current_user.role == "l1_employer" || current_user.role == "l2_employer"
       employee_detail = EmployeeDetail.find_by(employee_email: current_user.email)
       @user_details = if employee_detail
         UserDetail.includes(:department, :activity, :employee_detail, achievements: :achievement_remark)
                 .where(employee_detail_id: employee_detail.id)
-                .order('departments.department_type, activities.activity_name')
+                .order("departments.department_type, activities.activity_name")
       else
         UserDetail.none
       end
     elsif current_user.role == "hod"
       @user_details = UserDetail.includes(:department, :activity, :employee_detail, achievements: :achievement_remark)
-                              .order('departments.department_type, employee_details.employee_name, activities.activity_name')
+                              .order("departments.department_type, employee_details.employee_name, activities.activity_name")
     else
       @user_details = UserDetail.none
     end
@@ -326,73 +324,73 @@ class UserDetailsController < ApplicationController
 
     # FIXED: Correct quarter definitions to match the system
     @quarters = [
-      { name: "Q1", months: ["april", "may", "june"], label: "Q1 (Apr-Jun)" },
-      { name: "Q2", months: ["july", "august", "september"], label: "Q2 (Jul-Sep)" },
-      { name: "Q3", months: ["october", "november", "december"], label: "Q3 (Oct-Dec)" },
-      { name: "Q4", months: ["january", "february", "march"], label: "Q4 (Jan-Mar)" }
+      { name: "Q1", months: [ "april", "may", "june" ], label: "Q1 (Apr-Jun)" },
+      { name: "Q2", months: [ "july", "august", "september" ], label: "Q2 (Jul-Sep)" },
+      { name: "Q3", months: [ "october", "november", "december" ], label: "Q3 (Oct-Dec)" },
+      { name: "Q4", months: [ "january", "february", "march" ], label: "Q4 (Jan-Mar)" }
     ]
   end
 
-  
+
   def destroy
     begin
       @user_detail = UserDetail.find(params[:id])
-      
+
       # Store the current context before deletion
       department_id = @user_detail.department_id
       employee_detail_id = @user_detail.employee_detail_id
-      
+
       if @user_detail.destroy
         # Clear any existing flash messages
         flash.clear
-        
+
         # Role-based redirect
         if current_user.hod?
           # HOD redirects to new user detail form
-          redirect_to new_user_detail_path(department_id: department_id, employee_detail_id: employee_detail_id), 
+          redirect_to new_user_detail_path(department_id: department_id, employee_detail_id: employee_detail_id),
                       notice: "User detail was successfully deleted."
         else
           # Employee/L1/L2 redirects to HOD TARGET FORM (index page)
-          redirect_to user_details_path, 
+          redirect_to user_details_path,
                       notice: "User detail was successfully deleted."
         end
       else
         # Clear any existing flash messages
         flash.clear
-        
+
         # Role-based error redirect
         if current_user.hod?
-          redirect_to new_user_detail_path, 
+          redirect_to new_user_detail_path,
                       alert: "Failed to delete user detail."
         else
-          redirect_to user_details_path, 
+          redirect_to user_details_path,
                       alert: "Failed to delete user detail."
         end
       end
     rescue ActiveRecord::RecordNotFound
       # Clear any existing flash messages
       flash.clear
-      
+
       # Role-based error redirect
       if current_user.hod?
-        redirect_to new_user_detail_path, 
+        redirect_to new_user_detail_path,
                     alert: "User detail not found."
       else
-        redirect_to user_details_path, 
+        redirect_to user_details_path,
                     alert: "User detail not found."
       end
     rescue => e
       Rails.logger.error "Error in destroy action: #{e.message}"
-      
+
       # Clear any existing flash messages
       flash.clear
-      
+
       # Role-based error redirect
       if current_user.hod?
-        redirect_to new_user_detail_path, 
+        redirect_to new_user_detail_path,
                     alert: "An error occurred while deleting the user detail."
       else
-        redirect_to user_details_path, 
+        redirect_to user_details_path,
                     alert: "An error occurred while deleting the user detail."
       end
     end
@@ -403,63 +401,63 @@ class UserDetailsController < ApplicationController
     begin
       # Find a real employee detail record that has L1 code and mobile number
       test_employee = EmployeeDetail.joins(:user_detail)
-                                   .where.not(l1_code: [nil, ''])
-                                   .where.not(mobile_number: [nil, ''])
+                                   .where.not(l1_code: [ nil, "" ])
+                                   .where.not(mobile_number: [ nil, "" ])
                                    .first
-      
+
       if test_employee.nil?
         flash[:alert] = "❌ No employee found with L1 code and mobile number for testing"
         redirect_to get_user_detail_user_details_path
         return
       end
-      
+
       # Find the L1 manager
-      l1_manager = EmployeeDetail.find_by('employee_code LIKE ?', test_employee.l1_code.strip + '%')
-      
+      l1_manager = EmployeeDetail.find_by("employee_code LIKE ?", test_employee.l1_code.strip + "%")
+
       if l1_manager.nil?
         flash[:alert] = "❌ L1 manager not found with code: #{test_employee.l1_code}"
         redirect_to get_user_detail_user_details_path
         return
       end
-      
+
       if l1_manager.mobile_number.blank?
         flash[:alert] = "❌ L1 manager #{l1_manager.employee_name} has no mobile number"
         redirect_to get_user_detail_user_details_path
         return
       end
-      
+
       # Test with Q1 quarter
       result = send_sms_to_l1(test_employee, "Q1 (APR-JUN)", nil)
-      
+
       if result[:success]
         flash[:notice] = "✅ Test SMS sent successfully! Message ID: #{result[:message_id]}"
       else
         flash[:alert] = "❌ Test SMS failed: #{result[:error]}"
         Rails.logger.error "Test SMS failed: #{result.inspect}"
       end
-      
+
     rescue => e
       flash[:alert] = "❌ Test SMS error: #{e.message}"
       Rails.logger.error "Test SMS error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
     end
-    
+
     redirect_to get_user_detail_user_details_path
   end
 
   def get_user_detail
-    if ["employee", "l1_employer", "l2_employer"].include?(current_user.role)
+    if [ "employee", "l1_employer", "l2_employer" ].include?(current_user.role)
       @employee_detail = EmployeeDetail.find_by(employee_email: current_user.email)
 
       @user_details = if @employee_detail
         # Get all user_details for this employee and deduplicate by activity
         all_details = UserDetail.includes(:department, :activity, :employee_detail, achievements: :achievement_remark)
                                .where(employee_detail_id: @employee_detail.id)
-        
+
         # Deduplicate by keeping the most recent record for each activity
         deduplicated_details = all_details.group_by(&:activity_id).map do |activity_id, records|
           records.max_by(&:updated_at)
         end
-        
+
         # Convert to ActiveRecord relation and limit
         UserDetail.where(id: deduplicated_details.map(&:id)).limit(100)
       else
@@ -469,12 +467,12 @@ class UserDetailsController < ApplicationController
     elsif current_user.role == "hod"
       # Get all user_details and deduplicate by activity and employee
       all_details = UserDetail.includes(:department, :activity, :employee_detail, achievements: :achievement_remark)
-      
+
       # Deduplicate by keeping the most recent record for each activity-employee combination
-      deduplicated_details = all_details.group_by { |detail| [detail.activity_id, detail.employee_detail_id] }.map do |key, records|
+      deduplicated_details = all_details.group_by { |detail| [ detail.activity_id, detail.employee_detail_id ] }.map do |key, records|
         records.max_by(&:updated_at)
       end
-      
+
       # Convert to ActiveRecord relation and limit
       @user_details = UserDetail.where(id: deduplicated_details.map(&:id)).limit(100)
       @employee_detail = nil
@@ -482,19 +480,19 @@ class UserDetailsController < ApplicationController
   end
 
   def submitted_achievements
-    if ["employee", "l1_employer", "l2_employer"].include?(current_user.role)
+    if [ "employee", "l1_employer", "l2_employer" ].include?(current_user.role)
       @employee_detail = EmployeeDetail.find_by(employee_email: current_user.email)
 
       @user_details = if @employee_detail
         # Get all user_details for this employee and deduplicate by activity
         all_details = UserDetail.includes(:department, :activity, :employee_detail, achievements: :achievement_remark)
                                .where(employee_detail_id: @employee_detail.id)
-        
+
         # Deduplicate by keeping the most recent record for each activity
         deduplicated_details = all_details.group_by(&:activity_id).map do |activity_id, records|
           records.max_by(&:updated_at)
         end
-        
+
         # Convert to ActiveRecord relation and limit
         UserDetail.where(id: deduplicated_details.map(&:id)).limit(100)
       else
@@ -504,18 +502,18 @@ class UserDetailsController < ApplicationController
     elsif current_user.role == "hod"
       # Get all user_details and deduplicate by activity and employee
       all_details = UserDetail.includes(:department, :activity, :employee_detail, achievements: :achievement_remark)
-      
+
       # Deduplicate by keeping the most recent record for each activity-employee combination
-      deduplicated_details = all_details.group_by { |detail| [detail.activity_id, detail.employee_detail_id] }.map do |key, records|
+      deduplicated_details = all_details.group_by { |detail| [ detail.activity_id, detail.employee_detail_id ] }.map do |key, records|
         records.max_by(&:updated_at)
       end
-      
+
       # Convert to ActiveRecord relation and limit
       @user_details = UserDetail.where(id: deduplicated_details.map(&:id)).limit(100)
       @employee_detail = nil
     end
   end
-  
+
   def submit_achievements
     begin
       achievement_data = params[:achievement] || {}
@@ -525,11 +523,10 @@ class UserDetailsController < ApplicationController
 
 
       ActiveRecord::Base.transaction do
-        
         achievement_data.each do |user_detail_id, monthly_data|
           user_detail = UserDetail.find_by(id: user_detail_id)
           next unless user_detail
-          
+
           employee_detail = user_detail.employee_detail
           next unless employee_detail
 
@@ -538,38 +535,38 @@ class UserDetailsController < ApplicationController
             employee_remarks = values[:employee_remarks]
 
             next if achievement_value.blank?
-            
+
             target_value = user_detail.send(month)
             next if target_value.blank?
 
             achievement = Achievement.find_or_initialize_by(
-              user_detail: user_detail, 
+              user_detail: user_detail,
               month: month
             )
-            
+
             achievement.achievement = achievement_value
             achievement.employee_remarks = employee_remarks
-            achievement.status = 'pending'
-            
+            achievement.status = "pending"
+
             if achievement.save
               success_count += 1
             end
           end
-        
+
           # Send SMS only once per employee per quarter
           unless processed_employees.include?(employee_detail.id)
             processed_employees.add(employee_detail.id)
-            
+
             quarters_filled = Set.new
             monthly_data.each do |month, values|
               next if values[:achievement].blank?
               quarter = determine_quarter(month)
               quarters_filled.add(quarter) if quarter.present?
             end
-            
+
             quarters_filled.each do |quarter|
               sms_already_sent = check_sms_already_sent(employee_detail.id, quarter)
-              
+
               unless sms_already_sent
                 sms_result = send_sms_to_l1(employee_detail, quarter, user_detail)
                 sms_results << {
@@ -578,13 +575,12 @@ class UserDetailsController < ApplicationController
                   success: sms_result[:success],
                   message: sms_result[:success] ? "SMS sent successfully" : sms_result[:error]
                 }
-                
+
                 mark_sms_as_sent(employee_detail.id, quarter)
               end
             end
           end
         end
-        
       end
 
       # Prepare response message
@@ -596,9 +592,9 @@ class UserDetailsController < ApplicationController
         end
       end
 
-      render json: { 
-        success: true, 
-        count: success_count, 
+      render json: {
+        success: true,
+        count: success_count,
         sms_results: sms_results,
         message: response_message
       }
@@ -606,26 +602,26 @@ class UserDetailsController < ApplicationController
       Rails.logger.error "Achievement submission failed: #{e.message}"
       Rails.logger.error "Error class: #{e.class}"
       Rails.logger.error "Backtrace: #{e.backtrace.first(10).join("\n")}"
-      
-      error_response = { 
-        success: false, 
+
+      error_response = {
+        success: false,
         error: "Achievement submission failed: #{e.message}",
         message: "There was an error submitting achievements. Please try again."
       }
-      
+
       Rails.logger.error "Error response prepared: #{error_response.inspect}"
-      
+
       render json: error_response, status: :internal_server_error
     end
   end
 
   def get_activities
     department_id = params[:department_id]
-    
+
     if department_id.present?
       activities = Activity.select(:id, :activity_name, :unit, :weight, :theme_name)
                           .where(department_id: department_id)
-      
+
       activities_data = activities.map do |activity|
         {
           id: activity.id,
@@ -635,47 +631,46 @@ class UserDetailsController < ApplicationController
           theme_name: activity.theme_name
         }
       end
-      
+
       render json: activities_data
     else
-      render json: { error: 'Department ID is required' }, status: :bad_request
+      render json: { error: "Department ID is required" }, status: :bad_request
     end
   rescue ActiveRecord::RecordNotFound
-    render json: { error: 'Department not found' }, status: :not_found
+    render json: { error: "Department not found" }, status: :not_found
   rescue => e
-    render json: { error: 'An error occurred while fetching activities' }, status: :internal_server_error
+    render json: { error: "An error occurred while fetching activities" }, status: :internal_server_error
   end
-  
+
   def bulk_create
-    
     department_id = params[:department_id]
     employee_detail_id = params[:employee_detail_id]
     user_details_params = params[:user_details]
 
     # Enhanced validation
     if department_id.blank?
-      render json: { error: 'Department ID is required' }, status: :bad_request
+      render json: { error: "Department ID is required" }, status: :bad_request
       return
     end
 
     if employee_detail_id.blank?
-      render json: { error: 'Employee Detail ID is required' }, status: :bad_request
+      render json: { error: "Employee Detail ID is required" }, status: :bad_request
       return
     end
 
     if user_details_params.blank?
-      render json: { error: 'No user details provided' }, status: :bad_request
+      render json: { error: "No user details provided" }, status: :bad_request
       return
     end
 
     # Validate that department and employee exist
     unless Department.exists?(department_id)
-      render json: { error: 'Department not found' }, status: :not_found
+      render json: { error: "Department not found" }, status: :not_found
       return
     end
 
     unless EmployeeDetail.exists?(employee_detail_id)
-      render json: { error: 'Employee not found' }, status: :not_found
+      render json: { error: "Employee not found" }, status: :not_found
       return
     end
 
@@ -701,25 +696,25 @@ class UserDetailsController < ApplicationController
 
           # Extract monthly data
           month_data = {
-            april: extract_month_value(details, 'april'),
-            may: extract_month_value(details, 'may'),
-            june: extract_month_value(details, 'june'),
-            july: extract_month_value(details, 'july'),
-            august: extract_month_value(details, 'august'),
-            september: extract_month_value(details, 'september'),
-            october: extract_month_value(details, 'october'),
-            november: extract_month_value(details, 'november'),
-            december: extract_month_value(details, 'december'),
-            january: extract_month_value(details, 'january'),
-            february: extract_month_value(details, 'february'),
-            march: extract_month_value(details, 'march')
+            april: extract_month_value(details, "april"),
+            may: extract_month_value(details, "may"),
+            june: extract_month_value(details, "june"),
+            july: extract_month_value(details, "july"),
+            august: extract_month_value(details, "august"),
+            september: extract_month_value(details, "september"),
+            october: extract_month_value(details, "october"),
+            november: extract_month_value(details, "november"),
+            december: extract_month_value(details, "december"),
+            january: extract_month_value(details, "january"),
+            february: extract_month_value(details, "february"),
+            march: extract_month_value(details, "march")
           }
 
           # Extract activity metadata (unit and theme_name)
           # Handle blank values properly - convert empty strings to nil for database
-          unit_value = details['unit'] || details[:unit]
-          theme_value = details['theme_name'] || details[:theme_name]
-          
+          unit_value = details["unit"] || details[:unit]
+          theme_value = details["theme_name"] || details[:theme_name]
+
           activity_metadata = {
             unit: unit_value.present? ? unit_value : nil,
             theme_name: theme_value.present? ? theme_value : nil
@@ -735,18 +730,18 @@ class UserDetailsController < ApplicationController
           # Update Activity metadata (always update to handle clearing values)
           activity = Activity.find(activity_id)
           activity_update_data = {}
-          
+
           # Always include unit and theme_name in update (nil values will clear the fields)
           activity_update_data[:unit] = activity_metadata[:unit]
           activity_update_data[:theme_name] = activity_metadata[:theme_name]
-          
+
           unless activity.update(activity_update_data)
             errors << "Failed to update activity metadata for activity #{activity_id}: #{activity.errors.full_messages.join(', ')}"
           end
 
           # Update the user_detail record with monthly data
           user_detail_record.assign_attributes(month_data)
-          
+
           if user_detail_record.save
             if user_detail_record.previously_new_record?
               created_count += 1
@@ -770,15 +765,15 @@ class UserDetailsController < ApplicationController
       message = []
       message << "#{created_count} records created" if created_count > 0
       message << "#{updated_count} records updated" if updated_count > 0
-      message = ["No changes made"] if message.empty?
+      message = [ "No changes made" ] if message.empty?
 
       response_data = {
         success: true,
-        message: message.join(', '),
+        message: message.join(", "),
         created: created_count,
         updated: updated_count
       }
-      
+
       response_data[:warnings] = errors if errors.present?
 
       render json: response_data
@@ -792,14 +787,14 @@ class UserDetailsController < ApplicationController
       }, status: :unprocessable_entity
     end
   end
-  
+
   def export
     @user_details = UserDetail.includes(:employee_detail, :department, :activity)
                               .limit(5000)
 
     respond_to do |format|
       format.xlsx {
-        response.headers['Content-Disposition'] = 'attachment; filename="user_details.xlsx"'
+        response.headers["Content-Disposition"] = 'attachment; filename="user_details.xlsx"'
       }
     end
   end
@@ -807,7 +802,7 @@ class UserDetailsController < ApplicationController
   def import
     file = params[:file]
 
-    unless file && [".xlsx", ".xls"].include?(File.extname(file.original_filename))
+    unless file && [ ".xlsx", ".xls" ].include?(File.extname(file.original_filename))
       redirect_to new_user_detail_path, alert: "Please upload a valid .xlsx or .xls file."
       return
     end
@@ -815,7 +810,7 @@ class UserDetailsController < ApplicationController
     begin
       spreadsheet = Roo::Excelx.new(file.tempfile.path)
       header = spreadsheet.row(1)
-      
+
 
 
       errors = []
@@ -830,7 +825,7 @@ class UserDetailsController < ApplicationController
             row = {}
             header.each_with_index do |col_name, index|
               next if col_name.nil?
-              key = col_name.to_s.strip.downcase.gsub(/\s+/, '_')
+              key = col_name.to_s.strip.downcase.gsub(/\s+/, "_")
               row[key] = row_data[index]
             end
 
@@ -839,12 +834,12 @@ class UserDetailsController < ApplicationController
             employee_name = row["employee_name"]
             employee_email = row["employee_email"]
             employee_code = row["employee_code"]
-            
+
             # FIXED: Better mobile number extraction with more column name variations
-            mobile_number = row["mobile_no"] || row["mobile_number"] || row["mobile"] || 
+            mobile_number = row["mobile_no"] || row["mobile_number"] || row["mobile"] ||
                            row["mobile_no."] || row["mobile_number."] || row["mobile."] ||
                            row["mobile_no_"] || row["mobile_number_"] || row["mobile_"]
-            
+
             l1_code = row["l1_code"]
             l1_employer_name = row["l1_employer_name"]
             l2_code = row["l2_code"]
@@ -961,26 +956,26 @@ class UserDetailsController < ApplicationController
 
 
   private
-  
+
   def set_user_detail
     @user_detail = UserDetail.find(params[:id])
   end
-  
+
   def user_detail_params
-    params.require(:user_detail).permit(:department_id, :activity_id, :april, :may, :june, 
-                                        :july, :august, :september, :october, :november, 
+    params.require(:user_detail).permit(:department_id, :activity_id, :april, :may, :june,
+                                        :july, :august, :september, :october, :november,
                                         :december, :january, :february, :march, :employee_detail_id, :employee_detail_email)
   end
-  
+
   def bulk_create_params
     params.permit(:department_id, :employee_detail_id, user_details: {})
   end
 
   def extract_month_value(details, month)
     return nil if details.blank?
-    
+
     value = details[month] || details[month.to_sym] || details[month.to_s]
-    
+
     return nil if value.blank?
     return value.to_f if value.is_a?(String) && value.match?(/^\d+\.?\d*$/)
     value
@@ -988,40 +983,40 @@ class UserDetailsController < ApplicationController
 
   def normalize_percentage(value)
     return nil if value.nil?
-    
+
     # FIXED: Don't convert values to percentages automatically
     # Only convert if explicitly marked as percentage
     if value.is_a?(String)
       # Remove any whitespace
       cleaned_value = value.strip
       return nil if cleaned_value.blank?
-      
+
       # Handle percentage values (only if they contain % symbol)
-      if cleaned_value.include?('%')
-        return cleaned_value.gsub('%', '').to_f
+      if cleaned_value.include?("%")
+        return cleaned_value.gsub("%", "").to_f
       end
-      
+
       # Handle numeric strings - return as is, don't convert to percentage
       if cleaned_value.match?(/^\d+\.?\d*$/)
         return cleaned_value.to_f
       end
-      
+
       # Return the original string if it's not numeric
-      return cleaned_value
+      cleaned_value
     elsif value.is_a?(Numeric)
       # FIXED: Don't automatically convert numbers to percentages
       # Only convert if the value is explicitly a decimal percentage (0.0 to 1.0)
       # AND it's marked as a percentage in the original data
-      return value
+      value
     else
       # For other types, try to convert to string and then process
-      return normalize_percentage(value.to_s)
+      normalize_percentage(value.to_s)
     end
   end
 
   def load_form_data
     @departments = Department.select(:id, :department_type)
-    @activities = @user_detail.department_id.present? ? 
+    @activities = @user_detail.department_id.present? ?
                   Activity.select(:id, :activity_name, :unit, :theme_name)
                          .where(department_id: @user_detail.department_id) : []
     @user_details = UserDetail.includes(:department, :activity).limit(100)
@@ -1029,15 +1024,15 @@ class UserDetailsController < ApplicationController
 
   def filter_conditions
     conditions = {}
-    
+
     if params[:department_id].present?
       conditions[:department_id] = params[:department_id]
     end
-    
+
     if params[:employee_detail_id].present?
       conditions[:employee_detail_id] = params[:employee_detail_id]
     end
-    
+
     conditions
   end
 
@@ -1047,21 +1042,21 @@ class UserDetailsController < ApplicationController
       # Get L1 manager's mobile number (not the employee's mobile number)
       l1_code = employee_detail.l1_code
       return { success: false, error: "L1 code not found for employee" } unless l1_code.present?
-      
+
       # Find the L1 manager's employee detail record
-      l1_manager = EmployeeDetail.find_by('employee_code LIKE ?', l1_code.strip + '%')
+      l1_manager = EmployeeDetail.find_by("employee_code LIKE ?", l1_code.strip + "%")
       return { success: false, error: "L1 manager not found with code: #{l1_code}" } unless l1_manager.present?
-      
+
       l1_mobile = l1_manager.mobile_number
       return { success: false, error: "L1 manager mobile number not found" } unless l1_mobile.present?
-      
+
       # Clean and validate mobile number
-      l1_mobile = l1_mobile.to_s.strip.gsub(/\D/, '')
+      l1_mobile = l1_mobile.to_s.strip.gsub(/\D/, "")
       return { success: false, error: "Invalid mobile number format" } if l1_mobile.length < 10
-      
+
       # Prepare the message exactly as per the working API example
       message = "Emp-Code: #{employee_detail.employee_code}, Emp-Name: #{employee_detail.employee_name} has submitted his #{quarter} Qtr KRA MIS. Please review and approve in the system. Ploughman Agro Private Limited"
-      
+
       # Prepare API parameters using the exact working API
       params = {
         authkey: "37317061706c39353312",
@@ -1073,60 +1068,60 @@ class UserDetailsController < ApplicationController
         DLT_TE_ID: "1707175594432371766",
         unicode: "1"
       }
-      
+
       # Build the API URL
       api_url = "https://sms.yoursmsbox.com/api/sendhttp.php"
-      
-      
+
+
       # Send SMS using HTTParty (which is already in Gemfile)
-      require 'httparty'
+      require "httparty"
       response = HTTParty.get(api_url, query: params)
-      
-      
+
+
       if response.success?
         # Parse the JSON response to check if SMS was actually sent
         begin
           response_data = JSON.parse(response.body)
           if response_data["Status"] == "Success" && response_data["Code"] == "000"
-            return { 
-              success: true, 
-              message: "SMS sent successfully", 
-              message_id: response_data['Message-Id'],
+            {
+              success: true,
+              message: "SMS sent successfully",
+              message_id: response_data["Message-Id"],
               response: response_data
             }
           else
             Rails.logger.error "SMS API returned error: #{response_data}"
-            return { 
-              success: false, 
-              error: "SMS API error: #{response_data['Description'] || response_data['Status']}" 
+            {
+              success: false,
+              error: "SMS API error: #{response_data['Description'] || response_data['Status']}"
             }
           end
         rescue JSON::ParserError => e
           Rails.logger.error "Failed to parse SMS API response: #{e.message}"
-          return { success: false, error: "Invalid SMS API response format" }
+          { success: false, error: "Invalid SMS API response format" }
         end
       else
         Rails.logger.error "SMS API HTTP error: #{response.code} - #{response.body}"
-        return { success: false, error: "SMS API HTTP error: #{response.code}" }
+        { success: false, error: "SMS API HTTP error: #{response.code}" }
       end
-      
+
     rescue => e
       Rails.logger.error "SMS service error: #{e.message}"
       Rails.logger.error "Backtrace: #{e.backtrace.first(5).join("\n")}"
-      return { success: false, error: "SMS service error: #{e.message}" }
+      { success: false, error: "SMS service error: #{e.message}" }
     end
   end
 
   def determine_quarter(month)
     case month.to_s.downcase
-    when 'april', 'may', 'june'
-      'Q1 (APR-JUN)'
-    when 'july', 'august', 'september'
-      'Q2 (JUL-SEP)'
-    when 'october', 'november', 'december'
-      'Q3 (OCT-DEC)'
-    when 'january', 'february', 'march'
-      'Q4 (JAN-MAR)'
+    when "april", "may", "june"
+      "Q1 (APR-JUN)"
+    when "july", "august", "september"
+      "Q2 (JUL-SEP)"
+    when "october", "november", "december"
+      "Q3 (OCT-DEC)"
+    when "january", "february", "march"
+      "Q4 (JAN-MAR)"
     else
       nil
     end

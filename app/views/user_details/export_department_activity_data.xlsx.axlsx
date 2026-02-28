@@ -10,31 +10,31 @@ wb.add_worksheet(name: "Department Activity Data") do |sheet|
     "April", "May", "June", "July", "August", "September",
     "October", "November", "December", "January", "February", "March"
   ]
-  
+
   sheet.add_row headers, style: sheet.styles.add_style(
     bg_color: "6c757d",
     fg_color: "FFFFFF",
     b: true,
     alignment: { horizontal: :center, vertical: :center }
   )
-  
+
   # Add data rows
   @user_details.each do |user_detail|
     # Get L1 and L2 employer details
     employee_detail = user_detail.employee_detail
-    
+
     # Find L1 employer
     l1_employer = nil
     if employee_detail&.l1_code.present?
-      l1_employer = EmployeeDetail.find_by('employee_code LIKE ?', employee_detail.l1_code.strip + '%')
+      l1_employer = EmployeeDetail.find_by("employee_code LIKE ?", employee_detail.l1_code.strip + "%")
     end
-    
+
     # Find L2 employer
     l2_employer = nil
     if employee_detail&.l2_code.present?
-      l2_employer = EmployeeDetail.find_by('employee_code LIKE ?', employee_detail.l2_code.strip + '%')
+      l2_employer = EmployeeDetail.find_by("employee_code LIKE ?", employee_detail.l2_code.strip + "%")
     end
-    
+
     row_data = [
       user_detail.department&.department_type || "-",
       user_detail.employee_detail&.employee_name || "-",
@@ -64,10 +64,10 @@ wb.add_worksheet(name: "Department Activity Data") do |sheet|
       user_detail.february || "-",
       user_detail.march || "-"
     ]
-    
+
     sheet.add_row row_data
   end
-  
+
   # Auto-fit columns
   sheet.column_widths 15, 20, 15, 25, 15, 10, 20, 15, 15, 20, 15, 15, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8
 end

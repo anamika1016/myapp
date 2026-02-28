@@ -2,12 +2,12 @@ namespace :departments do
   desc "Check and fix employee references in departments"
   task fix_employee_references: :environment do
     puts "Checking department employee references..."
-    
+
     Department.all.each do |dept|
       puts "\nDepartment ID: #{dept.id}"
       puts "Department Type: #{dept.department_type}"
       puts "Employee Reference: '#{dept.employee_reference}'"
-      
+
       if dept.employee_reference.blank?
         puts "  ❌ Employee reference is blank!"
       else
@@ -24,13 +24,13 @@ namespace :departments do
         end
       end
     end
-    
+
     puts "\n" + "="*50
     puts "Employee Details Summary:"
     puts "Total employees: #{EmployeeDetail.count}"
     puts "Employees with employee_id: #{EmployeeDetail.where.not(employee_id: nil).count}"
     puts "Employees with employee_name: #{EmployeeDetail.where.not(employee_name: nil).count}"
-    
+
     puts "\nFirst 5 employees:"
     EmployeeDetail.limit(5).each do |emp|
       puts "  #{emp.employee_name} (ID: #{emp.employee_id})"

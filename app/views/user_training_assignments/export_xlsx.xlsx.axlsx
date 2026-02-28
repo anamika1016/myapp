@@ -34,13 +34,13 @@ wb.styles do |s|
         emp.user_training_assignments.each do |assignment|
           t = assignment.training
           next unless t
-          
+
           prog = progress_map[t.id]
           is_completed = (prog&.status == "completed")
-          
+
           # Convert time to exact minutes or formatted string, e.g. 1.5 mins
           time_spent_mins = prog ? (prog.time_spent.to_f / 60.0).round(2) : 0
-          
+
           row = [
             emp.employee_code,
             emp.employee_name,
@@ -54,13 +54,13 @@ wb.styles do |s|
             is_completed ? prog.ended_at&.strftime("%d %b %Y %H:%M") : "-",
             prog&.financial_year.presence || "-"
           ]
-          
+
           row_styles = [
             cell_style, cell_style, cell_style, cell_style, cell_style, cell_style, cell_style,
             (is_completed ? completed_style : pending_style),
             cell_style, cell_style, cell_style
           ]
-          
+
           sheet.add_row row, style: row_styles
         end
       else
@@ -73,7 +73,7 @@ wb.styles do |s|
         ], style: cell_style
       end
     end
-    
+
     sheet.column_widths 15, 25, 30, 35, 15, 15, 15, 15, 18, 20, 15
   end
 end
