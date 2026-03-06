@@ -1,7 +1,5 @@
-# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
-
 one:
-  achievement_id: 1
+  achievement: one
   l1_remarks: MyText
   l1_percentage: 1.5
   l2_remarks: MyText
@@ -9,7 +7,7 @@ one:
   employee_remarks: MyText
 
 two:
-  achievement_id: 2
+  achievement: two
   l1_remarks: MyText
   l1_percentage: 1.5
   l2_remarks: MyText

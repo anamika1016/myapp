@@ -23,6 +23,7 @@ Rails.application.routes.draw do
     end
     collection do
       get "monthly_certificate/:year/:month", to: "trainings#monthly_certificate", as: :monthly_certificate
+      get :download_assessment_template
     end
   end
 

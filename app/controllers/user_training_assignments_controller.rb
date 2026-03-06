@@ -40,7 +40,14 @@ class UserTrainingAssignmentsController < ApplicationController
     @employee = EmployeeDetail.includes(:user).find(params[:employee_detail_id])
     all_trainings = Training.order(:year, :month, :title)
     @trainings_by_month = all_trainings.group_by { |t| [ t.year, t.month ] }
-    @assigned_ids = @employee.user_training_assignments.pluck(:training_id)
+
+    if @employee.assignments_managed?
+      # HOD has explicitly managed this employee → show only their assigned training IDs
+      @assigned_ids = @employee.user_training_assignments.pluck(:training_id)
+    else
+      # Unmanaged employee → pre-tick ALL trainings (they currently see everything by default)
+      @assigned_ids = all_trainings.pluck(:id)
+    end
   end
 
   # PATCH /user_training_assignments/:employee_detail_id
@@ -59,6 +66,9 @@ class UserTrainingAssignmentsController < ApplicationController
         user_id: @employee.user_id   # link user_id if they have a login
       )
     end
+
+    # ✅ Mark this employee as HOD-managed so new trainings won't auto-appear
+    @employee.update_column(:assignments_managed, true)
 
     redirect_to user_training_assignments_path,
                 notice: "Training assignments updated for #{@employee.employee_name}"

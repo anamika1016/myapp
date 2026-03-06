@@ -257,7 +257,7 @@
                           <span style="font-size: 9px; background: #f1f5f9; color: #64748b; padding: 1px 4px; border-radius: 4px; margin-left: 5px;">Inactive</span>
                         <% end %>
                       </div>
-                      <div class="ppt-meta">Duration: <%= training.duration %> min &nbsp;·&nbsp; <%= training.month_name %> <%= training.year %></div>
+                      <div class="ppt-meta">Duration: <%= training.duration >= 60 ? "#{training.duration / 60} min" : "#{training.duration} sec" %> &nbsp;·&nbsp; <%= training.month_name %> <%= training.year %></div>
                     </div>
                   </label>
                 <% end %>

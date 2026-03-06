@@ -148,7 +148,7 @@
             total_in_db = Training.where(year: year, month: month)
             all_done = total_in_db.any? && total_in_db.all? do |t| 
               prog = @progress_map[t.id]
-              prog&.status == 'completed' && (prog.time_spent.to_i >= (t.duration.to_i * 60))
+              prog&.status == 'completed' && (prog.time_spent.to_i >= t.duration.to_i)
             end
           %>
           
@@ -164,7 +164,7 @@
               <% 
                 valid_completed = total_in_db.select do |t| 
                   prog = @progress_map[t.id]
-                  prog&.status == 'completed' && (prog.time_spent.to_i >= (t.duration.to_i * 60))
+                  prog&.status == 'completed' && (prog.time_spent.to_i >= t.duration.to_i)
                 end.size
               %>
               <%= valid_completed %> / <%= total_in_db.size %> Total PPTs Completed (with required time)
@@ -195,7 +195,7 @@
                       <% end %>
                     </div>
                   </td>
-                  <td><%= training.duration %> mins</td>
+                  <td><%= training.duration >= 60 ? "#{training.duration / 60} mins" : "#{training.duration} secs" %></td>
                   <td>
                     <% if progress&.status == 'completed' %>
                       <span class="status-badge status-completed">✅ Done</span>

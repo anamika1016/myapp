@@ -4,15 +4,35 @@
   <%= f.text_field :title, class: "w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" %>
 </div>
 
+<!--
 <div class="mb-4">
   <%= f.label :description, class: "block text-sm font-medium text-gray-700 mb-1" %>
   <%= f.text_area :description, rows: 4, class: "w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" %>
 </div>
+-->
 
 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
   <div>
-    <%= f.label :duration, "Duration (Minutes)", class: "block text-sm font-medium text-gray-700 mb-1" %>
-    <%= f.number_field :duration, class: "w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" %>
+    <%= f.label :duration, "Duration", class: "block text-sm font-medium text-gray-700 mb-1" %>
+    <% options = [
+      ["30 Seconds", 30],
+      ["1 Minute", 60],
+      ["2 Minutes", 120],
+      ["3 Minutes", 180],
+      ["5 Minutes", 300],
+      ["10 Minutes", 600],
+      ["15 Minutes", 900],
+      ["20 Minutes", 1200],
+      ["30 Minutes", 1800],
+      ["45 Minutes", 2700],
+      ["60 Minutes", 3600],
+      ["90 Minutes", 5400],
+      ["120 Minutes", 7200],
+      ["180 Minutes", 10800],
+      ["240 Minutes", 14400]
+    ] %>
+    <%= f.select :duration, options_for_select(options, f.object.duration || 60), {}, 
+          class: "w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" %>
   </div>
 
   <div>
@@ -46,7 +66,12 @@
 
   <div id="assessment_section" class="hidden">
     <div class="mb-4">
-      <label class="block text-sm font-medium text-gray-700 mb-1">Upload Questions via Excel</label>
+      <div class="flex items-center justify-between mb-1">
+        <label class="block text-sm font-medium text-gray-700">Upload Questions via Excel</label>
+        <%= link_to download_assessment_template_trainings_path(format: :xlsx), class: "text-xs px-3 py-1 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition font-bold" do %>
+          ⬇ Export Format
+        <% end %>
+      </div>
       <input type="file" name="excel_file" accept=".xlsx, .xls" class="w-full border border-gray-300 rounded-lg p-2 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 transition">
       <p class="mt-1 text-xs text-gray-500">Excel format: Question | Option A | Option B | Option C | Option D | Answer</p>
     </div>

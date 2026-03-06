@@ -15,9 +15,9 @@ wb.styles do |s|
       "Training Topic",
       "Training Month",
       "Training Year",
-      "Required Mins",
+      "Required Duration",
       "Status",
-      "Time Spent (Mins)",
+      "Time Spent",
       "Completed On",
       "Financial Year"
     ], style: header_style, height: 30
@@ -38,8 +38,22 @@ wb.styles do |s|
           prog = progress_map[t.id]
           is_completed = (prog&.status == "completed")
 
-          # Convert time to exact minutes or formatted string, e.g. 1.5 mins
-          time_spent_mins = prog ? (prog.time_spent.to_f / 60.0).round(2) : 0
+          # Convert time to exact minutes or seconds string, e.g. 1.5 mins or 30s
+          time_spent_str = if prog
+            if prog.time_spent.to_i >= 60
+              "#{(prog.time_spent.to_f / 60.0).round(2)} mins"
+            else
+              "#{prog.time_spent.to_i} secs"
+            end
+          else
+            "0"
+          end
+
+          duration_str = if t.duration >= 60
+            "#{t.duration / 60} mins"
+          else
+            "#{t.duration} secs"
+          end
 
           row = [
             emp.employee_code,
@@ -48,9 +62,9 @@ wb.styles do |s|
             t.title,
             t.month_name, # uses the method defined on Training model
             t.year,
-            t.duration,
+            duration_str,
             is_completed ? "Completed" : "Pending",
-            time_spent_mins > 0 ? time_spent_mins : "-",
+            time_spent_str != "0" ? time_spent_str : "-",
             is_completed ? prog.ended_at&.strftime("%d %b %Y %H:%M") : "-",
             prog&.financial_year.presence || "-"
           ]

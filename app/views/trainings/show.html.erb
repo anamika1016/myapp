@@ -1,6 +1,6 @@
 <div class="main-content ml-64 w-auto px-6 py-8"
      data-training-id="<%= @training.id %>"
-     data-duration-minutes="<%= @training.duration %>"
+     data-duration-seconds="<%= @training.duration %>"
      data-status="<%= @progress&.status %>">
 
   <div class="page-card">
@@ -22,7 +22,7 @@
         <!-- RIGHT: all chips -->
         <div class="header-chips">
           <span class="chip chip-gray">
-            ⏱ Required: <%= @training.duration %> min
+            ⏱ Required: <%= @training.duration >= 60 ? "#{@training.duration / 60} min" : "#{@training.duration} sec" %>
           </span>
           <span class="chip chip-gray" id="timer-display">
             ⏳ 00:00
@@ -118,53 +118,51 @@
 
 <script>
   (function() {
-    let timerInterval;
-    let handleUnloadFn;
-    let toggleTimerFn;
+    let timerInterval   = null;
+    let handleUnloadFn  = null;
+    let toggleTimerFn   = null;
 
     function initTimer() {
-      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+      // Cleanup previous listeners (Turbo re-runs this on every page visit)
+      if (timerInterval)  { clearInterval(timerInterval); timerInterval = null; }
       if (handleUnloadFn) {
-        window.removeEventListener("beforeunload", handleUnloadFn);
-        document.removeEventListener("turbo:before-visit", handleUnloadFn);
+        window.removeEventListener('beforeunload', handleUnloadFn);
+        document.removeEventListener('turbo:before-visit', handleUnloadFn);
         handleUnloadFn = null;
       }
       if (toggleTimerFn) {
-        document.removeEventListener("visibilitychange", toggleTimerFn);
+        document.removeEventListener('visibilitychange', toggleTimerFn);
         toggleTimerFn = null;
       }
 
-      const container = document.querySelector('.main-content');
-      if (!container || !container.dataset.trainingId) return;
+      const container = document.querySelector('.main-content[data-training-id]');
+      if (!container) return;
 
       const trainingId      = container.dataset.trainingId;
-      const requiredDuration = parseInt(container.dataset.durationMinutes || 0) * 60;
+      const requiredSeconds = parseInt(container.dataset.durationSeconds || 0);
       const status          = container.dataset.status;
       const timerDisplay    = document.getElementById('timer-display');
       const completeBtn     = document.getElementById('complete-btn');
       const actionBar       = document.getElementById('action-bar');
-      const csrfMeta        = document.querySelector('meta[name="csrf-token"]');
-      const csrfToken       = csrfMeta ? csrfMeta.content : '';
+      const csrfToken       = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
 
       if (!timerDisplay) return;
-      let secondsSpent = 0;
-      let isTracking = true;
-      let lastSaveTime = 0;
 
-      // Reveal action bar when last file card is visible
+      let secondsSpent  = 0;   // overwritten from server before interval starts
+      let lastSaveTime  = 0;
+      let timerRunning  = false;
+
+      // Action bar: reveal when last file card scrolls into view
       if (actionBar) {
         const fileCards = document.querySelectorAll('.file-card');
         const sentinel  = fileCards[fileCards.length - 1];
         if (sentinel) {
-          const obs = new IntersectionObserver((entries) => {
-            entries.forEach(e => {
-              if (e.isIntersecting) {
-                actionBar.classList.remove('action-bar--hidden');
-                actionBar.classList.add('action-bar--visible');
-              }
-            });
-          }, { threshold: 0.8 });
-          obs.observe(sentinel);
+          new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting) {
+              actionBar.classList.remove('action-bar--hidden');
+              actionBar.classList.add('action-bar--visible');
+            }
+          }, { threshold: 0.8 }).observe(sentinel);
         } else {
           actionBar.classList.remove('action-bar--hidden');
           actionBar.classList.add('action-bar--visible');
@@ -172,76 +170,59 @@
       }
 
       function updateDisplay() {
-        const m = Math.floor(secondsSpent / 60).toString().padStart(2,'0');
-        const s = (secondsSpent % 60).toString().padStart(2,'0');
+        const m = Math.floor(secondsSpent / 60).toString().padStart(2, '0');
+        const s = (secondsSpent % 60).toString().padStart(2, '0');
         timerDisplay.innerHTML = `⏳ ${m}:${s}`;
-        if (secondsSpent >= requiredDuration) enableCompleteButton();
+        if (secondsSpent >= requiredSeconds) enableCompleteButton();
       }
 
-      function saveProgress(isUnloading) {
+      function saveProgress(force) {
         if (status === 'completed') return;
-        // Don't save if there isn't any meaningful progression since last save
-        if (secondsSpent === lastSaveTime && !isUnloading) return;
-        
-        const payload = JSON.stringify({ time_spent: secondsSpent });
-        const url = `/trainings/${trainingId}/update_progress`;
-        
-        fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-          body: payload,
-          keepalive: true // Crucial for beforeunload
-        }).catch(err => console.debug("Progress save error:", err));
-        
+        if (!force && secondsSpent === lastSaveTime) return;
+        fetch(`/trainings/${trainingId}/update_progress`, {
+          method:    'POST',
+          headers:   { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+          body:      JSON.stringify({ time_spent: secondsSpent }),
+          keepalive: true   // works during beforeunload
+        }).catch(() => {});
         lastSaveTime = secondsSpent;
       }
 
-      toggleTimerFn = function() {
-        if (document.hidden) {
-          isTracking = false;
-          saveProgress(true); // Save progress immediately when hiding tab
-        } else {
-          isTracking = true;
-        }
-      };
+      function startInterval() {
+        if (timerRunning) return;
+        timerRunning = true;
 
-      handleUnloadFn = function() {
-        if (timerInterval) {
-          saveProgress(true);
-          clearInterval(timerInterval);
-          timerInterval = null;
-        }
-      };
-
-      if (status !== 'completed') {
-        fetch(`/trainings/${trainingId}/start_training`, {
-          method: 'POST',
-          headers: { 'X-CSRF-Token': csrfToken, 'Accept': 'application/json' }
-        })
-        .then(r => r.json())
-        .then(data => {
-          if (data.time_spent && !isNaN(data.time_spent)) {
-             secondsSpent = parseInt(data.time_spent, 10);
-             lastSaveTime = secondsSpent;
-             updateDisplay();
+        // Pause when tab hidden, resume when visible again
+        toggleTimerFn = function () {
+          if (document.hidden) {
+            // Tab hidden → save immediately and STOP counting
+            saveProgress(true);
+            clearInterval(timerInterval);
+            timerInterval = null;
+          } else {
+            // Tab visible again → RESUME from where we left off
+            if (!timerInterval && status !== 'completed') {
+              timerInterval = setInterval(tick, 1000);
+            }
           }
-        });
+        };
+        document.addEventListener('visibilitychange', toggleTimerFn);
 
-        timerInterval = setInterval(() => {
-          if (isTracking && !document.hidden) {
-             secondsSpent++;
-             updateDisplay();
+        // Save on page close / Turbo navigation
+        handleUnloadFn = function () { saveProgress(true); };
+        window.addEventListener('beforeunload', handleUnloadFn);
+        document.addEventListener('turbo:before-visit', handleUnloadFn);
 
-             // Auto save every 15 seconds
-             if (secondsSpent - lastSaveTime >= 15) {
-               saveProgress(false);
-             }
-          }
-        }, 1000);
+        // Only run interval if tab is currently visible
+        if (!document.hidden) {
+          timerInterval = setInterval(tick, 1000);
+        }
+      }
 
-        document.addEventListener("visibilitychange", toggleTimerFn);
-        window.addEventListener("beforeunload", handleUnloadFn);
-        document.addEventListener("turbo:before-visit", handleUnloadFn);
+      function tick() {
+        secondsSpent++;
+        updateDisplay();
+        if (secondsSpent - lastSaveTime >= 15) saveProgress(false);
       }
 
       function enableCompleteButton() {
@@ -249,50 +230,63 @@
         completeBtn.disabled = false;
         completeBtn.classList.remove('btn-complete--disabled');
         completeBtn.classList.add('btn-complete--ready');
-        if (completeBtn.dataset.assessmentUrl) {
-          completeBtn.innerHTML = '📝 Take Assessment';
-        } else {
-          completeBtn.innerHTML = '✅ Complete Training';
-        }
+        completeBtn.innerHTML = completeBtn.dataset.assessmentUrl
+          ? '📝 Take Assessment'
+          : '✅ Complete Training';
       }
 
+      // Already completed — just show the time, no interval needed
+      if (status === 'completed') {
+        updateDisplay();
+        return;
+      }
+
+      // ── KEY FIX: fetch saved time FIRST, then start interval ──
+      fetch(`/trainings/${trainingId}/start_training`, {
+        method:  'POST',
+        headers: { 'X-CSRF-Token': csrfToken, 'Accept': 'application/json' }
+      })
+      .then(r => r.json())
+      .then(data => {
+        // Resume from saved seconds (0 on first visit)
+        secondsSpent = parseInt(data.time_spent || 0, 10);
+        lastSaveTime = secondsSpent;
+        updateDisplay();    // show correct time right away
+        startInterval();    // NOW start counting
+      })
+      .catch(() => startInterval());  // fallback if request fails
+
+      // Complete / Assessment button
       if (completeBtn) {
-        completeBtn.onclick = function () {
-          if (timerInterval) {
-            clearInterval(timerInterval);
-            timerInterval = null;
-          }
+        completeBtn.addEventListener('click', function () {
+          clearInterval(timerInterval); timerInterval = null;
           if (handleUnloadFn) {
-            window.removeEventListener("beforeunload", handleUnloadFn);
-            document.removeEventListener("turbo:before-visit", handleUnloadFn);
+            window.removeEventListener('beforeunload', handleUnloadFn);
+            document.removeEventListener('turbo:before-visit', handleUnloadFn);
           }
-          if (toggleTimerFn) {
-            document.removeEventListener("visibilitychange", toggleTimerFn);
-          }
-          
+          if (toggleTimerFn) document.removeEventListener('visibilitychange', toggleTimerFn);
+
           if (completeBtn.dataset.assessmentUrl) {
-            // Assessment Flow
             fetch(`/trainings/${trainingId}/update_progress`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken, 'Accept': 'application/json' },
-              body: JSON.stringify({ time_spent: secondsSpent })
-            }).then(() => {
-              window.location.href = completeBtn.dataset.assessmentUrl;
-            });
+              method:  'POST',
+              headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+              body:    JSON.stringify({ time_spent: secondsSpent })
+            }).then(() => { window.location.href = completeBtn.dataset.assessmentUrl; });
           } else {
-            // Normal Flow
             fetch(`/trainings/${trainingId}/complete_training`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken, 'Accept': 'application/json' },
-              body: JSON.stringify({ time_spent: secondsSpent })
-            }).then(r => r.json()).then(data => {
-              if (data.status === 'completed') { 
-                alert('Training completed successfully!'); 
-                window.location.reload(); 
+              method:  'POST',
+              headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+              body:    JSON.stringify({ time_spent: secondsSpent })
+            })
+            .then(r => r.json())
+            .then(data => {
+              if (data.status === 'completed') {
+                alert('Training completed successfully!');
+                window.location.reload();
               }
             });
           }
-        };
+        });
       }
     }
 

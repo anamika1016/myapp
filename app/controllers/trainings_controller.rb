@@ -5,11 +5,17 @@ class TrainingsController < ApplicationController
     if current_user.role == "hod"
       @trainings = Training.includes(:user_training_progresses)
     else
-      # Non-HOD users only see trainings explicitly assigned to them via EmployeeDetail
+      # Non-HOD users: check assignments_managed flag
       employee = current_user.employee_detail || EmployeeDetail.find_by(employee_email: current_user.email)
       if employee
-        assigned_ids = employee.user_training_assignments.pluck(:training_id)
-        @trainings = Training.where(id: assigned_ids).includes(:user_training_progresses)
+        if employee.assignments_managed?
+          # HOD has explicitly managed this employee's assignments → show ONLY assigned trainings
+          assigned_ids = employee.user_training_assignments.pluck(:training_id)
+          @trainings = Training.where(id: assigned_ids).includes(:user_training_progresses)
+        else
+          # Employee not yet managed by HOD → show ALL active trainings (default behaviour)
+          @trainings = Training.includes(:user_training_progresses)
+        end
       else
         @trainings = Training.none
       end
@@ -74,12 +80,25 @@ class TrainingsController < ApplicationController
   def create
     @training = Training.new(training_params)
     @training.created_by = current_user.id
+    # Default status to Active so employees see it immediately
+    @training.status = true if @training.status.nil?
 
     if @training.save
       if @training.has_assessment && params[:excel_file].present?
         import_questions_from_excel(@training, params[:excel_file])
       end
-      redirect_to trainings_path, notice: "Training uploaded successfully"
+
+      # ✅ Auto-assign this new training to ALL already-managed employees
+      # so it appears pre-ticked in their assignment list and visible in their login.
+      # Unmanaged employees already see ALL trainings by default.
+      EmployeeDetail.where(assignments_managed: true).each do |employee|
+        employee.user_training_assignments.find_or_create_by(
+          training_id: @training.id,
+          user_id:     employee.user_id
+        )
+      end
+
+      redirect_to trainings_path, notice: "Training uploaded successfully and assigned to all employees."
     else
       render :new, status: :unprocessable_entity
     end
@@ -169,9 +188,10 @@ class TrainingsController < ApplicationController
   # Converts PPT/DOCX to PDF using LibreOffice and streams it for inline preview
   def preview
     @training = Training.find(params[:id])
-    file = @training.files.find { |f| f.id == params[:file_id].to_i }
+    # Use find_by for more robust lookup
+    file = @training.files.find_by(id: params[:file_id])
 
-    return head :not_found unless file
+    return render plain: "File not found", status: :not_found unless file
 
     # If it's already a PDF, just redirect
     if file.content_type.include?("pdf")
@@ -180,31 +200,47 @@ class TrainingsController < ApplicationController
     end
 
     # For PPT/DOCX: download to temp, convert with LibreOffice, stream back
-    tmp_dir = Dir.mktmpdir("training_preview_")
+    begin
+      tmp_dir = Dir.mktmpdir("training_preview_")
+      original_ext = File.extname(file.filename.to_s)
+      tmp_input = File.join(tmp_dir, "input#{original_ext}")
 
-    original_ext = File.extname(file.filename.to_s)
-    tmp_input = File.join(tmp_dir, "input#{original_ext}")
+      # Write file content to temp location
+      File.open(tmp_input, "wb") do |f|
+        f.write(file.download)
+      end
 
-    # Write file content to temp location
-    File.open(tmp_input, "wb") do |f|
-      f.write(file.download)
-    end
+      # Find libreoffice command
+      libre_cmd = "libreoffice"
+      unless system("command -v #{libre_cmd} >/dev/null 2>&1")
+        libre_cmd = "soffice" # Try soffice fallback
+      end
 
-    # Convert to PDF using LibreOffice headless
-    system("libreoffice --headless --convert-to pdf --outdir #{Shellwords.escape(tmp_dir)} #{Shellwords.escape(tmp_input)} 2>/dev/null")
+      # Check if libreoffice/soffice is available
+      if system("command -v #{libre_cmd} >/dev/null 2>&1")
+        # Convert to PDF using LibreOffice headless
+        # Added -env:UserInstallation to ensure it works in environments without a writable home for the web user
+        system("#{libre_cmd} --headless --convert-to pdf --outdir #{Shellwords.escape(tmp_dir)} -env:UserInstallation=file://#{Shellwords.escape(tmp_dir)} #{Shellwords.escape(tmp_input)} > /dev/null 2>&1")
 
-    pdf_path = File.join(tmp_dir, "input.pdf")
+        pdf_path = File.join(tmp_dir, "input.pdf")
 
-    if File.exist?(pdf_path)
-      pdf_data = File.read(pdf_path)
-      FileUtils.remove_entry_secure(tmp_dir) rescue nil
-      send_data pdf_data,
-        type: "application/pdf",
-        disposition: "inline",
-        filename: "#{File.basename(file.filename.to_s, original_ext)}.pdf"
-    else
-      FileUtils.remove_entry_secure(tmp_dir) rescue nil
-      head :unprocessable_entity
+        if File.exist?(pdf_path)
+          pdf_data = File.read(pdf_path)
+          send_data pdf_data,
+            type: "application/pdf",
+            disposition: "inline",
+            filename: "#{File.basename(file.filename.to_s, original_ext)}.pdf"
+        else
+          render html: "<!DOCTYPE html><html><body style='font-family: sans-serif; padding: 20px; color: #666;'><h3>Preview Unavailable</h3><p>Could not generate a preview for this file type. Please <a href='#{rails_blob_path(file, disposition: 'attachment')}'>download</a> it to view.</p></body></html>".html_safe, status: :ok
+        end
+      else
+        render html: "<!DOCTYPE html><html><body style='font-family: sans-serif; padding: 20px; color: #666;'><h3>Preview Service Unavailable</h3><p>Server-side preview is not available on this server. Please <a href='#{rails_blob_path(file, disposition: 'attachment')}'>download</a> the file directly.</p></body></html>".html_safe, status: :ok
+      end
+    rescue StandardError => e
+      Rails.logger.error "Preview Conversion Error: #{e.message}"
+      render html: "<!DOCTYPE html><html><body style='font-family: sans-serif; padding: 20px; color: #666;'><h3>Error</h3><p>An error occurred while generating the preview. Please <a href='#{rails_blob_path(file, disposition: 'attachment')}'>download</a> the file.</p></body></html>".html_safe, status: :ok
+    ensure
+      FileUtils.remove_entry_secure(tmp_dir) if tmp_dir && Dir.exist?(tmp_dir)
     end
   end
 
@@ -249,8 +285,8 @@ class TrainingsController < ApplicationController
 
     valid_completions = @month_trainings.all? do |t|
       p = progress_map[t.id]
-      # Status must be completed AND time_spent (seconds) >= duration (minutes) * 60
-      p&.status == "completed" && (p.time_spent.to_i >= (t.duration.to_i * 60))
+      # Status must be completed AND time_spent (seconds) >= duration (seconds)
+      p&.status == "completed" && (p.time_spent.to_i >= t.duration.to_i)
     end
 
     unless valid_completions
@@ -281,6 +317,14 @@ class TrainingsController < ApplicationController
     # Optional: check if already completed
     if @progress.status == "completed"
       redirect_to trainings_path, notice: "You have already completed this training."
+    end
+  end
+
+  def download_assessment_template
+    respond_to do |format|
+      format.xlsx {
+        response.headers["Content-Disposition"] = "attachment; filename=Assessment_Template.xlsx"
+      }
     end
   end
 

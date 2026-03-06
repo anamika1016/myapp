@@ -15,7 +15,7 @@
       <svg xmlns="http://www.w3.org/2000/svg" style="width:13px;height:13px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
-      <%= training.duration %> min
+      <%= training.duration >= 60 ? "#{training.duration / 60} min" : "#{training.duration} sec" %>
     </span>
   </div>
 
@@ -40,7 +40,7 @@
       <svg xmlns="http://www.w3.org/2000/svg" style="width:12px;height:12px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
-      Required Duration: <%= training.duration %> mins
+      Required Duration: <%= training.duration >= 60 ? "#{training.duration / 60} mins" : "#{training.duration} secs" %>
     </div>
   </div>
 
