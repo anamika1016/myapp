@@ -216,10 +216,11 @@ class TrainingsController < ApplicationController
       libre_cmd = "/usr/bin/libreoffice" if libre_cmd.empty? && File.exist?("/usr/bin/libreoffice")
 
       if libre_cmd.present? && File.exist?(libre_cmd)
-        # Use /var/www/.libreoffice as user installation dir so www-data (web server user)
-        # has a writable location. Run from /tmp to avoid CWD issues with spaces in path.
-        libre_user_dir = "/var/www/.libreoffice"
-        FileUtils.mkdir_p(libre_user_dir) unless Dir.exist?(libre_user_dir)
+        # Use tmp_dir as the LibreOffice user installation so it works for ANY user
+        # (local dev or www-data on server) without needing a writable home dir.
+        # Run from /tmp (chdir) to avoid CWD issues with spaces in the app path.
+        libre_user_dir = File.join(tmp_dir, "lo_profile")
+        FileUtils.mkdir_p(libre_user_dir)
 
         convert_cmd = [
           libre_cmd,
@@ -232,7 +233,7 @@ class TrainingsController < ApplicationController
 
         require "open3"
         _stdout, stderr, status = Open3.capture3(
-          { "HOME" => "/var/www", "TMPDIR" => "/tmp" },
+          { "HOME" => tmp_dir, "TMPDIR" => "/tmp" },
           *convert_cmd,
           chdir: "/tmp"
         )
