@@ -233,7 +233,13 @@ class TrainingsController < ApplicationController
 
         require "open3"
         _stdout, stderr, status = Open3.capture3(
-          { "HOME" => tmp_dir, "TMPDIR" => "/tmp" },
+          {
+            "HOME"          => tmp_dir,
+            "TMPDIR"        => "/tmp",
+            "XDG_CACHE_HOME"  => File.join(tmp_dir, ".cache"),
+            "XDG_CONFIG_HOME" => File.join(tmp_dir, ".config"),
+            "DCONF_PROFILE"   => "0"
+          },
           *convert_cmd,
           chdir: "/tmp"
         )
@@ -258,7 +264,11 @@ class TrainingsController < ApplicationController
       Rails.logger.error "Preview Conversion Error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
       render html: "<!DOCTYPE html><html><body style='font-family: sans-serif; padding: 20px; color: #666;'><h3>Error</h3><p>An error occurred while generating the preview. Please <a href='#{rails_blob_path(file, disposition: 'attachment')}'>download</a> the file.</p></body></html>".html_safe, status: :ok
     ensure
-      FileUtils.remove_entry_secure(tmp_dir) if tmp_dir && Dir.exist?(tmp_dir)
+      if tmp_dir && Dir.exist?(tmp_dir)
+        # www-data may have written files in tmp_dir; make them all deletable first
+        system("chmod -R 777 #{Shellwords.escape(tmp_dir)} 2>/dev/null")
+        FileUtils.remove_entry_secure(tmp_dir)
+      end
     end
   end
 
