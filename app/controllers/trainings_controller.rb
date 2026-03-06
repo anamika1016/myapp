@@ -211,16 +211,33 @@ class TrainingsController < ApplicationController
       end
 
       # Find libreoffice command
-      libre_cmd = "libreoffice"
-      unless system("command -v #{libre_cmd} >/dev/null 2>&1")
-        libre_cmd = "soffice" # Try soffice fallback
-      end
+      libre_cmd = `which libreoffice 2>/dev/null`.strip
+      libre_cmd = `which soffice 2>/dev/null`.strip if libre_cmd.empty?
+      libre_cmd = "/usr/bin/libreoffice" if libre_cmd.empty? && File.exist?("/usr/bin/libreoffice")
 
-      # Check if libreoffice/soffice is available
-      if system("command -v #{libre_cmd} >/dev/null 2>&1")
-        # Convert to PDF using LibreOffice headless
-        # Added -env:UserInstallation to ensure it works in environments without a writable home for the web user
-        system("#{libre_cmd} --headless --convert-to pdf --outdir #{Shellwords.escape(tmp_dir)} -env:UserInstallation=file://#{Shellwords.escape(tmp_dir)} #{Shellwords.escape(tmp_input)} > /dev/null 2>&1")
+      if libre_cmd.present? && File.exist?(libre_cmd)
+        # Use /var/www/.libreoffice as user installation dir so www-data (web server user)
+        # has a writable location. Run from /tmp to avoid CWD issues with spaces in path.
+        libre_user_dir = "/var/www/.libreoffice"
+        FileUtils.mkdir_p(libre_user_dir) unless Dir.exist?(libre_user_dir)
+
+        convert_cmd = [
+          libre_cmd,
+          "--headless",
+          "--convert-to", "pdf",
+          "--outdir", tmp_dir,
+          "-env:UserInstallation=file://#{libre_user_dir}",
+          tmp_input
+        ]
+
+        require "open3"
+        _stdout, stderr, status = Open3.capture3(
+          { "HOME" => "/var/www", "TMPDIR" => "/tmp" },
+          *convert_cmd,
+          chdir: "/tmp"
+        )
+
+        Rails.logger.info "LibreOffice exit: #{status.exitstatus} | stderr: #{stderr}"
 
         pdf_path = File.join(tmp_dir, "input.pdf")
 
@@ -237,7 +254,7 @@ class TrainingsController < ApplicationController
         render html: "<!DOCTYPE html><html><body style='font-family: sans-serif; padding: 20px; color: #666;'><h3>Preview Service Unavailable</h3><p>Server-side preview is not available on this server. Please <a href='#{rails_blob_path(file, disposition: 'attachment')}'>download</a> the file directly.</p></body></html>".html_safe, status: :ok
       end
     rescue StandardError => e
-      Rails.logger.error "Preview Conversion Error: #{e.message}"
+      Rails.logger.error "Preview Conversion Error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
       render html: "<!DOCTYPE html><html><body style='font-family: sans-serif; padding: 20px; color: #666;'><h3>Error</h3><p>An error occurred while generating the preview. Please <a href='#{rails_blob_path(file, disposition: 'attachment')}'>download</a> the file.</p></body></html>".html_safe, status: :ok
     ensure
       FileUtils.remove_entry_secure(tmp_dir) if tmp_dir && Dir.exist?(tmp_dir)
