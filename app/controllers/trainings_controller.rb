@@ -210,10 +210,21 @@ class TrainingsController < ApplicationController
         f.write(file.download)
       end
 
-      # Find libreoffice command
-      libre_cmd = `which libreoffice 2>/dev/null`.strip
-      libre_cmd = `which soffice 2>/dev/null`.strip if libre_cmd.empty?
-      libre_cmd = "/usr/bin/libreoffice" if libre_cmd.empty? && File.exist?("/usr/bin/libreoffice")
+      # Find libreoffice command (server pe install zaroori: apt install libreoffice-core libreoffice-impress)
+      libre_cmd = ENV["LIBREOFFICE_PATH"].presence
+      unless libre_cmd.present? && File.exist?(libre_cmd)
+        %w[
+          /usr/bin/libreoffice
+          /usr/bin/soffice
+        ].each do |path|
+          if File.exist?(path)
+            libre_cmd = path
+            break
+          end
+        end
+      end
+      libre_cmd = `which libreoffice 2>/dev/null`.strip if libre_cmd.blank?
+      libre_cmd = `which soffice 2>/dev/null`.strip if libre_cmd.blank?
 
       if libre_cmd.present? && File.exist?(libre_cmd)
         # Use tmp_dir as the LibreOffice user installation so it works for ANY user
@@ -258,7 +269,8 @@ class TrainingsController < ApplicationController
           render html: "<!DOCTYPE html><html><body style='font-family: sans-serif; padding: 20px; color: #666;'><h3>Preview Unavailable</h3><p>Could not generate a preview for this file type. Please <a href='#{rails_blob_path(file, disposition: 'attachment')}'>download</a> it to view.</p></body></html>".html_safe, status: :ok
         end
       else
-        render html: "<!DOCTYPE html><html><body style='font-family: sans-serif; padding: 20px; color: #666;'><h3>Preview Service Unavailable</h3><p>Server-side preview is not available on this server. Please <a href='#{rails_blob_path(file, disposition: 'attachment')}'>download</a> the file directly.</p></body></html>".html_safe, status: :ok
+        Rails.logger.warn "PPT/DOCX preview: LibreOffice not found. On server run: sudo apt install -y libreoffice-core libreoffice-impress"
+        render html: "<!DOCTYPE html><html><body style='font-family: sans-serif; padding: 20px; color: #666;'><h3>Preview Service Unavailable</h3><p>Server-side preview is not available on this server. Install LibreOffice on the server (e.g. <code>sudo apt install -y libreoffice-core libreoffice-impress</code>), then restart the app. Until then, please <a href='#{rails_blob_path(file, disposition: 'attachment')}'>download</a> the file directly.</p></body></html>".html_safe, status: :ok
       end
     rescue StandardError => e
       Rails.logger.error "Preview Conversion Error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
