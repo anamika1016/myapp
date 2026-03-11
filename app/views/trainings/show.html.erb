@@ -1,6 +1,7 @@
 <div class="main-content ml-64 w-auto px-6 py-8"
      data-training-id="<%= @training.id %>"
      data-duration-seconds="<%= @training.duration %>"
+     data-time-spent-seconds="<%= @progress&.time_spent.to_i %>"
      data-status="<%= @progress&.status %>">
 
   <div class="page-card">
@@ -140,6 +141,7 @@
 
       const trainingId      = container.dataset.trainingId;
       const requiredSeconds = parseInt(container.dataset.durationSeconds || 0);
+      const savedSeconds    = parseInt(container.dataset.timeSpentSeconds || 0);
       const status          = container.dataset.status;
       const timerDisplay    = document.getElementById('timer-display');
       const completeBtn     = document.getElementById('complete-btn');
@@ -237,6 +239,8 @@
 
       // Already completed — just show the time, no interval needed
       if (status === 'completed') {
+        secondsSpent = savedSeconds;
+        lastSaveTime = secondsSpent;
         updateDisplay();
         return;
       }

@@ -63,7 +63,7 @@
       <% end %>
 
     <% else %>
-      <% progress = training.user_training_progresses.find { |p| p.user_id == current_user.id } %>
+      <% progress ||= training.user_training_progresses.find { |p| p.user_id == current_user.id } %>
       <% if progress&.status == "completed" %>
         <div style="width: 100%;">
           <div style="display:flex; align-items:center; gap:8px;">

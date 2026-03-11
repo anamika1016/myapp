@@ -152,7 +152,8 @@
     <div class="green-line"></div>
 
     <div class="completed-text" style="font-size: 16pt; margin-bottom: 25px;">
-      has successfully completed
+       has successfully completed </br>
+       </br>
       <% if @certificate_type == "monthly" %>
         <% @month_trainings.each_with_index do |t, i| %>
           <%= t.title %><%= ", " unless i == @month_trainings.size - 1 %>

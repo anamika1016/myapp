@@ -36,6 +36,25 @@ class TrainingsController < ApplicationController
     end
 
     @trainings = @trainings.order(created_at: :desc)
+
+    # For employees: build an ordered map of "best" progress per training.
+    # This avoids issues when duplicate progress rows exist (e.g., old 'started' rows)
+    # and ensures UI checks use the latest/most relevant record.
+    if current_user.role != "hod"
+      ordered_progresses = UserTrainingProgress
+        .where(user_id: current_user.id, training_id: @trainings.select(:id))
+        .order(
+          Arel.sql("CASE WHEN status = 'completed' THEN 0 ELSE 1 END ASC"),
+          ended_at: :desc,
+          updated_at: :desc,
+          id: :desc
+        )
+
+      @progress_by_training_id = {}
+      ordered_progresses.each do |p|
+        @progress_by_training_id[p.training_id] ||= p
+      end
+    end
   end
 
   def edit
@@ -318,10 +337,20 @@ class TrainingsController < ApplicationController
     end
 
     # 2. Check if ALL are completed AND meet duration requirements
-    all_progress = UserTrainingProgress.where(user: @target_user, training_id: @month_trainings.pluck(:id))
+    all_progress = UserTrainingProgress
+      .where(user: @target_user, training_id: @month_trainings.pluck(:id))
+      .order(
+        Arel.sql("CASE WHEN status = 'completed' THEN 0 ELSE 1 END ASC"),
+        ended_at: :desc,
+        updated_at: :desc,
+        id: :desc
+      )
 
-    # Map progress for quick check
-    progress_map = all_progress.index_by(&:training_id)
+    # Map "best" progress for quick check (handles duplicate rows safely)
+    progress_map = {}
+    all_progress.each do |p|
+      progress_map[p.training_id] ||= p
+    end
 
     valid_completions = @month_trainings.all? do |t|
       p = progress_map[t.id]
