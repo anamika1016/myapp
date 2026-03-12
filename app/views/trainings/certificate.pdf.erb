@@ -2,15 +2,23 @@
   html, body {
     margin: 0;
     padding: 0;
-    background-color: #fff;
+    /* If wkhtmltopdf leaves any tiny gaps, avoid white bands */
+    background-color: #e8f5e9;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
   }
   .certificate-wrapper {
-    width: 297mm !important;
-    height: 210mm !important;
-    position: relative;
+    /* Fill the entire A4 landscape page area */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
     /* Main background gradient matching PSD */
     background: radial-gradient(circle at center, #ffffff 0%, #e8f5e9 100%);
-    border: 1px solid #c8e6c9;
     box-sizing: border-box;
   }
 
