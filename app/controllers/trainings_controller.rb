@@ -327,9 +327,15 @@ class TrainingsController < ApplicationController
     @month = params[:month].to_i
     @target_user = (current_user.hod? && params[:user_id].present?) ? User.find(params[:user_id]) : current_user
 
-    # 1. Find ALL trainings that exist for this MONTH/YEAR (the curriculum)
-    @month_trainings = Training.where(month: @month, year: @year)
     employee = @target_user.employee_detail || EmployeeDetail.find_by(employee_email: @target_user.email)
+
+    # 1. Use same set of trainings as index: assigned-only if assignments_managed, else all for this month/year
+    if employee&.assignments_managed?
+      assigned_ids = employee.user_training_assignments.pluck(:training_id)
+      @month_trainings = Training.where(month: @month, year: @year, id: assigned_ids)
+    else
+      @month_trainings = Training.where(month: @month, year: @year)
+    end
 
     if @month_trainings.empty?
       redirect_to trainings_path, alert: "No active trainings found for this month."
