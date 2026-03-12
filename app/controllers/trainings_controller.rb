@@ -378,7 +378,13 @@ class TrainingsController < ApplicationController
     @month_name = Date::MONTHNAMES[@month]
     @display_title = "#{@month_name} #{@year} Training Program"
 
-    render_certificate
+    begin
+      render_certificate
+    rescue StandardError => e
+      Rails.logger.error "PDF certificate failed: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+      redirect_to trainings_path, alert: "Certificate could not be generated. Please ensure wkhtmltopdf is installed on the server. (Check log for details.)"
+    end
   end
 
   def assessment
