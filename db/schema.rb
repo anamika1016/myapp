@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_03_06_062208) do
+ActiveRecord::Schema[8.0].define(version: 2026_04_02_111113) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -115,6 +115,35 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_06_062208) do
     t.string "mobile_number"
     t.boolean "assignments_managed", default: false
     t.index ["user_id"], name: "index_employee_details_on_user_id"
+  end
+
+  create_table "l1_pulse_assessments", force: :cascade do |t|
+    t.bigint "employee_detail_id", null: false
+    t.bigint "l1_user_id", null: false
+    t.text "remarks"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.float "remark_score"
+    t.integer "sense_of_purpose"
+    t.integer "workload_balance"
+    t.integer "manager_effectiveness"
+    t.integer "team_collaboration"
+    t.integer "recognition_growth"
+    t.integer "org_communication"
+    t.integer "learning_development"
+    t.integer "role_clarity"
+    t.integer "work_environment"
+    t.integer "commitment_retention"
+    t.integer "professionalism_conduct"
+    t.integer "work_quality_accuracy"
+    t.integer "initiative_problem_solving"
+    t.integer "papl_values_culture"
+    t.integer "collaboration"
+    t.integer "time_management_reliability"
+    t.integer "growth_mindset_development"
+    t.index ["employee_detail_id", "l1_user_id"], name: "index_l1_pulse_assessments_on_employee_and_l1_user", unique: true
+    t.index ["employee_detail_id"], name: "index_l1_pulse_assessments_on_employee_detail_id"
+    t.index ["l1_user_id"], name: "index_l1_pulse_assessments_on_l1_user_id"
   end
 
   create_table "sms_logs", force: :cascade do |t|
@@ -239,6 +268,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_06_062208) do
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "activities", "departments"
   add_foreign_key "employee_details", "users"
+  add_foreign_key "l1_pulse_assessments", "employee_details"
+  add_foreign_key "l1_pulse_assessments", "users", column: "l1_user_id"
   add_foreign_key "sms_logs", "employee_details"
   add_foreign_key "target_submissions", "employee_details"
   add_foreign_key "target_submissions", "user_details"

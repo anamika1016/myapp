@@ -9,9 +9,9 @@ class ApplicationController < ActionController::Base
     devise_parameter_sanitizer.permit(:sign_up, keys: [ :employee_code, :role ])
   end
 
-  # Override Devise's after_sign_in_path_for to always redirect to user profile
+  # Override Devise's after_sign_in_path_for to always redirect to dashboard
   def after_sign_in_path_for(resource)
-    settings_path
+    dashboard_path
   end
 
   def has_l1_responsibilities?

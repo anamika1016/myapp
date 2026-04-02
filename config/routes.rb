@@ -109,6 +109,10 @@ Rails.application.routes.draw do
   # Add a specific route for the dashboard
   root to: "home#dashboard"  # 👈 now root goes to dashboard
   get "dashboard", to: "home#dashboard"
+  get "dashboard/export_xlsx", to: "home#export_dashboard_xlsx", as: :export_dashboard_xlsx
+  get "dashboard/export_section_xlsx/:section", to: "home#export_dashboard_section_xlsx", as: :export_dashboard_section_xlsx
+  get "l1_pulse_360", to: "home#l1_pulse_360"
+  patch "l1_pulse_360/save", to: "home#save_l1_pulse_360", as: :save_l1_pulse_360
 
 
   # Settings routes

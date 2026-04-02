@@ -6,11 +6,12 @@ class User < ApplicationRecord
   has_many :target_submissions
   has_one :employee_detail
   has_one_attached :profile_image
+  has_many :l1_pulse_assessments, foreign_key: :l1_user_id, dependent: :destroy
   has_many :user_training_assignments, dependent: :destroy
   has_many :assigned_trainings, through: :user_training_assignments, source: :training
   has_many :user_training_progresses, dependent: :destroy
 
-  ROLES = %w[employee hod l1_employer l2_employer]
+  ROLES = %w[employee hod admin l1_employer l2_employer]
 
   # Auto-strip employee_code before save
   before_validation :sanitize_employee_code
@@ -26,6 +27,10 @@ class User < ApplicationRecord
 
   def hod?
     role == "hod"
+  end
+
+  def admin?
+    role == "admin"
   end
 
   def l1_employer?

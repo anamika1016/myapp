@@ -118,6 +118,20 @@
         <ul class="flex flex-col space-y-1">
 
           <!-- Employee Forms - Show for all employee types -->
+          <% if current_user.employee? || current_user.hod? || current_user.admin? || current_user.l1_employer? || current_user.l2_employer? %>
+          <li class="hs-accordion" id="users-accordion">
+            <%= link_to dashboard_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if current_page?(dashboard_path) || current_page?(root_path)} text-base text-gray-800 rounded-lg" do %>
+              <svg class="shrink-0 size-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M3 13h8V3H3z" />
+                <path d="M13 21h8v-6h-8z" />
+                <path d="M13 3h8v8h-8z" />
+                <path d="M3 21h8v-4H3z" />
+              </svg>
+              <span class="font-semibold">DASHBOARD</span>
+            <% end %>
+          </li>
+          <% end %>
+
           <% if current_user.employee? || current_user.l1_employer? || current_user.l2_employer? %>
           <li class="hs-accordion" id="users-accordion">
             <%= link_to user_details_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if current_page?(user_details_path)} text-base text-gray-800 rounded-lg" do %>
@@ -193,6 +207,19 @@
                   <circle cx="12" cy="12" r="3" />
                 </svg>
                 <span class="font-semibold">L1 Employee Details</span>
+              <% end %>
+            </li>
+          <% end %>
+
+          <% if current_user.hod? || current_user.admin? || EmployeeDetail.exists?(l1_code: current_user.employee_code) || EmployeeDetail.exists?(l1_employer_name: current_user.email) %>
+            <li class="hs-accordion" id="users-accordion">
+              <%= link_to l1_pulse_360_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if current_page?(l1_pulse_360_path)} text-base text-gray-800 rounded-lg" do %>
+                <svg class="shrink-0 size-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="8" />
+                  <path d="M12 7v5l3 2" />
+                  <path d="M4 12h2M18 12h2M12 4V2M12 22V20" />
+                </svg>
+                <span class="font-semibold">L1_PULSE-360</span>
               <% end %>
             </li>
           <% end %>
