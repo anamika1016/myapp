@@ -33,22 +33,21 @@ class HomeController < ApplicationController
 
     workbook.add_worksheet(name: "Annual Review") do |sheet|
       if @dashboard_mode == :admin
-        sheet.add_row [ "Employee", "Code", "Department", "Q1", "Q2", "Q3", "Q4", "Total", "Annual %", "L1 Remarks" ]
+        sheet.add_row [ "Employee", "Code", "Department", "Q1", "Q2", "Q3", "Q4", "Annual %" ]
         @employee_rows.each do |row|
           sheet.add_row [
             row[:employee_name], row[:employee_code], row[:department],
             formatted_percent(row[:quarter_summaries][0][:percentage]), formatted_percent(row[:quarter_summaries][1][:percentage]),
             formatted_percent(row[:quarter_summaries][2][:percentage]), formatted_percent(row[:quarter_summaries][3][:percentage]),
-            row[:total], formatted_percent(row[:annual_percentage]),
-            row[:l1_remarks].join(" | ")
+            formatted_percent(row[:annual_percentage])
           ]
         end
       else
-        sheet.add_row [ "Quarter", "KRA Score", "L1 Remarks" ]
+        sheet.add_row [ "Quarter", "KRA Score" ]
         @quarter_summaries.each do |quarter|
-          sheet.add_row [ quarter[:name], formatted_percent(quarter[:percentage]), quarter[:l1_remarks].join(" | ") ]
+          sheet.add_row [ quarter[:name], formatted_percent(quarter[:percentage]) ]
         end
-        sheet.add_row [ "KRA Total", @annual_total, "#{formatted_percent(@annual_percentage)} Annual Average", "" ]
+        sheet.add_row [ "Annual Average", formatted_percent(@annual_percentage) ]
       end
     end
 
@@ -189,16 +188,16 @@ class HomeController < ApplicationController
     when "annual"
       workbook.add_worksheet(name: "Annual Review") do |sheet|
         if @dashboard_mode == :admin
-          sheet.add_row [ "Employee", "Code", "Department", "Q1", "Q2", "Q3", "Q4", "Total", "Annual %", "L1 Remarks" ]
+          sheet.add_row [ "Employee", "Code", "Department", "Q1", "Q2", "Q3", "Q4", "Annual %" ]
           @employee_rows.each do |row|
-            sheet.add_row [ row[:employee_name], row[:employee_code], row[:department], formatted_percent(row[:quarter_summaries][0][:percentage]), formatted_percent(row[:quarter_summaries][1][:percentage]), formatted_percent(row[:quarter_summaries][2][:percentage]), formatted_percent(row[:quarter_summaries][3][:percentage]), row[:total], formatted_percent(row[:annual_percentage]), row[:l1_remarks].join(" | ") ]
+            sheet.add_row [ row[:employee_name], row[:employee_code], row[:department], formatted_percent(row[:quarter_summaries][0][:percentage]), formatted_percent(row[:quarter_summaries][1][:percentage]), formatted_percent(row[:quarter_summaries][2][:percentage]), formatted_percent(row[:quarter_summaries][3][:percentage]), formatted_percent(row[:annual_percentage]) ]
           end
         else
-          sheet.add_row [ "Quarter", "KRA Score", "L1 Remarks" ]
+          sheet.add_row [ "Quarter", "KRA Score" ]
           @quarter_summaries.each do |quarter|
-            sheet.add_row [ quarter[:name], formatted_percent(quarter[:percentage]), quarter[:l1_remarks].join(" | ") ]
+            sheet.add_row [ quarter[:name], formatted_percent(quarter[:percentage]) ]
           end
-          sheet.add_row [ "KRA Total", @annual_total, "#{formatted_percent(@annual_percentage)} Annual Average", "" ]
+          sheet.add_row [ "Annual Average", formatted_percent(@annual_percentage) ]
         end
       end
     when "pulse"

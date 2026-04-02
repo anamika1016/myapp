@@ -13,12 +13,12 @@
         <div class="hero-tags">
           <%= link_to "Annual Review", "#annual-review-section", class: "hero-tag hero-menu-tag" %>
           <% if @dashboard_mode == :admin %>
-            <%= link_to "Pulse Score / 15%", "#pulse-score-section", class: "hero-tag hero-menu-tag" %>
-            <%= link_to "Line Manager Feedback / 10%", "#pulse-remarks-section", class: "hero-tag hero-menu-tag" %>
+            <%= link_to "Pulse Score", "#pulse-score-section", class: "hero-tag hero-menu-tag" %>
+            <%= link_to "Line Manager Feedback", "#pulse-remarks-section", class: "hero-tag hero-menu-tag" %>
           <% else %>
             <%= link_to "Score Range", "#action-guidance-section", class: "hero-tag hero-menu-tag" %>
-            <%= link_to "Pulse Check / 15%", "#pulse-score-section", class: "hero-tag hero-menu-tag" %>
-            <%= link_to "Line Manager Feedback / 10%", "#pulse-remarks-section", class: "hero-tag hero-menu-tag" %>
+            <%= link_to "Pulse Check", "#pulse-score-section", class: "hero-tag hero-menu-tag" %>
+            <%= link_to "Line Manager Feedback ", "#pulse-remarks-section", class: "hero-tag hero-menu-tag" %>
           <% end %>
           <%= link_to "COMPOSITE PERFORMANCE SCORE", "#summary-box-section", class: "hero-tag hero-menu-tag" %>
           <%= link_to "Export Excel", export_dashboard_xlsx_path(format: :xlsx), class: "hero-tag export-tag" %>
@@ -85,7 +85,7 @@
           <div class="box-header">
             <div>
               <h2>SECTION A: Annually / Weightage : 75%</h2>
-              <p>Sabhi users ka Q1, Q2, Q3, Q4 aur annual score sirf L1 percentage aur L1 remarks ke hisab se.</p>
+              <p>Sabhi users ka Q1, Q2, Q3, Q4 aur annual score sirf L1 percentage ke hisab se.</p>
             </div>
             <%= link_to "Export", export_dashboard_section_xlsx_path("annual", format: :xlsx), class: "section-export-btn" %>
           </div>
@@ -101,9 +101,7 @@
                   <th>Q2</th>
                   <th>Q3</th>
                   <th>Q4</th>
-                  <th>Total</th>
                   <th>%</th>
-                  <th>L1 Remarks</th>
                 </tr>
               </thead>
               <tbody>
@@ -115,19 +113,7 @@
                     <% row[:quarter_summaries].each do |quarter| %>
                       <td><span class="score-chip"><%= quarter[:percentage] %>%</span></td>
                     <% end %>
-                    <td><span class="score-chip total-chip"><%= row[:total] %></span></td>
                     <td><span class="score-chip percentage-chip"><%= row[:annual_percentage] %>%</span></td>
-                    <td class="remarks-cell">
-                      <% if row[:l1_remarks]&.any? %>
-                        <div class="remarks-block">
-                          <% row[:l1_remarks].each_with_index do |remark, index| %>
-                            <div class="remark-line <%= 'with-divider' unless index == row[:l1_remarks].length - 1 %>"><%= remark %></div>
-                          <% end %>
-                        </div>
-                      <% else %>
-                        <span class="empty-state">No remarks</span>
-                      <% end %>
-                    </td>
                   </tr>
                 <% end %>
               </tbody>
@@ -158,18 +144,13 @@
             <strong><%= number_with_precision(@annual_percentage, precision: 1) %>%</strong>
             <small class="stat-subtext">KRA weightage 75%</small>
           </div>
-          <div class="stat-card status-card">
-            <span>Composite Status</span>
-            <strong><%= employee_composite[:band] %></strong>
-            <small class="stat-subtext">Rating <%= employee_composite[:rating] %> / 5</small>
-          </div>
         </div>
 
         <div class="annual-box employee-kra-box" id="annual-review-section">
           <div class="box-header">
             <div>
               <h2>SECTION A: Annually / Weightage : 75%</h2>
-              <p>Quarter-wise annual score and L1 review remarks for your dashboard.</p>
+              <p>Quarter-wise annual score for your dashboard.</p>
             </div>
             <%= link_to "Export", export_dashboard_section_xlsx_path("annual", format: :xlsx), class: "section-export-btn" %>
           </div>
@@ -187,10 +168,6 @@
               <span>Department</span>
               <strong><%= employee_department %></strong>
             </div>
-            <div class="employee-meta-card">
-              <span>KRA Total</span>
-              <strong><%= number_with_precision(@annual_total, precision: 1) %></strong>
-            </div>
           </div>
 
           <div class="table-wrap">
@@ -199,7 +176,6 @@
                 <tr>
                   <th>Quarter</th>
                   <th>KRA Score</th>
-                  <th>L1 Remarks</th>
                 </tr>
               </thead>
               <tbody>
@@ -208,32 +184,18 @@
                     <tr>
                       <td><strong><%= quarter[:name] %></strong></td>
                       <td><span class="score-chip"><%= number_with_precision(quarter[:percentage], precision: 1) %>%</span></td>
-                      <td class="remarks-cell">
-                        <% if quarter[:l1_remarks].any? %>
-                          <div class="remarks-block">
-                            <% quarter[:l1_remarks].each_with_index do |remark, index| %>
-                              <div class="remark-line <%= 'with-divider' unless index == quarter[:l1_remarks].length - 1 %>"><%= remark %></div>
-                            <% end %>
-                          </div>
-                        <% else %>
-                          <span class="empty-state">No remarks</span>
-                        <% end %>
-                      </td>
                     </tr>
                   <% end %>
                 <% else %>
                   <tr>
-                    <td colspan="3" class="empty-state">No quarterly annual data available.</td>
+                    <td colspan="2" class="empty-state">No quarterly annual data available.</td>
                   </tr>
                 <% end %>
               </tbody>
               <tfoot>
                 <tr>
-                  <td><strong>KRA Total</strong></td>
-                  <td><span class="score-chip total-chip"><%= number_with_precision(@annual_total, precision: 1) %></span></td>
-                  <td>
-                    <span class="score-chip percentage-chip"><%= number_with_precision(@annual_percentage, precision: 1) %>% Annual Average</span>
-                  </td>
+                  <td><strong>Annual Average</strong></td>
+                  <td><span class="score-chip percentage-chip"><%= number_with_precision(@annual_percentage, precision: 1) %>%</span></td>
                 </tr>
               </tfoot>
             </table>
@@ -243,7 +205,7 @@
         <div class="remarks-panel score-guide employee-guide-panel" id="action-guidance-section">
           <div class="box-header">
             <div>
-              <h2>SECTION 3 - SCORE RANGE</h2>
+              <h2>SCORE RANGE</h2>
               <p>Final composite score band, rating, and recommended action.</p>
             </div>
           </div>
@@ -482,7 +444,7 @@
     <div class="remarks-panel score-guide admin-guide-panel" id="action-guidance-section">
       <div class="box-header">
         <div>
-          <h2>SECTION 3 - SCORE RANGE</h2>
+          <h2>SCORE RANGE</h2>
           <p>Final composite score band, rating, and recommended action guide.</p>
         </div>
       </div>
@@ -743,9 +705,9 @@
           <thead>
             <tr>
               <th>User</th>
-              <th>KRA %</th>
-              <th>Pulse %</th>
-              <th>Manager %</th>
+              <th>SECTION A -KRA %</th>
+              <th>SECTION B -Pulse %</th>
+              <th>SECTION C -Manager %</th>
               <th>Final Total</th>
             </tr>
           </thead>
@@ -1117,7 +1079,7 @@
   }
 
   .employee-summary-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .stat-card {
@@ -1158,17 +1120,12 @@
     background: linear-gradient(135deg, #ecf5ff 0%, #d7e9ff 100%);
   }
 
-  .status-card {
-    background: linear-gradient(135deg, #fff1f2 0%, #ffe0e6 100%);
-  }
-
   .employee-summary-grid .stat-card strong {
     font-size: 1.35rem;
     line-height: 1.25;
   }
 
-  .employee-summary-grid .final-card strong,
-  .employee-summary-grid .status-card strong {
+  .employee-summary-grid .final-card strong {
     font-size: 1.85rem;
   }
 
