@@ -8,7 +8,7 @@ class L1PulseAssessment < ApplicationRecord
             :professionalism_conduct, :work_quality_accuracy, :initiative_problem_solving,
             :papl_values_culture, :collaboration, :time_management_reliability,
             :growth_mindset_development,
-            numericality: { greater_than_or_equal_to: 1, less_than_or_equal_to: 5 },
+            numericality: { only_integer: true, greater_than_or_equal_to: 1, less_than_or_equal_to: 5 },
             allow_nil: true
   validates :remark_score,
             numericality: { greater_than_or_equal_to: 0, less_than_or_equal_to: 10 },
