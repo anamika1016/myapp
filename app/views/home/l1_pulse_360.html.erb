@@ -61,11 +61,14 @@
                 </tr>
               </thead>
               <tbody>
-                <tr class="guide-row guide-row-5"><td>≥ 90% (45-50)</td><td><strong>Outstanding</strong></td><td>5 (★★★★★)</td><td>Accelerated growth track / highest increment</td></tr>
-                <tr class="guide-row guide-row-4"><td>75 - 89% (38-44)</td><td><strong>Exceeds Expectations</strong></td><td>4 (★★★★)</td><td>Merit increment + recognition award</td></tr>
-                <tr class="guide-row guide-row-3"><td>60 - 74% (30-37)</td><td><strong>Meets Expectations</strong></td><td>3 (★★★)</td><td>Standard increment as per policy</td></tr>
-                <tr class="guide-row guide-row-2"><td>45 - 59% (23-29)</td><td><strong>Needs Improvement</strong></td><td>2 (★★)</td><td>PIP + structured coaching plan</td></tr>
-                <tr class="guide-row guide-row-1"><td>&lt; 45% (&lt; 23)</td><td><strong>Unsatisfactory</strong></td><td>1 (★)</td><td>Formal PIP / disciplinary review</td></tr>
+                <% score_range_rows.each do |row| %>
+                  <tr class="guide-row guide-row-<%= row[:rating_value] %>">
+                    <td><%= row[:score_range] %></td>
+                    <td><strong><%= row[:band] %></strong></td>
+                    <td><%= row[:rating_value] %> (<%= row[:stars] %>)</td>
+                    <td><%= row[:action] %></td>
+                  </tr>
+                <% end %>
               </tbody>
             </table>
           </div>
@@ -76,7 +79,7 @@
           <div class="l1-pulse-card-header">
             <span class="section-tag pulse-tag">Section B</span>
             <h2>PULSE-360 SURVEY SCORE (Weightage : 15%)</h2>
-            <p>Please provide scores (1-5) for the employee pulse survey metrics. Category will update dynamically.</p>
+            <p>Please provide scores (1-5) under the five Section B headings. Category will update dynamically.</p>
           </div>
 
           <div class="l1-pulse-table-wrap">
@@ -84,16 +87,12 @@
               <thead>
                 <tr>
                   <th class="sticky-col">Employee Name</th>
-                  <th class="metric-th">Sense of Purpose &amp; Mission Alignment</th>
-                  <th class="metric-th">Workload &amp; Well-being Balance</th>
-                  <th class="metric-th">Manager Effectiveness &amp; Support</th>
-                  <th class="metric-th">Team Collaboration &amp; Relationships</th>
-                  <th class="metric-th">Recognition &amp; Growth Opportunities</th>
-                  <th class="metric-th">Org. Communication &amp; Transparency</th>
-                  <th class="metric-th">Learning &amp; Development Access</th>
-                  <th class="metric-th">Role Clarity &amp; Goal Setting</th>
-                  <th class="metric-th">Work Environment &amp; Safety</th>
-                  <th class="metric-th">Commitment &amp; Retention Intent</th>
+                  <th class="metric-th">Values Alignment</th>
+                  <th class="metric-th">Technical Knowledge</th>
+                  <th class="metric-th">Customer &amp; Field Engagement</th>
+                  <th class="metric-th">Execution &amp; Accountability</th>
+                  <th class="metric-th">Initiative &amp; Leadership</th>
+                  <th class="total-col">Total / 25</th>
                   <th class="total-col">Wt % / 15%</th>
                   <th class="category-col">Category & Action</th>
                 </tr>
@@ -102,27 +101,28 @@
                 <% @pulse_rows.each do |row| %>
                   <% assessment = row[:assessment] %>
                   <% cat = row[:pulse_category] %>
+                  <% values_alignment = assessment.values_alignment %>
+                  <% technical_knowledge = assessment.technical_knowledge %>
+                  <% customer_field_engagement = assessment.customer_field_engagement %>
+                  <% execution_accountability = assessment.execution_accountability %>
+                  <% initiative_leadership = assessment.initiative_leadership %>
                   <tr class="pulse-input-row" data-employee-id="<%= row[:employee_detail_id] %>">
                     <td class="staff-name sticky-col">
                       <strong><%= row[:employee_name] %></strong>
                       <small><%= row[:employee_code] %></small>
                     </td>
-                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][sense_of_purpose]", assessment.sense_of_purpose, min: 1, max: 5, step: 1, class: "pulse-input pulse-bg-light", data: { pulse_score: true } %></td>
-                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][workload_balance]", assessment.workload_balance, min: 1, max: 5, step: 1, class: "pulse-input pulse-bg-light", data: { pulse_score: true } %></td>
-                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][manager_effectiveness]", assessment.manager_effectiveness, min: 1, max: 5, step: 1, class: "pulse-input pulse-bg-light", data: { pulse_score: true } %></td>
-                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][team_collaboration]", assessment.team_collaboration, min: 1, max: 5, step: 1, class: "pulse-input pulse-bg-light", data: { pulse_score: true } %></td>
-                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][recognition_growth]", assessment.recognition_growth, min: 1, max: 5, step: 1, class: "pulse-input pulse-bg-light", data: { pulse_score: true } %></td>
-                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][org_communication]", assessment.org_communication, min: 1, max: 5, step: 1, class: "pulse-input pulse-bg-light", data: { pulse_score: true } %></td>
-                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][learning_development]", assessment.learning_development, min: 1, max: 5, step: 1, class: "pulse-input pulse-bg-light", data: { pulse_score: true } %></td>
-                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][role_clarity]", assessment.role_clarity, min: 1, max: 5, step: 1, class: "pulse-input pulse-bg-light", data: { pulse_score: true } %></td>
-                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][work_environment]", assessment.work_environment, min: 1, max: 5, step: 1, class: "pulse-input pulse-bg-light", data: { pulse_score: true } %></td>
-                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][commitment_retention]", assessment.commitment_retention, min: 1, max: 5, step: 1, class: "pulse-input pulse-bg-light", data: { pulse_score: true } %></td>
-                    <td class="total-cell" data-pulse-total><%= row[:pulse_weighted] %></td>
+                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][values_alignment]", values_alignment, min: 1, max: 5, step: 0.1, class: "pulse-input pulse-bg-light", data: { pulse_score: true } %></td>
+                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][technical_knowledge]", technical_knowledge, min: 1, max: 5, step: 0.1, class: "pulse-input pulse-bg-light", data: { pulse_score: true } %></td>
+                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][customer_field_engagement]", customer_field_engagement, min: 1, max: 5, step: 0.1, class: "pulse-input pulse-bg-light", data: { pulse_score: true } %></td>
+                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][execution_accountability]", execution_accountability, min: 1, max: 5, step: 0.1, class: "pulse-input pulse-bg-light", data: { pulse_score: true } %></td>
+                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][initiative_leadership]", initiative_leadership, min: 1, max: 5, step: 0.1, class: "pulse-input pulse-bg-light", data: { pulse_score: true } %></td>
+                    <td class="total-cell" data-pulse-raw-total><%= row[:total_score] %></td>
+                    <td class="total-cell" data-pulse-weighted><%= row[:pulse_weighted] %></td>
                     <td class="category-cell-mini">
                       <div class="cat-action-box" data-cat-box>
-                        <span class="stars <%= cat[:className] %>" data-pulse-stars><%= cat[:stars] %></span>
-                        <strong data-pulse-category-name><%= cat[:category] %></strong>
-                        <small data-pulse-action><%= cat[:action] %></small>
+                        <span class="stars <%= cat&.dig(:className) %>" data-pulse-stars><%= cat&.dig(:stars) %></span>
+                        <strong data-pulse-category-name><%= cat&.dig(:category) %></strong>
+                        <small data-pulse-action><%= cat&.dig(:action) %></small>
                       </div>
                     </td>
                   </tr>
@@ -566,12 +566,12 @@
 
   .l1-pulse-table {
     width: 100%;
-    min-width: 2140px;
+    min-width: 1480px;
     border-collapse: collapse;
   }
 
   .l1-pulse-table th {
-    padding: 1.05rem 0.85rem;
+    padding: 0.9rem 0.65rem;
     font-size: 0.73rem;
     font-weight: 800;
     text-transform: uppercase;
@@ -588,11 +588,11 @@
   }
 
   .pulse-theme-table .metric-th {
-    min-width: 170px;
+    min-width: 145px;
     white-space: normal;
     text-transform: none;
     letter-spacing: 0.02em;
-    line-height: 1.45;
+    line-height: 1.35;
   }
 
   .mgr-theme-table th {
@@ -602,7 +602,7 @@
   }
 
   .l1-pulse-table td {
-    padding: 1rem 0.85rem;
+    padding: 0.85rem 0.6rem;
     text-align: center;
     vertical-align: middle;
     color: var(--l1-ink);
@@ -622,7 +622,7 @@
     position: sticky;
     left: 0;
     z-index: 2;
-    min-width: 250px;
+    min-width: 220px;
     text-align: left !important;
     border-right: 1px solid #dce8f2 !important;
     background: linear-gradient(180deg, #ffffff 0%, #f8fbfe 100%) !important;
@@ -646,8 +646,8 @@
   }
 
   .pulse-input {
-    width: 72px;
-    padding: 0.8rem 0.65rem;
+    width: 64px;
+    padding: 0.68rem 0.45rem;
     border-radius: 14px;
     border: 1px solid #cad8e3;
     text-align: center;
@@ -678,7 +678,7 @@
   }
 
   .total-col {
-    min-width: 130px;
+    min-width: 110px;
   }
 
   .total-cell,
@@ -859,10 +859,10 @@
 <script>
   (function() {
     function getCategory(total) {
-      if (total >= 45) return { stars: "★★★★★", category: "Outstanding", action: "Accelerated growth track / highest increment", className: "stars-5" };
-      if (total >= 38) return { stars: "★★★★", category: "Exceeds Expectations", action: "Merit increment + recognition award", className: "stars-4" };
-      if (total >= 30) return { stars: "★★★", category: "Meets Expectations", action: "Standard increment as per policy", className: "stars-3" };
-      if (total >= 23) return { stars: "★★", category: "Needs Improvement", action: "PIP + structured coaching plan", className: "stars-2" };
+      if (total >= 22.5) return { stars: "★★★★★", category: "Outstanding", action: "Accelerated growth track / highest increment", className: "stars-5" };
+      if (total >= 18.75) return { stars: "★★★★", category: "Exceeds Expectations", action: "Merit increment + recognition award", className: "stars-4" };
+      if (total >= 15) return { stars: "★★★", category: "Meets Expectations", action: "Standard increment as per policy", className: "stars-3" };
+      if (total >= 11.25) return { stars: "★★", category: "Needs Improvement", action: "PIP + structured coaching plan", className: "stars-2" };
       return { stars: "★", category: "Unsatisfactory", action: "Formal PIP / disciplinary review", className: "stars-1" };
     }
 
@@ -872,14 +872,32 @@
       
       if (rowB) {
         let pTotal = 0;
-        rowB.querySelectorAll("[data-pulse-score]").forEach(i => { if(i.value) pTotal += parseInt(i.value); });
-        rowB.querySelector("[data-pulse-total]").textContent = (pTotal > 0 ? ((pTotal/50.0)*15.0).toFixed(2) : "0.00");
-        
-        const cat = getCategory(pTotal);
-        rowB.querySelector("[data-pulse-stars]").textContent = cat.stars;
-        rowB.querySelector("[data-pulse-stars]").className = "stars " + cat.className;
-        rowB.querySelector("[data-pulse-category-name]").textContent = cat.category;
-        rowB.querySelector("[data-pulse-action]").textContent = cat.action;
+        let hasPulseScores = false;
+        rowB.querySelectorAll("[data-pulse-score]").forEach(i => {
+          if (i.value) {
+            hasPulseScores = true;
+            pTotal += parseFloat(i.value);
+          }
+        });
+        rowB.querySelector("[data-pulse-raw-total]").textContent = hasPulseScores ? pTotal.toFixed(1) : "";
+        rowB.querySelector("[data-pulse-weighted]").textContent = hasPulseScores ? ((pTotal / 25.0) * 15.0).toFixed(2) : "0.0";
+
+        const starsNode = rowB.querySelector("[data-pulse-stars]");
+        const categoryNode = rowB.querySelector("[data-pulse-category-name]");
+        const actionNode = rowB.querySelector("[data-pulse-action]");
+
+        if (hasPulseScores) {
+          const cat = getCategory(pTotal);
+          starsNode.textContent = cat.stars;
+          starsNode.className = "stars " + cat.className;
+          categoryNode.textContent = cat.category;
+          actionNode.textContent = cat.action;
+        } else {
+          starsNode.textContent = "";
+          starsNode.className = "stars";
+          categoryNode.textContent = "";
+          actionNode.textContent = "";
+        }
       }
 
       if (rowC) {

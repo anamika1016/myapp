@@ -56,20 +56,9 @@
       manager_feedback = @dashboard_manager_feedback || {}
       manager_criteria = Array(manager_feedback[:criteria])
       employee_department = @dashboard_employee_department.presence || @user_details&.first&.department&.department_type.presence || @employee_detail&.department.presence || "N/A"
-      pulse_dimensions = [
-        { label: "Sense of Purpose & Mission Alignment", score: @dashboard_pulse_scores&.dig(:sense_of_purpose) },
-        { label: "Workload & Well-being Balance", score: @dashboard_pulse_scores&.dig(:workload_balance) },
-        { label: "Manager Effectiveness & Support", score: @dashboard_pulse_scores&.dig(:manager_effectiveness) },
-        { label: "Team Collaboration & Relationships", score: @dashboard_pulse_scores&.dig(:team_collaboration) },
-        { label: "Recognition & Growth Opportunities", score: @dashboard_pulse_scores&.dig(:recognition_growth) },
-        { label: "Org. Communication & Transparency", score: @dashboard_pulse_scores&.dig(:org_communication) },
-        { label: "Learning & Development Access", score: @dashboard_pulse_scores&.dig(:learning_development) },
-        { label: "Role Clarity & Goal Setting", score: @dashboard_pulse_scores&.dig(:role_clarity) },
-        { label: "Work Environment & Safety", score: @dashboard_pulse_scores&.dig(:work_environment) },
-        { label: "Commitment & Retention Intent", score: @dashboard_pulse_scores&.dig(:commitment_retention) }
-      ]
+      pulse_dimensions = pulse_dimension_rows_for(@dashboard_pulse_scores)
       pulse_raw_percentage = if @dashboard_pulse_available && @dashboard_pulse_scores&.dig(:total_score).present?
-        ((@dashboard_pulse_scores[:total_score].to_f / 50.0) * 100.0).round(2)
+        ((@dashboard_pulse_scores[:total_score].to_f / 25.0) * 100.0).round(2)
       end
       composite_pulse_percentage = pulse_raw_percentage.to_f
       composite_manager_percentage = manager_feedback[:raw_total].to_f
@@ -205,7 +194,7 @@
           <div class="box-header">
             <div>
               <h2>SCORE RANGE</h2>
-              <p>Final composite score band, rating, and recommended action.</p>
+              <p>Final composite score band, rating, and recommended action guide.</p>
             </div>
           </div>
 
@@ -220,36 +209,14 @@
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td>&gt;= 90%</td>
-                  <td>Outstanding</td>
-                  <td><span class="star-rating stars-5"><strong>5</strong> (★★★★★)</span></td>
-                  <td>Accelerated growth track / highest increment</td>
-                </tr>
-                <tr>
-                  <td>75 - 89%</td>
-                  <td>Exceeds Expectations</td>
-                  <td><span class="star-rating stars-4"><strong>4</strong> (★★★★)</span></td>
-                  <td>Merit increment + recognition award</td>
-                </tr>
-                <tr>
-                  <td>60 - 74%</td>
-                  <td>Meets Expectations</td>
-                  <td><span class="star-rating stars-3"><strong>3</strong> (★★★)</span></td>
-                  <td>Standard increment as per policy</td>
-                </tr>
-                <tr>
-                  <td>45 - 59%</td>
-                  <td>Needs Improvement</td>
-                  <td><span class="star-rating stars-2"><strong>2</strong> (★★)</span></td>
-                  <td>PIP + structured coaching plan</td>
-                </tr>
-                <tr>
-                  <td>&lt; 45%</td>
-                  <td>Unsatisfactory</td>
-                  <td><span class="star-rating stars-1"><strong>1</strong> (★)</span></td>
-                  <td>Formal PIP / disciplinary review</td>
-                </tr>
+                <% score_range_rows.each do |row| %>
+                  <tr>
+                    <td><%= row[:score_range] %></td>
+                    <td><%= row[:band] %></td>
+                    <td><span class="star-rating <%= row[:className] %>"><strong><%= row[:rating_value] %></strong> (<%= row[:stars] %>)</span></td>
+                    <td><%= row[:action] %></td>
+                  </tr>
+                <% end %>
               </tbody>
             </table>
           </div>
@@ -278,15 +245,14 @@
                 </thead>
                 <tbody>
                   <% pulse_dimensions.each do |dimension| %>
-                    <% weighted_score = dimension[:score].present? ? ((dimension[:score].to_f / 5.0) * 10.0).round(2) : nil %>
-                    <% rating_details = score_rating_details(dimension[:score]) %>
                     <tr>
                       <td><%= dimension[:label] %></td>
-                      <td>10%</td>
+                      <td><%= dimension[:weight] %>%</td>
                       <td><%= dimension[:score].presence || "-" %></td>
-                      <td><%= weighted_score.present? ? "#{number_with_precision(weighted_score, precision: 2)}%" : "-" %></td>
+                      <td><%= dimension[:weighted_score].present? ? "#{number_with_precision(dimension[:weighted_score], precision: 2)}%" : "-" %></td>
                       <td>
-                        <% if rating_details.present? %>
+                        <% if dimension[:rating_text].present? && dimension[:score].present? %>
+                          <% rating_details = score_rating_details(dimension[:score]) %>
                           <span class="star-rating <%= rating_details[:className] %>"><strong><%= rating_details[:rating] %></strong> (<%= rating_details[:stars] %>)</span>
                         <% else %>
                           -
@@ -459,36 +425,14 @@
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td>≥ 90%</td>
-              <td>Outstanding</td>
-              <td><span class="star-rating stars-5" style="gap: 5px;"><strong>5</strong> (★★★★★)</span></td>
-              <td>Accelerated growth track / highest increment</td>
-            </tr>
-            <tr>
-              <td>75 - 89%</td>
-              <td>Exceeds Expectations</td>
-              <td><span class="star-rating stars-4" style="gap: 5px;"><strong>4</strong> (★★★★)</span></td>
-              <td>Merit increment + recognition award</td>
-            </tr>
-            <tr>
-              <td>60 - 74%</td>
-              <td>Meets Expectations</td>
-              <td><span class="star-rating stars-3" style="gap: 5px;"><strong>3</strong> (★★★)</span></td>
-              <td>Standard increment as per policy</td>
-            </tr>
-            <tr>
-              <td>45 - 59%</td>
-              <td>Needs Improvement</td>
-              <td><span class="star-rating stars-2" style="gap: 5px;"><strong>2</strong> (★★)</span></td>
-              <td>PIP + structured coaching plan</td>
-            </tr>
-            <tr>
-              <td>&lt; 45%</td>
-              <td>Unsatisfactory</td>
-              <td><span class="star-rating stars-1" style="gap: 5px;"><strong>1</strong> (★)</span></td>
-              <td>Formal PIP / disciplinary review</td>
-            </tr>
+            <% score_range_rows.each do |row| %>
+              <tr>
+                <td><%= row[:score_range] %></td>
+                <td><%= row[:band] %></td>
+                <td><span class="star-rating <%= row[:className] %>" style="gap: 5px;"><strong><%= row[:rating_value] %></strong> (<%= row[:stars] %>)</span></td>
+                <td><%= row[:action] %></td>
+              </tr>
+            <% end %>
           </tbody>
         </table>
       </div>
@@ -506,14 +450,14 @@
       <div class="table-wrap pulse-score-table-wrap">
         <%
           pulse_category_markup = lambda do |total_score|
-            case total_score
-            when 45..50
+            case ((total_score.to_f / 25.0) * 100.0)
+            when 90..100
               '<span class="star-rating stars-5">★★★★★</span> <span class="category-label">Outstanding</span>'
-            when 38..44
+            when 75...90
               '<span class="star-rating stars-4">★★★★</span> <span class="category-label">Exceeds Expectations</span>'
-            when 30..37
+            when 60...75
               '<span class="star-rating stars-3">★★★</span> <span class="category-label">Meets Expectations</span>'
-            when 23..29
+            when 45...60
               '<span class="star-rating stars-2">★★</span> <span class="category-label">Needs Improvement</span>'
             else
               '<span class="star-rating stars-1">★</span> <span class="category-label">Unsatisfactory</span>'
@@ -526,82 +470,56 @@
               <th>Staff Name</th>
               <th>Role</th>
               <th>Wt %</th>
-              <th>Sense of Purpose & Mission Alignment (1-5)</th>
-              <th>Workload & Well-being Balance (1-5)</th>
-              <th>Manager Effectiveness & Support (1-5)</th>
-              <th>Team Collaboration & Relationships (1-5)</th>
-              <th>Recognition & Growth Opportunities (1-5)</th>
-              <th>Org. Communication & Transparency (1-5)</th>
-              <th>Learning & Development Access (1-5)</th>
-              <th>Role Clarity & Goal Setting (1-5)</th>
-              <th>Work Environment & Safety (1-5)</th>
-              <th>Commitment & Retention Intent (1-5)</th>
-              <th>Total /50</th>
+              <% pulse_group_rows_for(@dashboard_pulse_scores).each do |dimension| %>
+                <th><%= dimension[:label] %> (1-5)</th>
+              <% end %>
+              <th>Total /25</th>
+              <th>15% Computed</th>
               <th>Category & Action</th>
             </tr>
           </thead>
           <tbody>
             <% if @dashboard_mode == :admin %>
               <% @employee_rows.each do |row| %>
+                <% grouped_scores = pulse_group_rows_for(row[:pulse_scores]) %>
                 <tr>
                   <td><%= row[:employee_name] %></td>
                   <td><%= row[:role] %></td>
                   <td><%= row[:summary_scores][:pulse_score] %>%</td>
-                  <td><%= row[:pulse_scores][:sense_of_purpose] %></td>
-                  <td><%= row[:pulse_scores][:workload_balance] %></td>
-                  <td><%= row[:pulse_scores][:manager_effectiveness] %></td>
-                  <td><%= row[:pulse_scores][:team_collaboration] %></td>
-                  <td><%= row[:pulse_scores][:recognition_growth] %></td>
-                  <td><%= row[:pulse_scores][:org_communication] %></td>
-                  <td><%= row[:pulse_scores][:learning_development] %></td>
-                  <td><%= row[:pulse_scores][:role_clarity] %></td>
-                  <td><%= row[:pulse_scores][:work_environment] %></td>
-                  <td><%= row[:pulse_scores][:commitment_retention] %></td>
+                  <% grouped_scores.each do |dimension| %>
+                    <td><%= dimension[:score] %></td>
+                  <% end %>
                   <td class="pulse-total"><%= row[:pulse_scores][:total_score] %></td>
+                  <td class="pulse-total"><%= row[:summary_scores][:pulse_score] %>%</td>
                   <td><%= row[:pulse_available] ? pulse_category_markup.call(row[:pulse_scores][:total_score]) : "" %></td>
                 </tr>
               <% end %>
             <% else %>
+              <% grouped_scores = pulse_group_rows_for(@dashboard_pulse_scores) %>
               <tr>
                 <td><%= @employee_detail&.employee_name.presence || current_user.email %></td>
                 <td><%= @user_details.first&.department&.department_type.presence || @employee_detail&.department.presence || "N/A" %></td>
                 <td><%= @dashboard_summary_scores[:pulse_score] %>%</td>
-                <td><%= @dashboard_pulse_scores[:sense_of_purpose] %></td>
-                <td><%= @dashboard_pulse_scores[:workload_balance] %></td>
-                <td><%= @dashboard_pulse_scores[:manager_effectiveness] %></td>
-                <td><%= @dashboard_pulse_scores[:team_collaboration] %></td>
-                <td><%= @dashboard_pulse_scores[:recognition_growth] %></td>
-                <td><%= @dashboard_pulse_scores[:org_communication] %></td>
-                <td><%= @dashboard_pulse_scores[:learning_development] %></td>
-                <td><%= @dashboard_pulse_scores[:role_clarity] %></td>
-                <td><%= @dashboard_pulse_scores[:work_environment] %></td>
-                <td><%= @dashboard_pulse_scores[:commitment_retention] %></td>
+                <% grouped_scores.each do |dimension| %>
+                  <td><%= dimension[:score] %></td>
+                <% end %>
                 <td class="pulse-total"><%= @dashboard_pulse_scores[:total_score] %></td>
+                <td class="pulse-total"><%= @dashboard_summary_scores[:pulse_score] %>%</td>
                 <td><%= @dashboard_pulse_available ? pulse_category_markup.call(@dashboard_pulse_scores[:total_score]) : "" %></td>
               </tr>
             <% end %>
           </tbody>
-          <% if @dashboard_mode == :admin && @employee_rows.any? %>
+          <% if @dashboard_mode == :admin && (team_average = pulse_team_average(@employee_rows)) %>
             <tfoot style="background: rgba(18, 56, 77, 0.05); font-weight: bold; border-top: 2px solid #cbd5e1;">
               <tr>
                 <td colspan="2">TEAM AVERAGE</td>
-                <td><%= (@employee_rows.sum { |r| r[:summary_scores][:pulse_score] } / @employee_rows.size).round(1) %>%</td>
-                <td><%= (@employee_rows.sum { |r| r[:pulse_scores][:sense_of_purpose].to_f } / @employee_rows.size).round(1) %></td>
-                <td><%= (@employee_rows.sum { |r| r[:pulse_scores][:workload_balance].to_f } / @employee_rows.size).round(1) %></td>
-                <td><%= (@employee_rows.sum { |r| r[:pulse_scores][:manager_effectiveness].to_f } / @employee_rows.size).round(1) %></td>
-                <td><%= (@employee_rows.sum { |r| r[:pulse_scores][:team_collaboration].to_f } / @employee_rows.size).round(1) %></td>
-                <td><%= (@employee_rows.sum { |r| r[:pulse_scores][:recognition_growth].to_f } / @employee_rows.size).round(1) %></td>
-                <td><%= (@employee_rows.sum { |r| r[:pulse_scores][:org_communication].to_f } / @employee_rows.size).round(1) %></td>
-                <td><%= (@employee_rows.sum { |r| r[:pulse_scores][:learning_development].to_f } / @employee_rows.size).round(1) %></td>
-                <td><%= (@employee_rows.sum { |r| r[:pulse_scores][:role_clarity].to_f } / @employee_rows.size).round(1) %></td>
-                <td><%= (@employee_rows.sum { |r| r[:pulse_scores][:work_environment].to_f } / @employee_rows.size).round(1) %></td>
-                <td><%= (@employee_rows.sum { |r| r[:pulse_scores][:commitment_retention].to_f } / @employee_rows.size).round(1) %></td>
-                <td class="pulse-total"><%= (@employee_rows.sum { |r| r[:pulse_scores][:total_score].to_f } / @employee_rows.size).round(1) %></td>
-                <% 
-                  avg_total = (@employee_rows.sum { |r| r[:pulse_scores][:total_score].to_f } / @employee_rows.size).round(0).to_i
-                  avg_cat = pulse_category_details(avg_total) 
-                %>
-                <td><%= avg_cat[:stars] %> <%= avg_cat[:category] %></td>
+                <td><%= team_average[:pulse_score] %>%</td>
+                <% team_average[:grouped_scores].each do |dimension| %>
+                  <td><%= dimension[:score] %></td>
+                <% end %>
+                <td class="pulse-total"><%= team_average[:total_score] %></td>
+                <td class="pulse-total"><%= team_average[:pulse_score] %>%</td>
+                <td><%= team_average[:category][:stars] %> <%= team_average[:category][:category] %></td>
               </tr>
             </tfoot>
           <% end %>

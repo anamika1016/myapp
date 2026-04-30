@@ -3,7 +3,7 @@ require "axlsx"
 class HomeController < ApplicationController
   before_action :authenticate_user!
   before_action :ensure_l1_pulse_access!, only: [ :l1_pulse_360, :save_l1_pulse_360 ]
-  helper_method :composite_category_details, :pulse_category_details, :score_rating_details, :score_rating_text
+  helper_method :composite_category_details, :pulse_category_details, :score_rating_details, :score_rating_text, :pulse_group_rows_for, :pulse_dimension_rows_for, :pulse_team_average, :score_range_rows, :employee_role_label
 
   def index
   end
@@ -61,42 +61,31 @@ class HomeController < ApplicationController
     workbook.add_worksheet(name: @dashboard_mode == :admin ? "Pulse 360 Score" : "Pulse Check") do |sheet|
       if @dashboard_mode == :admin
         sheet.add_row [
-          "Staff Name", "Role", "Wt %", "Sense of Purpose & Mission Alignment (1-5)", "Workload & Well-being Balance (1-5)",
-          "Manager Effectiveness & Support (1-5)", "Team Collaboration & Relationships (1-5)", "Recognition & Growth Opportunities (1-5)",
-          "Org. Communication & Transparency (1-5)", "Learning & Development Access (1-5)", "Role Clarity & Goal Setting (1-5)",
-          "Work Environment & Safety (1-5)", "Commitment & Retention Intent (1-5)", "Total /50", "Category & Action"
+          "Staff Name", "Role", "Wt %", "Values Alignment (1-5)", "Technical Knowledge (1-5)",
+          "Customer & Field Engagement (1-5)", "Execution & Accountability (1-5)", "Initiative & Leadership (1-5)",
+          "Total /25", "15% Computed", "Category & Action"
         ]
         @employee_rows.each do |row|
           category = row[:pulse_category]
+          grouped_scores = pulse_group_rows_for(row[:pulse_scores])
           sheet.add_row [
             row[:employee_name], row[:role], row[:summary_scores][:pulse_score],
-            row[:pulse_scores][:sense_of_purpose], row[:pulse_scores][:workload_balance],
-            row[:pulse_scores][:manager_effectiveness], row[:pulse_scores][:team_collaboration],
-            row[:pulse_scores][:recognition_growth], row[:pulse_scores][:org_communication],
-            row[:pulse_scores][:learning_development], row[:pulse_scores][:role_clarity],
-            row[:pulse_scores][:work_environment], row[:pulse_scores][:commitment_retention],
+            grouped_scores[0][:score], grouped_scores[1][:score], grouped_scores[2][:score],
+            grouped_scores[3][:score], grouped_scores[4][:score],
             row[:pulse_scores][:total_score],
+            row[:summary_scores][:pulse_score],
             category.present? ? "#{category[:category]} - #{category[:action]}" : ""
           ]
         end
-        if @employee_rows.any?
-          avg_total = (@employee_rows.sum { |r| r[:pulse_scores][:total_score].to_f } / @employee_rows.size).round(0).to_i
-          avg_category = pulse_category_details(avg_total)
+        if (team_average = pulse_team_average(@employee_rows))
           sheet.add_row [
             "TEAM AVERAGE", "",
-            (@employee_rows.sum { |r| r[:summary_scores][:pulse_score].to_f } / @employee_rows.size).round(1),
-            (@employee_rows.sum { |r| r[:pulse_scores][:sense_of_purpose].to_f } / @employee_rows.size).round(1),
-            (@employee_rows.sum { |r| r[:pulse_scores][:workload_balance].to_f } / @employee_rows.size).round(1),
-            (@employee_rows.sum { |r| r[:pulse_scores][:manager_effectiveness].to_f } / @employee_rows.size).round(1),
-            (@employee_rows.sum { |r| r[:pulse_scores][:team_collaboration].to_f } / @employee_rows.size).round(1),
-            (@employee_rows.sum { |r| r[:pulse_scores][:recognition_growth].to_f } / @employee_rows.size).round(1),
-            (@employee_rows.sum { |r| r[:pulse_scores][:org_communication].to_f } / @employee_rows.size).round(1),
-            (@employee_rows.sum { |r| r[:pulse_scores][:learning_development].to_f } / @employee_rows.size).round(1),
-            (@employee_rows.sum { |r| r[:pulse_scores][:role_clarity].to_f } / @employee_rows.size).round(1),
-            (@employee_rows.sum { |r| r[:pulse_scores][:work_environment].to_f } / @employee_rows.size).round(1),
-            (@employee_rows.sum { |r| r[:pulse_scores][:commitment_retention].to_f } / @employee_rows.size).round(1),
-            (@employee_rows.sum { |r| r[:pulse_scores][:total_score].to_f } / @employee_rows.size).round(1),
-            "#{avg_category[:category]} - #{avg_category[:action]}"
+            team_average[:pulse_score],
+            team_average[:grouped_scores][0][:score], team_average[:grouped_scores][1][:score], team_average[:grouped_scores][2][:score],
+            team_average[:grouped_scores][3][:score], team_average[:grouped_scores][4][:score],
+            team_average[:total_score],
+            team_average[:pulse_score],
+            "#{team_average[:category][:category]} - #{team_average[:category][:action]}"
           ]
         end
       else
@@ -203,15 +192,14 @@ class HomeController < ApplicationController
     when "pulse"
       workbook.add_worksheet(name: "Pulse Score") do |sheet|
         if @dashboard_mode == :admin
-          sheet.add_row [ "Staff Name", "Role", "Wt %", "Sense of Purpose & Mission Alignment (1-5)", "Workload & Well-being Balance (1-5)", "Manager Effectiveness & Support (1-5)", "Team Collaboration & Relationships (1-5)", "Recognition & Growth Opportunities (1-5)", "Org. Communication & Transparency (1-5)", "Learning & Development Access (1-5)", "Role Clarity & Goal Setting (1-5)", "Work Environment & Safety (1-5)", "Commitment & Retention Intent (1-5)", "Total /50", "Category & Action" ]
+          sheet.add_row [ "Staff Name", "Role", "Wt %", "Values Alignment (1-5)", "Technical Knowledge (1-5)", "Customer & Field Engagement (1-5)", "Execution & Accountability (1-5)", "Initiative & Leadership (1-5)", "Total /25", "15% Computed", "Category & Action" ]
           @employee_rows.each do |row|
             category = row[:pulse_category]
-            sheet.add_row [ row[:employee_name], row[:role], row[:summary_scores][:pulse_score], row[:pulse_scores][:sense_of_purpose], row[:pulse_scores][:workload_balance], row[:pulse_scores][:manager_effectiveness], row[:pulse_scores][:team_collaboration], row[:pulse_scores][:recognition_growth], row[:pulse_scores][:org_communication], row[:pulse_scores][:learning_development], row[:pulse_scores][:role_clarity], row[:pulse_scores][:work_environment], row[:pulse_scores][:commitment_retention], row[:pulse_scores][:total_score], category.present? ? "#{category[:category]} - #{category[:action]}" : "" ]
+            grouped_scores = pulse_group_rows_for(row[:pulse_scores])
+            sheet.add_row [ row[:employee_name], row[:role], row[:summary_scores][:pulse_score], grouped_scores[0][:score], grouped_scores[1][:score], grouped_scores[2][:score], grouped_scores[3][:score], grouped_scores[4][:score], row[:pulse_scores][:total_score], row[:summary_scores][:pulse_score], category.present? ? "#{category[:category]} - #{category[:action]}" : "" ]
           end
-          if @employee_rows.any?
-            avg_total = (@employee_rows.sum { |r| r[:pulse_scores][:total_score].to_f } / @employee_rows.size).round(0).to_i
-            avg_category = pulse_category_details(avg_total)
-            sheet.add_row [ "TEAM AVERAGE", "", (@employee_rows.sum { |r| r[:summary_scores][:pulse_score].to_f } / @employee_rows.size).round(1), (@employee_rows.sum { |r| r[:pulse_scores][:sense_of_purpose].to_f } / @employee_rows.size).round(1), (@employee_rows.sum { |r| r[:pulse_scores][:workload_balance].to_f } / @employee_rows.size).round(1), (@employee_rows.sum { |r| r[:pulse_scores][:manager_effectiveness].to_f } / @employee_rows.size).round(1), (@employee_rows.sum { |r| r[:pulse_scores][:team_collaboration].to_f } / @employee_rows.size).round(1), (@employee_rows.sum { |r| r[:pulse_scores][:recognition_growth].to_f } / @employee_rows.size).round(1), (@employee_rows.sum { |r| r[:pulse_scores][:org_communication].to_f } / @employee_rows.size).round(1), (@employee_rows.sum { |r| r[:pulse_scores][:learning_development].to_f } / @employee_rows.size).round(1), (@employee_rows.sum { |r| r[:pulse_scores][:role_clarity].to_f } / @employee_rows.size).round(1), (@employee_rows.sum { |r| r[:pulse_scores][:work_environment].to_f } / @employee_rows.size).round(1), (@employee_rows.sum { |r| r[:pulse_scores][:commitment_retention].to_f } / @employee_rows.size).round(1), (@employee_rows.sum { |r| r[:pulse_scores][:total_score].to_f } / @employee_rows.size).round(1), "#{avg_category[:category]} - #{avg_category[:action]}" ]
+          if (team_average = pulse_team_average(@employee_rows))
+            sheet.add_row [ "TEAM AVERAGE", "", team_average[:pulse_score], team_average[:grouped_scores][0][:score], team_average[:grouped_scores][1][:score], team_average[:grouped_scores][2][:score], team_average[:grouped_scores][3][:score], team_average[:grouped_scores][4][:score], team_average[:total_score], team_average[:pulse_score], "#{team_average[:category][:category]} - #{team_average[:category][:action]}" ]
           end
         else
           sheet.add_row [ "Pulse Dimension", "Wt %", "Score (1-5)", "Wtd Score", "Rating" ]
@@ -281,12 +269,18 @@ class HomeController < ApplicationController
       next if assessment_blank?(assessment_params)
 
       assessment = L1PulseAssessment.find_or_initialize_by(employee_detail_id: employee_detail.id, l1_user_id: current_user.id)
+      values_alignment = assessment_params[:values_alignment].presence
+      technical_knowledge = assessment_params[:technical_knowledge].presence
+      customer_field_engagement = assessment_params[:customer_field_engagement].presence
+      execution_accountability = assessment_params[:execution_accountability].presence
+      initiative_leadership = assessment_params[:initiative_leadership].presence
+
       assessment.assign_attributes(
-        sense_of_purpose: assessment_params[:sense_of_purpose].presence, workload_balance: assessment_params[:workload_balance].presence,
-        manager_effectiveness: assessment_params[:manager_effectiveness].presence, team_collaboration: assessment_params[:team_collaboration].presence,
-        recognition_growth: assessment_params[:recognition_growth].presence, org_communication: assessment_params[:org_communication].presence,
-        learning_development: assessment_params[:learning_development].presence, role_clarity: assessment_params[:role_clarity].presence,
-        work_environment: assessment_params[:work_environment].presence, commitment_retention: assessment_params[:commitment_retention].presence,
+        values_alignment: values_alignment,
+        technical_knowledge: technical_knowledge,
+        customer_field_engagement: customer_field_engagement,
+        execution_accountability: execution_accountability,
+        initiative_leadership: initiative_leadership,
         remarks: assessment_params[:remarks].presence, professionalism_conduct: assessment_params[:professionalism_conduct].presence,
         work_quality_accuracy: assessment_params[:work_quality_accuracy].presence, initiative_problem_solving: assessment_params[:initiative_problem_solving].presence,
         papl_values_culture: assessment_params[:papl_values_culture].presence, collaboration: assessment_params[:collaboration].presence,
@@ -336,11 +330,13 @@ class HomeController < ApplicationController
   end
 
   def pulse_category_details(ts)
-    case ts
-    when 45..50 then { stars: "★★★★★", category: "Outstanding", action: "Accelerated growth track / highest increment", className: "stars-5" }
-    when 38..44 then { stars: "★★★★", category: "Exceeds Expectations", action: "Merit increment + recognition award", className: "stars-4" }
-    when 30..37 then { stars: "★★★", category: "Meets Expectations", action: "Standard increment as per policy", className: "stars-3" }
-    when 23..29 then { stars: "★★", category: "Needs Improvement", action: "PIP + structured coaching plan", className: "stars-2" }
+    return nil if ts.blank?
+
+    case pulse_raw_percentage(ts).to_f
+    when 90..100 then { stars: "★★★★★", category: "Outstanding", action: "Accelerated growth track / highest increment", className: "stars-5" }
+    when 75...90 then { stars: "★★★★", category: "Exceeds Expectations", action: "Merit increment + recognition award", className: "stars-4" }
+    when 60...75 then { stars: "★★★", category: "Meets Expectations", action: "Standard increment as per policy", className: "stars-3" }
+    when 45...60 then { stars: "★★", category: "Needs Improvement", action: "PIP + structured coaching plan", className: "stars-2" }
     else { stars: "★", category: "Unsatisfactory", action: "Formal PIP / disciplinary review", className: "stars-1" }
     end
   end
@@ -364,38 +360,56 @@ class HomeController < ApplicationController
 
   def score_range_rows
     [
-      { score_range: ">= 90%", band: "Outstanding", rating: "5 (★★★★★)", action: "Accelerated growth track / highest increment" },
-      { score_range: "75 - 89%", band: "Exceeds Expectations", rating: "4 (★★★★)", action: "Merit increment + recognition award" },
-      { score_range: "60 - 74%", band: "Meets Expectations", rating: "3 (★★★)", action: "Standard increment as per policy" },
-      { score_range: "45 - 59%", band: "Needs Improvement", rating: "2 (★★)", action: "PIP + structured coaching plan" },
-      { score_range: "< 45%", band: "Unsatisfactory", rating: "1 (★)", action: "Formal PIP / disciplinary review" }
+      { score_range: "≥ 90%", band: "Outstanding", rating: "5 (★★★★★)", rating_value: 5, stars: "★★★★★", className: "stars-5", action: "Accelerated growth track / highest increment" },
+      { score_range: "75 - 89%", band: "Exceeds Expectations", rating: "4 (★★★★)", rating_value: 4, stars: "★★★★", className: "stars-4", action: "Merit increment + recognition award" },
+      { score_range: "60 - 74%", band: "Meets Expectations", rating: "3 (★★★)", rating_value: 3, stars: "★★★", className: "stars-3", action: "Standard increment as per policy" },
+      { score_range: "45 - 59%", band: "Needs Improvement", rating: "2 (★★)", rating_value: 2, stars: "★★", className: "stars-2", action: "PIP + structured coaching plan" },
+      { score_range: "< 45%", band: "Unsatisfactory", rating: "1 (★)", rating_value: 1, stars: "★", className: "stars-1", action: "Formal PIP / disciplinary review" }
     ]
+  end
+
+  def employee_role_label(employee_detail, user_details = employee_detail.user_details)
+    role = employee_detail.post.to_s.strip
+    return role if role.present? && role.casecmp("Imported") != 0
+
+    user_department = Array(user_details).first&.department&.department_type.to_s.strip
+    return user_department if user_department.present?
+
+    department = employee_detail.department.to_s.strip
+    return department if department.present?
+
+    "Employee"
   end
 
   def pulse_raw_percentage(total_score)
     return nil if total_score.blank?
 
-    ((total_score.to_f / 50.0) * 100.0).round(2)
+    ((total_score.to_f / 25.0) * 100.0).round(2)
+  end
+
+  def pulse_weighted_score(total_score)
+    return 0.0 if total_score.blank?
+
+    ((total_score.to_f / 25.0) * 15.0).round(2)
   end
 
   def pulse_dimension_rows_for(pulse_scores)
-    [
-      { label: "Sense of Purpose & Mission Alignment", weight: 10, score: pulse_scores&.dig(:sense_of_purpose) },
-      { label: "Workload & Well-being Balance", weight: 10, score: pulse_scores&.dig(:workload_balance) },
-      { label: "Manager Effectiveness & Support", weight: 10, score: pulse_scores&.dig(:manager_effectiveness) },
-      { label: "Team Collaboration & Relationships", weight: 10, score: pulse_scores&.dig(:team_collaboration) },
-      { label: "Recognition & Growth Opportunities", weight: 10, score: pulse_scores&.dig(:recognition_growth) },
-      { label: "Org. Communication & Transparency", weight: 10, score: pulse_scores&.dig(:org_communication) },
-      { label: "Learning & Development Access", weight: 10, score: pulse_scores&.dig(:learning_development) },
-      { label: "Role Clarity & Goal Setting", weight: 10, score: pulse_scores&.dig(:role_clarity) },
-      { label: "Work Environment & Safety", weight: 10, score: pulse_scores&.dig(:work_environment) },
-      { label: "Commitment & Retention Intent", weight: 10, score: pulse_scores&.dig(:commitment_retention) }
-    ].map do |dimension|
+    pulse_group_rows_for(pulse_scores).map do |dimension|
       score = dimension[:score]
       weighted_score = score.present? ? ((score.to_f / 5.0) * dimension[:weight]).round(2) : nil
 
       dimension.merge(weighted_score: weighted_score, rating_text: score_rating_text(score))
     end
+  end
+
+  def pulse_group_rows_for(pulse_scores)
+    [
+      { label: "Values Alignment", weight: 20, score: pulse_scores&.dig(:values_alignment) },
+      { label: "Technical Knowledge", weight: 20, score: pulse_scores&.dig(:technical_knowledge) },
+      { label: "Customer & Field Engagement", weight: 20, score: pulse_scores&.dig(:customer_field_engagement) },
+      { label: "Execution & Accountability", weight: 20, score: pulse_scores&.dig(:execution_accountability) },
+      { label: "Initiative & Leadership", weight: 20, score: pulse_scores&.dig(:initiative_leadership) }
+    ]
   end
 
   def employee_summary_rows
@@ -452,17 +466,24 @@ class HomeController < ApplicationController
     ps = pulse_total_score.present? ? pulse_total_score.to_f : 0.0
     rs = remark_score.present? ? remark_score.to_f : 0.0
     ws_annual = (ap * 0.75).round(2)
-    ws_pulse = ((ps.to_f / 50.0) * 15.0).round(2)
+    ws_pulse = pulse_weighted_score(ps)
     ws_remarks = ((rs.to_f / 10.0) * 10.0).round(2)
     { annual_score: ws_annual, pulse_score: ws_pulse, remarks_score: ws_remarks, final_total: (ws_annual + ws_pulse + ws_remarks).round(2) }
   end
 
   def pulse_scores_from_assessment(a)
-    { sense_of_purpose: a.sense_of_purpose.to_i, workload_balance: a.workload_balance.to_i, manager_effectiveness: a.manager_effectiveness.to_i, team_collaboration: a.team_collaboration.to_i, recognition_growth: a.recognition_growth.to_i, org_communication: a.org_communication.to_i, learning_development: a.learning_development.to_i, role_clarity: a.role_clarity.to_i, work_environment: a.work_environment.to_i, commitment_retention: a.commitment_retention.to_i, total_score: pulse_total_for_assessment(a) }
+    {
+      values_alignment: numeric_score_or_nil(a.values_alignment),
+      technical_knowledge: numeric_score_or_nil(a.technical_knowledge),
+      customer_field_engagement: numeric_score_or_nil(a.customer_field_engagement),
+      execution_accountability: numeric_score_or_nil(a.execution_accountability),
+      initiative_leadership: numeric_score_or_nil(a.initiative_leadership),
+      total_score: pulse_total_for_assessment(a)
+    }
   end
 
   def blank_pulse_scores
-    { sense_of_purpose: nil, workload_balance: nil, manager_effectiveness: nil, team_collaboration: nil, recognition_growth: nil, org_communication: nil, learning_development: nil, role_clarity: nil, work_environment: nil, commitment_retention: nil, total_score: nil }
+    { values_alignment: nil, technical_knowledge: nil, customer_field_engagement: nil, execution_accountability: nil, initiative_leadership: nil, total_score: nil }
   end
 
   def composite_category_details(ft)
@@ -476,7 +497,14 @@ class HomeController < ApplicationController
   end
 
   def assessment_blank?(p)
-    [ :sense_of_purpose, :workload_balance, :manager_effectiveness, :team_collaboration, :recognition_growth, :org_communication, :learning_development, :role_clarity, :work_environment, :commitment_retention, :remarks, :professionalism_conduct, :work_quality_accuracy, :initiative_problem_solving, :papl_values_culture, :collaboration, :time_management_reliability, :growth_mindset_development ].all? { |f| p[f].blank? }
+    [ :values_alignment, :technical_knowledge, :customer_field_engagement, :execution_accountability, :initiative_leadership, :remarks, :professionalism_conduct, :work_quality_accuracy, :initiative_problem_solving, :papl_values_culture, :collaboration, :time_management_reliability, :growth_mindset_development ].all? { |f| p[f].blank? }
+  end
+
+  def numeric_score_or_nil(value)
+    return nil if value.blank?
+
+    numeric = value.to_f
+    (numeric % 1).zero? ? numeric.to_i : numeric.round(1)
   end
 
   def build_employee_dashboard_row(ed)
@@ -487,19 +515,19 @@ class HomeController < ApplicationController
     ps = pa ? pulse_scores_from_assessment(pa) : blank_pulse_scores
     manager_feedback = manager_feedback_summary_for(pa)
     ts = ps[:total_score]
-    ws_pulse = ((ts.to_f / 50.0) * 15.0).round(2)
-    ws_pulse = 0.0 if pa.blank? || assessment_blank?(pa)
+    pulse_available = ts.present?
+    ws_pulse = pulse_available ? pulse_weighted_score(ts) : 0.0
     {
       employee_detail_id: ed.id, employee_name: ed.employee_name || "N/A", employee_code: ed.employee_code || "N/A",
-      role: ed.post.presence || "Employee",
+      role: employee_role_label(ed, ud),
       department: ud.first&.department&.department_type || ed.department || "N/A",
       quarter_summaries: qs, annual_percentage: ap,
       total: qs.sum { |q| q[:percentage] }.round(1),
       l1_remarks: qs.flat_map { |q| q[:l1_remarks] }.uniq,
       remarks: qs.flat_map { |q| q[:l1_remarks] }.uniq,
-      pulse_scores: ps, pulse_available: pa.present?, pulse_weighted: ws_pulse,
+      pulse_scores: ps, pulse_available: pulse_available, pulse_weighted: ws_pulse,
       pulse_raw_percentage: pulse_raw_percentage(ts) || 0.0,
-      pulse_category: pa ? pulse_category_details(ts) : nil,
+      pulse_category: pulse_category_details(ts),
       pulse_assessment_remarks: pa&.remarks, pulse_assessment_score: manager_feedback[:score_on_ten] || pa&.remark_score,
       manager_feedback: manager_feedback,
       manager_feedback_raw: pa ? manager_feedback_raw_percentage(pa) : 0.0,
@@ -525,15 +553,36 @@ class HomeController < ApplicationController
   end
 
   def pulse_total_for_assessment(a)
-    [ a.sense_of_purpose, a.workload_balance, a.manager_effectiveness, a.team_collaboration, a.recognition_growth, a.org_communication, a.learning_development, a.role_clarity, a.work_environment, a.commitment_retention ].compact.sum
+    scores = [ a.values_alignment, a.technical_knowledge, a.customer_field_engagement, a.execution_accountability, a.initiative_leadership ]
+    return nil if scores.all?(&:blank?)
+
+    scores.compact.sum(&:to_f).round(1)
   end
 
   def build_l1_pulse_row(ed)
     a = l1_assessment_for(ed)
     ts = pulse_total_for_assessment(a)
-    ws_pulse = ((ts.to_f / 50.0) * 15.0).round(2)
-    ws_pulse = 0.0 if a.blank? || assessment_blank?(a)
-    { employee_detail_id: ed.id, employee_name: ed.employee_name, employee_code: ed.employee_code, department: ed.user_details.first&.department&.department_type || ed.department, assessment: a, total_score: ts, pulse_weighted: ws_pulse, pulse_category: pulse_category_details(ts), manager_feedback_raw: manager_feedback_raw_percentage(a) }
+    { employee_detail_id: ed.id, employee_name: ed.employee_name, employee_code: ed.employee_code, department: ed.user_details.first&.department&.department_type || ed.department, assessment: a, total_score: ts, pulse_weighted: pulse_weighted_score(ts), pulse_category: pulse_category_details(ts), manager_feedback_raw: manager_feedback_raw_percentage(a) }
+  end
+
+  def pulse_team_average(rows)
+    scored_rows = rows.select { |row| row.dig(:pulse_scores, :total_score).present? }
+    return nil if scored_rows.empty?
+
+    average_total = (scored_rows.sum { |row| row[:pulse_scores][:total_score].to_f } / scored_rows.size).round(1)
+
+    {
+      pulse_score: (scored_rows.sum { |row| row[:summary_scores][:pulse_score].to_f } / scored_rows.size).round(1),
+      total_score: average_total,
+      grouped_scores: pulse_group_rows_for(
+        values_alignment: (scored_rows.sum { |row| row[:pulse_scores][:values_alignment].to_f } / scored_rows.size).round(1),
+        technical_knowledge: (scored_rows.sum { |row| row[:pulse_scores][:technical_knowledge].to_f } / scored_rows.size).round(1),
+        customer_field_engagement: (scored_rows.sum { |row| row[:pulse_scores][:customer_field_engagement].to_f } / scored_rows.size).round(1),
+        execution_accountability: (scored_rows.sum { |row| row[:pulse_scores][:execution_accountability].to_f } / scored_rows.size).round(1),
+        initiative_leadership: (scored_rows.sum { |row| row[:pulse_scores][:initiative_leadership].to_f } / scored_rows.size).round(1)
+      ),
+      category: pulse_category_details(average_total)
+    }
   end
 
   def formatted_percent(value)
@@ -574,8 +623,8 @@ class HomeController < ApplicationController
     @annual_percentage = ap
     @dashboard_employee_department = @user_details.first&.department&.department_type || @employee_detail&.department || "N/A"
     @dashboard_pulse_scores = ps
-    @dashboard_pulse_category = pa ? pulse_category_details(ps[:total_score]) : nil
-    @dashboard_pulse_available = pa.present?
+    @dashboard_pulse_category = pulse_category_details(ps[:total_score])
+    @dashboard_pulse_available = ps[:total_score].present?
     @dashboard_pulse_remarks = pa&.remarks
     @dashboard_pulse_remark_score = manager_feedback[:score_on_ten] || pa&.remark_score
     @dashboard_manager_feedback = manager_feedback

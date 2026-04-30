@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_04_02_111113) do
+ActiveRecord::Schema[8.0].define(version: 2026_04_30_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -141,6 +141,11 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_02_111113) do
     t.integer "collaboration"
     t.integer "time_management_reliability"
     t.integer "growth_mindset_development"
+    t.decimal "values_alignment", precision: 3, scale: 1
+    t.decimal "technical_knowledge", precision: 3, scale: 1
+    t.decimal "customer_field_engagement", precision: 3, scale: 1
+    t.decimal "execution_accountability", precision: 3, scale: 1
+    t.decimal "initiative_leadership", precision: 3, scale: 1
     t.index ["employee_detail_id", "l1_user_id"], name: "index_l1_pulse_assessments_on_employee_and_l1_user", unique: true
     t.index ["employee_detail_id"], name: "index_l1_pulse_assessments_on_employee_detail_id"
     t.index ["l1_user_id"], name: "index_l1_pulse_assessments_on_l1_user_id"
