@@ -26,7 +26,7 @@
           <table class="table table-hover w-full min-w-full">
             <thead class="bg-gray-800">
               <tr>
-                <th rowspan="3" class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Activity</th>
+                <th rowspan="3" class="activity-column px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Activity</th>
                 <th rowspan="3" class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Theme</th>
                 <th rowspan="3" class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Unit</th>
                 <th colspan="11" class="px-4 py-3 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 bg-orange-700">Q1 (APR-JUN)</th>
@@ -130,7 +130,7 @@
                 <% existing_achievements = detail.achievements.index_by(&:month) %>
                 <% if existing_achievements.values.any? { |a| a.achievement.present? } %>
                   <tr class="<%= index.even? ? 'bg-gray-50' : 'bg-white' %> hover:bg-gray-100 transition-colors duration-200" data-detail-id="<%= detail.id %>">
-                    <td class="px-4 py-3 text-sm text-gray-800 border-r border-gray-200"><%= detail.activity.activity_name %></td>
+                    <td class="activity-cell px-4 py-3 text-sm text-gray-800 border-r border-gray-200"><%= detail.activity.activity_name %></td>
                     <td class="px-4 py-3 text-sm text-gray-800 border-r border-gray-200"><%= detail.activity.theme_name.presence || 'No Theme' %></td>
                     <td class="px-4 py-3 text-sm text-gray-800 border-r border-gray-200 text-center"><%= detail.activity.unit %></td>
 
@@ -602,6 +602,15 @@
 
         function openModal(button) {
           const data = button.dataset;
+
+          function hasDisplayValue(value) {
+            return value !== null &&
+              value !== undefined &&
+              value.toString().trim() !== '' &&
+              value.toString().trim().toLowerCase() !== 'null' &&
+              value.toString().trim().toLowerCase() !== 'undefined' &&
+              value.toString().trim().toLowerCase() !== 'nil';
+          }
           
           // Populate quarter info
           document.getElementById('modalQuarter').textContent = data.quarter || 'N/A';
@@ -658,18 +667,11 @@
             const l1Remarks = monthData.l1_remarks;
             const l1Percentage = monthData.l1_percentage;
             
-            if (l1Remarks && l1Remarks.toString().trim() !== '' && 
-                l1Remarks.toString().trim() !== 'null' && 
-                l1Remarks.toString().trim() !== 'undefined' &&
-                l1Remarks.toString().trim() !== 'nil') {
+            if (hasDisplayValue(l1Remarks)) {
               allL1Remarks.push(l1Remarks.toString().trim());
             }
             
-            if (l1Percentage && l1Percentage.toString().trim() !== '' && 
-                l1Percentage.toString().trim() !== 'null' && 
-                l1Percentage.toString().trim() !== 'undefined' &&
-                l1Percentage.toString().trim() !== 'nil' &&
-                !isNaN(parseFloat(l1Percentage))) {
+            if (hasDisplayValue(l1Percentage) && !isNaN(parseFloat(l1Percentage))) {
               allL1Percentages.push(parseFloat(l1Percentage));
             }
             
@@ -677,18 +679,11 @@
             const l2Remarks = monthData.l2_remarks;
             const l2Percentage = monthData.l2_percentage;
             
-            if (l2Remarks && l2Remarks.toString().trim() !== '' && 
-                l2Remarks.toString().trim() !== 'null' && 
-                l2Remarks.toString().trim() !== 'undefined' &&
-                l2Remarks.toString().trim() !== 'nil') {
+            if (hasDisplayValue(l2Remarks)) {
               allL2Remarks.push(l2Remarks.toString().trim());
             }
             
-            if (l2Percentage && l2Percentage.toString().trim() !== '' && 
-                l2Percentage.toString().trim() !== 'null' && 
-                l2Percentage.toString().trim() !== 'undefined' &&
-                l2Percentage.toString().trim() !== 'nil' &&
-                !isNaN(parseFloat(l2Percentage))) {
+            if (hasDisplayValue(l2Percentage) && !isNaN(parseFloat(l2Percentage))) {
               allL2Percentages.push(parseFloat(l2Percentage));
             }
           });
@@ -699,10 +694,11 @@
           console.log('Collected L2 Percentages:', allL2Percentages);
           
           // Calculate overall L1 and L2 averages
-          let overallL1Percentage = allL1Percentages.length > 0 ? 
-            (allL1Percentages.reduce((a, b) => a + b, 0) / allL1Percentages.length).toFixed(1) : null;
-          let overallL2Percentage = allL2Percentages.length > 0 ? 
-            (allL2Percentages.reduce((a, b) => a + b, 0) / allL2Percentages.length).toFixed(1) : null;
+          const derivedQuarterPercentage = totalTarget > 0 ? ((totalAchievement / totalTarget) * 100).toFixed(1) : null;
+          let overallL1Percentage = allL1Percentages.length > 0 ?
+            (allL1Percentages.reduce((a, b) => a + b, 0) / allL1Percentages.length).toFixed(1) : derivedQuarterPercentage;
+          let overallL2Percentage = allL2Percentages.length > 0 ?
+            (allL2Percentages.reduce((a, b) => a + b, 0) / allL2Percentages.length).toFixed(1) : derivedQuarterPercentage;
           
           // Combine all L1 and L2 remarks - show unique remarks only once
           let uniqueL1Remarks = [...new Set(allL1Remarks)];
@@ -712,15 +708,11 @@
           let overallL2Remarks = uniqueL2Remarks.length > 0 ? uniqueL2Remarks.join('; ') : 'No remarks';
           
           // Only show data if it exists, otherwise show appropriate message
-          if (overallL1Remarks === 'No remarks' && overallL2Remarks === 'No remarks' && 
-              (overallL1Percentage === null || overallL1Percentage === '0.0') && 
-              (overallL2Percentage === null || overallL2Percentage === '0.0')) {
+          if (overallL1Remarks === 'No remarks' && overallL2Remarks === 'No remarks' &&
+              overallL1Percentage === null &&
+              overallL2Percentage === null) {
             // Check if any achievements have been submitted for this quarter
-            const hasAnyAchievements = quarterData.some(monthData => 
-              monthData.achievement && monthData.achievement.toString().trim() !== '' && 
-              monthData.achievement.toString().trim() !== 'null' && 
-              monthData.achievement.toString().trim() !== 'undefined'
-            );
+            const hasAnyAchievements = quarterData.some(monthData => hasDisplayValue(monthData.achievement));
             
             if (hasAnyAchievements) {
               // Check the status of achievements to determine appropriate message
@@ -761,11 +753,11 @@
           console.log('Final L2 Remarks:', overallL2Remarks);
           
           // Update L1 Summary
-          document.getElementById('l1Percentage').textContent = overallL1Percentage ? overallL1Percentage + '%' : 'N/A';
+          document.getElementById('l1Percentage').textContent = overallL1Percentage !== null ? overallL1Percentage + '%' : 'N/A';
           document.getElementById('l1Remarks').textContent = overallL1Remarks;
           
           // Update L2 Summary
-          document.getElementById('l2Percentage').textContent = overallL2Percentage ? overallL2Percentage + '%' : 'N/A';
+          document.getElementById('l2Percentage').textContent = overallL2Percentage !== null ? overallL2Percentage + '%' : 'N/A';
           document.getElementById('l2Remarks').textContent = overallL2Remarks;
           
           
@@ -897,6 +889,21 @@
   border-right: 1px solid #e5e7eb;
   white-space: nowrap;
   vertical-align: middle;
+}
+
+.table .activity-column,
+.table .activity-cell {
+  width: 260px;
+  min-width: 260px;
+  max-width: 260px;
+}
+
+.table .activity-cell {
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  text-align: left;
+  line-height: 1.5;
 }
 
 .table th {

@@ -13,7 +13,6 @@ class EmployeeDetailsController < ApplicationController
 
   def create
     @employee_detail = EmployeeDetail.new(employee_detail_params)
-    @employee_detail.user = current_user
 
     @q = EmployeeDetail.ransack(params[:q])
     if @employee_detail.save
@@ -63,13 +62,12 @@ class EmployeeDetailsController < ApplicationController
 
     workbook.add_worksheet(name: "Employees") do |sheet|
       sheet.add_row [
-        "Employee ID", "Name", "Email", "Employee Code",
+        "Name", "Email", "Employee Code",
         "L1 Code", "L2 Code", "L1 Name", "L2 Name", "Post", "Department"
       ]
 
       @employee_details.each do |emp|
         sheet.add_row [
-          emp.employee_id,
           emp.employee_name,
           emp.employee_email,
           emp.employee_code,
@@ -185,27 +183,50 @@ class EmployeeDetailsController < ApplicationController
     end
 
     spreadsheet = Roo::Spreadsheet.open(file.path)
-    header = spreadsheet.row(1)
+    header = spreadsheet.row(1).map { |value| normalize_import_header(value) }
 
     header_map = {
-      "Employee ID" => "employee_id",
-      "Name" => "employee_name",
-      "Email" => "employee_email",
-      "Employee Code" => "employee_code",
-      "L1 Code" => "l1_code",
-      "L2 Code" => "l2_code",
-      "L1 Name" => "l1_employer_name",
-      "L2 Name" => "l2_employer_name",
-      "Post" => "post",
-      "Department" => "department"
+      "employeeid" => "employee_id",
+      "name" => "employee_name",
+      "employeename" => "employee_name",
+      "email" => "employee_email",
+      "employeeemail" => "employee_email",
+      "employeecode" => "employee_code",
+      "empcode" => "employee_code",
+      "mobile" => "mobile_number",
+      "mobilenumber" => "mobile_number",
+      "mobile no" => "mobile_number",
+      "mobileno" => "mobile_number",
+      "mobile#" => "mobile_number",
+      "l1code" => "l1_code",
+      "l2code" => "l2_code",
+      "l1name" => "l1_employer_name",
+      "l1employername" => "l1_employer_name",
+      "l2name" => "l2_employer_name",
+      "l2employername" => "l2_employer_name",
+      "post" => "post",
+      "department" => "department"
     }
 
     (2..spreadsheet.last_row).each do |i|
       row = Hash[[ header, spreadsheet.row(i) ].transpose]
-      mapped_row = row.transform_keys { |key| header_map[key] }.compact
+      mapped_row = row.each_with_object({}) do |(key, value), mapped|
+        attribute_name = header_map[key.to_s]
+        next unless attribute_name
+        next if value.nil?
+
+        cleaned_value = value.is_a?(String) ? value.strip : value
+        next if cleaned_value.respond_to?(:blank?) ? cleaned_value.blank? : cleaned_value.nil?
+
+        mapped[attribute_name] = cleaned_value
+      end
 
       begin
-        EmployeeDetail.create!(mapped_row)
+        next if mapped_row.empty?
+
+        employee_detail = find_existing_employee_detail(mapped_row) || EmployeeDetail.new
+        employee_detail.assign_attributes(mapped_row)
+        employee_detail.save!
       rescue => e
         puts "Import failed for row #{i}: #{e.message}"
         next
@@ -713,6 +734,37 @@ end
   end
 
   private
+
+  def normalize_import_header(value)
+    value.to_s.strip.downcase.gsub(/[^a-z0-9#]+/, "")
+  end
+
+  def find_existing_employee_detail(mapped_row)
+    if mapped_row["employee_code"].present?
+      employee = EmployeeDetail.find_by(employee_code: mapped_row["employee_code"])
+      return employee if employee
+    end
+
+    if mapped_row["employee_email"].present?
+      employee = EmployeeDetail.find_by(employee_email: mapped_row["employee_email"])
+      return employee if employee
+    end
+
+    if mapped_row["employee_name"].present? && mapped_row["mobile_number"].present?
+      employee = EmployeeDetail.find_by(
+        employee_name: mapped_row["employee_name"],
+        mobile_number: mapped_row["mobile_number"]
+      )
+      return employee if employee
+    end
+
+    if mapped_row["employee_id"].present?
+      employee = EmployeeDetail.find_by(employee_id: mapped_row["employee_id"])
+      return employee if employee
+    end
+
+    nil
+  end
 
   def set_employee_detail
     @employee_detail = EmployeeDetail.find(params[:id])

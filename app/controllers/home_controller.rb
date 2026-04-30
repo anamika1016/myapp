@@ -508,8 +508,20 @@ class HomeController < ApplicationController
     }
   end
 
+  def latest_filled_l1_assessment_for(ed)
+    ed.l1_pulse_assessments.reject { |assessment| assessment_blank?(assessment) }.max_by(&:updated_at) ||
+      ed.l1_pulse_assessments.max_by(&:updated_at)
+  end
+
   def l1_assessment_for(ed)
-    ed.l1_pulse_assessments.find { |a| a.l1_user_id == current_user.id } || ed.l1_pulse_assessments.build(l1_user_id: current_user.id)
+    current_assessment = ed.l1_pulse_assessments.find { |assessment| assessment.l1_user_id == current_user.id }
+    return current_assessment if current_assessment.present?
+
+    if current_user.hod? || current_user.admin?
+      latest_filled_l1_assessment_for(ed) || ed.l1_pulse_assessments.build(l1_user_id: current_user.id)
+    else
+      ed.l1_pulse_assessments.build(l1_user_id: current_user.id)
+    end
   end
 
   def pulse_total_for_assessment(a)

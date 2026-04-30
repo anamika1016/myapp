@@ -9,7 +9,7 @@
             <i class="fas fa-edit me-3 text-2xl"></i>
             Quarterly Achievement Editor
           </h1>
-          <%= link_to user_details_path, class: "bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center" do %>
+          <%= link_to user_details_path, class: "bg-white bg-opacity-90 hover:bg-opacity-100 text-black px-4 py-2 rounded-lg transition-all duration-200 flex items-center" do %>
             <i class="fas fa-arrow-left me-2"></i>Back to List
           <% end %>
         </div>
@@ -24,19 +24,14 @@
         <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
           <div class="flex flex-wrap items-center gap-4">
             <label class="text-sm font-medium text-gray-700">Choose Quarter to Edit:</label>
-            <select id="quarterFilter" class="bg-white border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent min-w-[200px]">
-              <option value="">Select Quarter</option>
+            <select id="quarterFilter" class="bg-white border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent min-w-[200px] text-gray-700">
+              <option value="" selected disabled>Select Quarter</option>
               <option value="Q1">Q1 (April, May, June)</option>
               <option value="Q2">Q2 (July, August, September)</option>
               <option value="Q3">Q3 (October, November, December)</option>
               <option value="Q4">Q4 (January, February, March)</option>
             </select>
-            
-            <label class="text-sm font-medium text-gray-700 ml-4">Choose Month:</label>
-            <select id="monthFilter" class="bg-white border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent min-w-[150px] hidden">
-              <option value="">Select Month</option>
-            </select>
-            
+
             <div class="ml-4">
               <span id="selectedQuarterInfo" class="text-sm text-gray-600 hidden"></span>
             </div>
@@ -61,7 +56,7 @@
         <div id="quarterHeader" class="bg-white border border-gray-200 rounded-xl shadow-lg mb-6 hidden">
           <div id="quarterHeaderContent" class="bg-gray-600 text-white px-6 py-4 rounded-t-xl">
             <div class="flex justify-between items-center">
-              <h2 class="text-2xl font-bold">ACTIVITY</h2>
+              <h2 class="text-2xl font-bold">Quarterly Activity Editor</h2>
               <span id="quarterTitle" class="text-xl font-bold"></span>
             </div>
           </div>
@@ -70,99 +65,89 @@
         <!-- Activities Table -->
         <div id="activitiesList" class="w-full hidden">
           <div class="bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
-            <!-- Table Header -->
-            <div class="bg-gray-500 text-white">
-              <div class="grid grid-cols-12 gap-0">
-                <div class="px-4 py-3 font-semibold text-left col-span-4">ACTIVITY</div>
-                <div class="px-4 py-3 font-semibold text-center col-span-2">THEME</div>
-                <div class="px-4 py-3 font-semibold text-center col-span-1">UNIT</div>
-                <div class="px-4 py-3 font-semibold text-center col-span-1">TARGET</div>
-                <div class="px-4 py-3 font-semibold text-center col-span-2">ACHIEVEMENT</div>
-                <div class="px-4 py-3 font-semibold text-center col-span-2">REMARKS</div>
-              </div>
-            </div>
-            
-            <!-- Table Body -->
-            <div class="divide-y divide-gray-200">
-              <% @user_details.each_with_index do |detail, detail_index| %>
-                <% 
-                  # Define quarters and months mapping
-                  all_quarters = {
-                    'Q1' => ['april', 'may', 'june'],
-                    'Q2' => ['july', 'august', 'september'], 
-                    'Q3' => ['october', 'november', 'december'],
-                    'Q4' => ['january', 'february', 'march']
-                  }
-                  
-                  # Get existing achievements for this detail
-                  existing_achievements = {}
-                  if detail.achievements.present?
-                    existing_achievements = detail.achievements.index_by(&:month)
-                  end
-                %>
+            <% all_quarters = {
+              'Q1' => ['april', 'may', 'june'],
+              'Q2' => ['july', 'august', 'september'],
+              'Q3' => ['october', 'november', 'december'],
+              'Q4' => ['january', 'february', 'march']
+            } %>
 
-                <% all_quarters.each do |quarter_name, months| %>
-                  <% months.each_with_index do |month, month_index| %>
-                    <% 
-                      target_value = detail.respond_to?(month.to_sym) ? detail.send(month.to_sym) : ""
-                      existing_achievement = existing_achievements[month]
-                      achievement_value = existing_achievement&.achievement || ""
-                      employee_remarks = existing_achievement&.employee_remarks || ""
-                    %>
-                    
-                    <!-- Table Row -->
-                    <div class="month-row <%= quarter_name.downcase %> hidden grid grid-cols-12 gap-0 py-4 <%= detail_index.even? ? 'bg-gray-50' : 'bg-white' %>" 
-                         data-quarter="<%= quarter_name %>" 
-                         data-month="<%= month %>" 
-                         data-month-index="<%= month_index %>"
-                         data-detail-id="<%= detail.id %>">
-                      
-                      <!-- Activity Column -->
-                      <div class="px-4 py-2 text-sm text-gray-800 col-span-4">
-                        <%= detail.activity.activity_name %>
-                      </div>
-                      
-                      <!-- Theme Column -->
-                      <div class="px-4 py-2 text-sm text-center text-gray-800 col-span-2">
-                        <%= detail.activity.theme_name.present? ? detail.activity.theme_name : 'Technical Support' %>
-                      </div>
-                      
-                      <!-- Unit Column -->
-                      <div class="px-4 py-2 text-sm text-center text-gray-800 col-span-1">
-                        <%= detail.activity.unit.present? ? detail.activity.unit : '%' %>
-                      </div>
-                      
-                      <!-- Target Column -->
-                      <div class="px-4 py-2 text-sm text-center text-gray-800 font-semibold col-span-1">
-                        <%= target_value.present? ? target_value : '-' %>
-                      </div>
-                      
-                      <!-- Achievement Column -->
-                      <div class="px-4 py-2 text-center col-span-2">
-                        <%= text_field_tag "achievements[#{detail.id}][#{month}][achievement]", 
-                                           achievement_value,
-                                           class: "achievement-input w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent bg-gray-100",
-                                           placeholder: "Achievement",
-                                           data: {
-                                             target: target_value,
-                                             detail_id: detail.id,
-                                             month: month,
-                                             quarter: quarter_name
-                                           } %>
-                      </div>
-                      
-                      <!-- Remarks Column -->
-                      <div class="px-4 py-2 col-span-2">
-                        <%= text_area_tag "achievements[#{detail.id}][#{month}][employee_remarks]", 
-                                         employee_remarks,
-                                         class: "w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent bg-gray-100 resize-none",
-                                         rows: 2,
-                                         placeholder: "Remarks" %>
-                      </div>
-                    </div>
+            <div class="table-wrapper overflow-auto bg-white rounded-lg border border-gray-200 shadow-sm">
+              <table class="quarterly-table w-full min-w-full" id="quarterlyActivityTable">
+                <thead class="bg-gray-800">
+                  <tr>
+                    <th rowspan="3" class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 activity-column">Activity</th>
+                    <th rowspan="3" class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 theme-column">Theme</th>
+                    <th rowspan="3" class="px-4 py-3 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 unit-column">Unit</th>
+                    <% all_quarters.each do |quarter_name, months| %>
+                      <th colspan="9" class="px-4 py-3 text-center text-xs font-semibold text-white uppercase tracking-widest border-r border-gray-500 bg-gray-900 quarter-block-header hidden" data-quarter="<%= quarter_name %>">
+                        <%= quarter_name %> Quarter
+                      </th>
+                    <% end %>
+                  </tr>
+                  <tr>
+                    <% all_quarters.each do |quarter_name, months| %>
+                      <% months.each do |month| %>
+                        <th colspan="3" class="px-4 py-3 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 bg-gray-700 quarter-month-header hidden" data-quarter="<%= quarter_name %>">
+                          <%= month.capitalize %>
+                        </th>
+                      <% end %>
+                    <% end %>
+                  </tr>
+                  <tr class="bg-gray-700">
+                    <% all_quarters.each do |quarter_name, months| %>
+                      <% months.each do |_month| %>
+                        <th class="px-3 py-2 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 quarter-subheader hidden" data-quarter="<%= quarter_name %>">Target</th>
+                        <th class="px-3 py-2 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 quarter-subheader hidden" data-quarter="<%= quarter_name %>">Achievement</th>
+                        <th class="px-3 py-2 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 quarter-subheader hidden" data-quarter="<%= quarter_name %>">Remarks</th>
+                      <% end %>
+                    <% end %>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  <% @user_details.each_with_index do |detail, detail_index| %>
+                    <% existing_achievements = detail.achievements.present? ? detail.achievements.index_by(&:month) : {} %>
+                    <% all_quarters.each do |quarter_name, months| %>
+                      <tr class="quarter-row hidden <%= detail_index.even? ? 'bg-gray-50' : 'bg-white' %>" data-quarter="<%= quarter_name %>" data-detail-id="<%= detail.id %>">
+                        <td class="px-4 py-3 text-sm text-gray-800 border-r border-gray-200 activity-column"><%= detail.activity.activity_name %></td>
+                        <td class="px-4 py-3 text-sm text-gray-800 border-r border-gray-200 theme-column"><%= detail.activity.theme_name.present? ? detail.activity.theme_name : 'Technical Support' %></td>
+                        <td class="px-4 py-3 text-sm text-gray-800 text-center border-r border-gray-200 unit-column"><%= detail.activity.unit.present? ? detail.activity.unit : '%' %></td>
+
+                        <% months.each do |month| %>
+                          <% target_value = detail.respond_to?(month.to_sym) ? detail.send(month.to_sym) : "" %>
+                          <% existing_achievement = existing_achievements[month] %>
+                          <td class="px-3 py-3 text-sm text-gray-800 text-center border-r border-gray-200 bg-gray-50 target-cell">
+                            <span class="<%= target_value.present? ? 'text-gray-800 font-semibold' : 'text-gray-400' %>">
+                              <%= target_value.present? ? target_value : '-' %>
+                            </span>
+                          </td>
+                          <td class="px-3 py-3 text-sm text-center border-r border-gray-200 achievement-cell">
+                            <%= text_field_tag "achievements[#{detail.id}][#{month}][achievement]",
+                                               existing_achievement&.achievement,
+                                               class: "achievement-input w-full",
+                                               placeholder: "Achievement",
+                                               disabled: !target_value.present?,
+                                               data: {
+                                                 target: target_value,
+                                                 detail_id: detail.id,
+                                                 month: month,
+                                                 quarter: quarter_name
+                                               } %>
+                          </td>
+                          <td class="px-3 py-3 text-sm text-center border-r border-gray-200 remarks-cell">
+                            <%= text_area_tag "achievements[#{detail.id}][#{month}][employee_remarks]",
+                                              existing_achievement&.employee_remarks,
+                                              class: "remarks-textarea w-full",
+                                              rows: 2,
+                                              placeholder: "Remarks",
+                                              disabled: !target_value.present? %>
+                          </td>
+                        <% end %>
+                      </tr>
+                    <% end %>
                   <% end %>
-                <% end %>
-              <% end %>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -199,93 +184,131 @@
 </div>
 
 <style>
-  /* Enhanced UI with Table Theme */
-  .month-row {
+  .quarter-row,
+  .quarter-block-header,
+  .quarter-month-header,
+  .quarter-subheader {
     transition: all 0.3s ease;
   }
-  
-  .month-row.hidden {
+
+  .quarter-row.hidden,
+  .quarter-block-header.hidden,
+  .quarter-month-header.hidden,
+  .quarter-subheader.hidden {
     display: none;
   }
-  
-  .month-row:not(.hidden) {
-    animation: slideIn 0.4s ease-out;
+
+  .quarter-row:not(.hidden) {
+    animation: slideIn 0.35s ease-out;
   }
-  
+
   @keyframes slideIn {
     from {
       opacity: 0;
-      transform: translateY(20px);
+      transform: translateY(12px);
     }
     to {
       opacity: 1;
       transform: translateY(0);
     }
   }
-  
-  .month-row:hover {
-    background-color: #f8fafc !important;
-    transition: all 0.3s ease;
+
+  .table-wrapper {
+    overflow-x: auto;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbfd 100%);
+  }
+
+  .quarterly-table {
+    min-width: 1720px;
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+  }
+
+  .quarterly-table th,
+  .quarterly-table td {
+    vertical-align: middle;
+  }
+
+  .activity-column {
+    width: 22rem;
+    max-width: 22rem;
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.45;
+  }
+
+  .theme-column {
+    width: 15rem;
+    max-width: 15rem;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .unit-column {
+    width: 3.5rem;
+    min-width: 3.5rem;
+  }
+
+  .target-cell {
+    width: 4.25rem;
+    min-width: 4.25rem;
+  }
+
+  .achievement-cell,
+  .remarks-cell {
+    width: 7.25rem;
+    min-width: 7.25rem;
+  }
+
+  .quarterly-table tbody tr:nth-child(odd) td {
+    background: rgba(248, 250, 252, 0.88);
+  }
+
+  .quarterly-table tbody tr:nth-child(even) td {
+    background: rgba(255, 255, 255, 0.96);
+  }
+
+  .quarterly-table tbody tr:hover td {
+    background: linear-gradient(180deg, #f8fdff 0%, #eef8ff 100%) !important;
+  }
+
+  .achievement-input,
+  .remarks-textarea {
+    transition: all 0.25s ease;
+    border-radius: 12px;
+    border: 1px solid #cbd5e1;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    font-weight: 500;
+    width: 100%;
   }
 
   .achievement-input {
-    transition: all 0.3s ease;
-    border-radius: 6px;
-    border: 1px solid #d1d5db;
-    background: #f3f4f6;
-    font-weight: 500;
+    min-height: 42px;
+    padding: 0.65rem 0.85rem;
   }
 
-  .achievement-input:focus {
-    border-color: #6b7280;
+  .remarks-textarea {
+    min-height: 42px;
+    padding: 0.65rem 0.85rem;
+    resize: none;
+  }
+
+  .achievement-input:focus,
+  .remarks-textarea:focus {
+    outline: none;
+    border-color: #0ea5e9;
     background: white;
-    box-shadow: 0 0 0 2px rgba(107, 114, 128, 0.1);
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.12);
   }
 
-  .achievement-input:hover {
-    border-color: #9ca3af;
+  .achievement-input:hover,
+  .remarks-textarea:hover {
+    border-color: #94a3b8;
     background: #f9fafb;
   }
 
-  /* Table styling to match screenshot */
-  .bg-gray-500 {
-    background-color: #6b7280 !important;
-  }
-  
-  .bg-gray-600 {
-    background-color: #4b5563 !important;
-  }
-  
-  /* Table row styling */
-  .month-row:nth-child(even) {
-    background-color: #f9fafb;
-  }
-  
-  .month-row:nth-child(odd) {
-    background-color: #ffffff;
-  }
-  
-  /* Table cell styling */
-  .month-row > div {
-    border-right: 1px solid #e5e7eb;
-    min-height: 60px;
-    display: flex;
-    align-items: center;
-  }
-  
-  .month-row > div:last-child {
-    border-right: none;
-  }
-
-  /* Progress indicator enhancement */
-  .progress-indicator span {
-    transition: all 0.3s ease;
-    border-radius: 20px;
-    font-weight: 600;
-    letter-spacing: 0.025em;
-  }
-
-  /* Header enhancement */
   #quarterHeader {
     background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
     border: 1px solid #e2e8f0;
@@ -296,20 +319,6 @@
     background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
   }
 
-  /* Month headers enhancement */
-  #monthHeaders > div {
-    border-radius: 8px;
-    font-weight: 600;
-    letter-spacing: 0.025em;
-    transition: all 0.3s ease;
-  }
-
-  #monthHeaders > div:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  }
-
-  /* Submit section enhancement */
   #submitSection {
     background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
     border: 1px solid #e2e8f0;
@@ -317,7 +326,6 @@
     border-radius: 16px;
   }
 
-  /* Button enhancements */
   input[type="submit"], a[href*="user_details_path"] {
     transition: all 0.3s ease;
     border-radius: 12px;
@@ -331,14 +339,12 @@
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
   }
 
-  /* Filter section enhancement */
   .bg-gray-50 {
     background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
     border: 1px solid #e2e8f0;
     border-radius: 12px;
   }
 
-  /* Select dropdown enhancement */
   #quarterFilter {
     transition: all 0.3s ease;
     border-radius: 8px;
@@ -356,7 +362,6 @@
     border-color: #9ca3af;
   }
 
-  /* Sidebar compatibility - Force content to right of sidebar */
   body {
     margin: 0;
     padding: 0;
@@ -376,28 +381,12 @@
       margin-left: 0 !important;
       width: 100vw !important;
     }
-  }
 
-  /* Responsive adjustments */
-  @media (max-width: 1024px) {
-    .grid.lg\:grid-cols-4 {
-      grid-template-columns: 1fr;
-      gap: 1.5rem;
-    }
-    
-    .month-column {
-      margin-bottom: 1.5rem;
+    .quarterly-table {
+      min-width: 1480px;
     }
   }
 
-  @media (min-width: 1024px) {
-    .grid.lg\:grid-cols-4 {
-      grid-template-columns: 1fr 1fr 1fr 1fr;
-      gap: 1.5rem;
-    }
-  }
-
-  /* Additional enhancements */
   .bg-white {
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
@@ -415,12 +404,10 @@
     color: #1f2937;
   }
 
-  /* Smooth transitions for all elements */
   * {
     transition: all 0.2s ease;
   }
 
-  /* Enhanced shadows and borders */
   .shadow-lg {
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
   }
@@ -435,10 +422,8 @@
 </style>
 
 <script>
-  // Enhanced quarterly editor functionality that works without page refresh
   function initializeQuarterlyEditor() {
     const quarterFilter = document.getElementById('quarterFilter');
-    const monthFilter = document.getElementById('monthFilter');
     const selectQuarterMessage = document.getElementById('selectQuarterMessage');
     const quarterlyForm = document.querySelector('.quarterly-form');
     const quarterHeader = document.getElementById('quarterHeader');
@@ -449,6 +434,10 @@
       console.log('Quarterly editor elements not found, retrying...');
       setTimeout(initializeQuarterlyEditor, 100);
       return;
+    }
+
+    if (!quarterFilter.value) {
+      quarterFilter.selectedIndex = 0;
     }
     
     const quarterData = {
@@ -474,89 +463,54 @@
     function handleQuarterChange() {
       const selectedQuarter = quarterFilter.value;
       console.log('Quarter selected:', selectedQuarter);
+      const activitiesList = document.getElementById('activitiesList');
+      const quarterTitleElement = document.getElementById('quarterTitle');
+      const submitInfoElement = document.getElementById('submitInfo');
+      const submitBtnElement = document.getElementById('submitBtn');
+      const selectedQuarterInfo = document.getElementById('selectedQuarterInfo');
       
       if (selectedQuarter === '') {
-        // Hide everything when no quarter is selected
         selectQuarterMessage.classList.remove('hidden');
         quarterlyForm.classList.add('hidden');
         quarterHeader.classList.add('hidden');
         submitSection.classList.add('hidden');
-        monthFilter.classList.add('hidden');
+        if (activitiesList) activitiesList.classList.add('hidden');
+        if (selectedQuarterInfo) selectedQuarterInfo.classList.add('hidden');
         selectedQuarterField.value = '';
+        document.querySelectorAll('.quarter-row, .quarter-block-header, .quarter-month-header, .quarter-subheader').forEach(element => {
+          element.classList.add('hidden');
+        });
         return;
       }
-      
-      // Show month filter and populate it
-      monthFilter.classList.remove('hidden');
-      monthFilter.innerHTML = '<option value="">Select Month</option>';
-      
+
       const quarterInfo = quarterData[selectedQuarter];
-      quarterInfo.months.forEach((month, index) => {
-        const option = document.createElement('option');
-        option.value = quarterInfo.months[index].toLowerCase();
-        option.textContent = month;
-        monthFilter.appendChild(option);
-      });
-      
-      // Hide table until month is selected
-      const activitiesList = document.getElementById('activitiesList');
-      if (activitiesList) {
-        activitiesList.classList.add('hidden');
-      }
-      
-      console.log('Month filter populated for quarter:', selectedQuarter);
-    }
-    
-    // Month filter change handler
-    function handleMonthChange() {
-      const selectedQuarter = quarterFilter.value;
-      const selectedMonth = monthFilter.value;
-      
-      if (selectedQuarter === '' || selectedMonth === '') {
-        // Hide table if no month selected
-        const activitiesList = document.getElementById('activitiesList');
-        if (activitiesList) {
-          activitiesList.classList.add('hidden');
-        }
-        quarterHeader.classList.add('hidden');
-        submitSection.classList.add('hidden');
-        return;
-      }
-      
-      // Show the edit form
+
       selectQuarterMessage.classList.add('hidden');
       quarterlyForm.classList.remove('hidden');
       quarterHeader.classList.remove('hidden');
       submitSection.classList.remove('hidden');
+      if (activitiesList) activitiesList.classList.remove('hidden');
       selectedQuarterField.value = selectedQuarter;
-      
-      const quarterInfo = quarterData[selectedQuarter];
-      
-      // Update header information
-      const quarterTitleElement = document.getElementById('quarterTitle');
-      const submitInfoElement = document.getElementById('submitInfo');
-      const submitBtnElement = document.getElementById('submitBtn');
-      
-      if (quarterTitleElement) quarterTitleElement.textContent = selectedMonth.toUpperCase();
-      if (submitInfoElement) submitInfoElement.textContent = `Fill achievements and remarks for ${selectedMonth} in ${quarterInfo.title}`;
-      if (submitBtnElement) submitBtnElement.value = `Update ${selectedMonth} Achievements`;
-      
-      // Show the activities table
-      const activitiesList = document.getElementById('activitiesList');
-      if (activitiesList) {
-        activitiesList.classList.remove('hidden');
+
+      if (quarterTitleElement) quarterTitleElement.textContent = quarterInfo.title;
+      if (submitInfoElement) submitInfoElement.textContent = `Fill achievements and remarks for all activities in ${quarterInfo.title}`;
+      if (submitBtnElement) submitBtnElement.value = `Update ${selectedQuarter} Achievements`;
+      if (selectedQuarterInfo) {
+        selectedQuarterInfo.textContent = `Editing ${quarterInfo.title}`;
+        selectedQuarterInfo.classList.remove('hidden');
       }
-      
-      // Hide all month rows first
-      document.querySelectorAll('.month-row').forEach(row => {
-        row.classList.add('hidden');
+
+      document.querySelectorAll('.quarter-row, .quarter-block-header, .quarter-month-header, .quarter-subheader').forEach(element => {
+        element.classList.add('hidden');
       });
-      
-      // Show only selected month rows
-      const selectedRows = document.querySelectorAll(`.month-row[data-quarter="${selectedQuarter}"][data-month="${selectedMonth}"]`);
+
+      document.querySelectorAll(`.quarter-block-header[data-quarter="${selectedQuarter}"], .quarter-month-header[data-quarter="${selectedQuarter}"], .quarter-subheader[data-quarter="${selectedQuarter}"]`).forEach(element => {
+        element.classList.remove('hidden');
+      });
+
+      const selectedRows = document.querySelectorAll(`.quarter-row[data-quarter="${selectedQuarter}"]`);
       selectedRows.forEach((row, index) => {
         row.classList.remove('hidden');
-        // Add a small delay for smooth animation
         setTimeout(() => {
           row.style.opacity = '0';
           row.style.transform = 'translateY(10px)';
@@ -568,20 +522,15 @@
           }, 50);
         }, index * 50);
       });
-      
-      console.log('Month form displayed successfully for:', selectedMonth);
+
+      console.log('Quarter form displayed successfully for:', selectedQuarter);
     }
 
     // Remove existing event listeners to prevent duplicates
     quarterFilter.removeEventListener('change', quarterFilter.changeHandler);
-    monthFilter.removeEventListener('change', monthFilter.changeHandler);
     
-    // Create new change handlers
     quarterFilter.changeHandler = handleQuarterChange;
     quarterFilter.addEventListener('change', quarterFilter.changeHandler);
-    
-    monthFilter.changeHandler = handleMonthChange;
-    monthFilter.addEventListener('change', monthFilter.changeHandler);
 
     // Auto-calculate percentages when achievement values change
     function handleAchievementInput(e) {
@@ -610,15 +559,14 @@
     // Enhanced form validation
     function handleFormSubmit(e) {
       const selectedQuarter = quarterFilter.value;
-      const selectedMonth = monthFilter.value;
       
-      if (!selectedQuarter || !selectedMonth) {
+      if (!selectedQuarter) {
         e.preventDefault();
-        alert('Please select both quarter and month first.');
+        alert('Please select a quarter first.');
         return false;
       }
       
-      const visibleInputs = document.querySelectorAll(`.month-row[data-quarter="${selectedQuarter}"][data-month="${selectedMonth}"]:not(.hidden) .achievement-input`);
+      const visibleInputs = document.querySelectorAll(`.quarter-row[data-quarter="${selectedQuarter}"]:not(.hidden) .achievement-input`);
       let hasAnyValue = false;
       
       visibleInputs.forEach(input => {
@@ -629,11 +577,11 @@
       
       if (!hasAnyValue) {
         e.preventDefault();
-        alert(`Please enter at least one achievement value for ${selectedMonth} in ${quarterData[selectedQuarter].title}.`);
+        alert(`Please enter at least one achievement value in ${quarterData[selectedQuarter].title}.`);
         return false;
       }
       
-      return confirm(`Are you sure you want to update all achievements for ${selectedMonth} in ${quarterData[selectedQuarter].title}?`);
+      return confirm(`Are you sure you want to update all achievements for ${quarterData[selectedQuarter].title}?`);
     }
 
     // Remove existing form submit listeners
@@ -647,12 +595,10 @@
     console.log('Quarterly editor initialized successfully');
   }
 
-  // Initialize on multiple events to ensure it works
   document.addEventListener('DOMContentLoaded', initializeQuarterlyEditor);
   document.addEventListener('turbo:load', initializeQuarterlyEditor);
   document.addEventListener('turbo:render', initializeQuarterlyEditor);
   
-  // Also initialize when the page is ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeQuarterlyEditor);
   } else {

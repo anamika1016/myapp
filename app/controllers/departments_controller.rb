@@ -1066,7 +1066,7 @@ class DepartmentsController < ApplicationController
         id: department.id, # Use department.id for Edit functionality
         employee_id: employee.employee_id,
         employee_name: employee.employee_name,
-        employee_code: employee.employee_name,
+        employee_code: employee.employee_code,
         department: employee.department, # Employee's department
         department_type: department.department_type, # Activity's department
         total_activities: 0,
@@ -1118,7 +1118,7 @@ class DepartmentsController < ApplicationController
           id: department.id, # Use department.id for Edit functionality
           employee_id: employee.employee_id,
           employee_name: employee.employee_name,
-          employee_code: employee.employee_name,
+          employee_code: employee.employee_code,
           department: employee.department, # Employee's department
           department_type: department.department_type, # Activity's department
           total_activities: 0,

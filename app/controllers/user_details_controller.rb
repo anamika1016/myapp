@@ -835,14 +835,11 @@ class UserDetailsController < ApplicationController
             employee_email = row["employee_email"]
             employee_code = row["employee_code"]
 
-            # FIXED: Better mobile number extraction with more column name variations
-            mobile_number = row["mobile_no"] || row["mobile_number"] || row["mobile"] ||
-                           row["mobile_no."] || row["mobile_number."] || row["mobile."] ||
-                           row["mobile_no_"] || row["mobile_number_"] || row["mobile_"]
+            mobile_number = extract_employee_mobile_number(row)
 
-            l1_code = row["l1_code"]
+            l1_code = row["l1_code"] || row["l1_employer_code"]
             l1_employer_name = row["l1_employer_name"]
-            l2_code = row["l2_code"]
+            l2_code = row["l2_code"] || row["l2_employer_code"]
             l2_employer_name = row["l2_employer_name"]
             department_type = row["department"]
             activity_name = row["activity_name"]
@@ -885,28 +882,22 @@ class UserDetailsController < ApplicationController
 
             department = Department.find_or_create_by!(department_type: department_type)
 
-            # FIXED: Better employee creation/update logic
-            employee = EmployeeDetail.find_or_create_by!(
-              employee_name: employee_name.strip,
-              department: department_type.strip
-            ) do |e|
-              e.employee_id = SecureRandom.uuid
-              e.employee_email = employee_email.to_s.strip
-              e.employee_code = employee_code.to_s.strip
-              e.mobile_number = mobile_number.to_s.strip if mobile_number.present?
-              e.l1_code = l1_code.to_s.strip
-              e.l2_code = l2_code.to_s.strip
-              e.l1_employer_name = l1_employer_name.to_s.strip
-              e.l2_employer_name = l2_employer_name.to_s.strip
-              e.post = "Imported"
-            end
+            employee_attributes = {
+              employee_name: employee_name.to_s.strip,
+              employee_email: employee_email.to_s.strip,
+              employee_code: employee_code.to_s.strip,
+              mobile_number: mobile_number.to_s.strip,
+              l1_code: l1_code.to_s.strip,
+              l2_code: l2_code.to_s.strip,
+              l1_employer_name: l1_employer_name.to_s.strip,
+              l2_employer_name: l2_employer_name.to_s.strip,
+              department: department_type.to_s.strip
+            }.reject { |_, value| value.blank? }
 
-            # FIXED: Always update mobile number if provided in Excel
-            if mobile_number.present?
-              if employee.mobile_number != mobile_number.to_s.strip
-                employee.update!(mobile_number: mobile_number.to_s.strip)
-              end
-            end
+            employee = find_employee_for_user_detail_import(employee_attributes) || EmployeeDetail.new(employee_id: SecureRandom.uuid, post: "Imported")
+            employee.assign_attributes(employee_attributes)
+            employee.post = "Imported" if employee.post.blank?
+            employee.save!
 
             activity = Activity.find_or_create_by!(
               activity_name: activity_name.strip,
@@ -956,6 +947,60 @@ class UserDetailsController < ApplicationController
 
 
   private
+
+  def extract_employee_mobile_number(row)
+    prioritized_keys = %w[
+      employee_mobile_number
+      employee_mobile
+      employee_mobile_no
+      mobile_number
+      mobile_no
+      mobile
+      mobile_number.
+      mobile_no.
+      mobile.
+      mobile_number_
+      mobile_no_
+      mobile_
+    ]
+
+    prioritized_keys.each do |key|
+      value = row[key]
+      return value if value.present?
+    end
+
+    row.each do |key, value|
+      normalized_key = key.to_s.downcase.gsub(/[^a-z0-9]/, "")
+      next unless normalized_key.include?("mobile")
+      next if normalized_key.include?("l1") || normalized_key.include?("l2")
+
+      return value if value.present?
+    end
+
+    nil
+  end
+
+  def find_employee_for_user_detail_import(employee_attributes)
+    if employee_attributes[:employee_code].present?
+      employee = EmployeeDetail.find_by(employee_code: employee_attributes[:employee_code])
+      return employee if employee
+    end
+
+    if employee_attributes[:employee_email].present?
+      employee = EmployeeDetail.find_by(employee_email: employee_attributes[:employee_email])
+      return employee if employee
+    end
+
+    if employee_attributes[:employee_name].present? && employee_attributes[:department].present?
+      employee = EmployeeDetail.find_by(
+        employee_name: employee_attributes[:employee_name],
+        department: employee_attributes[:department]
+      )
+      return employee if employee
+    end
+
+    nil
+  end
 
   def set_user_detail
     @user_detail = UserDetail.find(params[:id])

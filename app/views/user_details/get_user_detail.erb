@@ -1,24 +1,36 @@
 <div class="main-content bg-gray-50 min-h-screen">
   <!-- Filter Section - Added without changing your existing code -->
-  <div class="bg-white border border-gray-200 rounded-xl shadow-lg mb-4">
-    <div class="bg-blue-100 px-6 py-4 border-b border-gray-200 rounded-t-xl">
-      <h2 class="text-2xl font-bold text-gray-800 flex items-center">
-        <i class="fas fa-filter me-2 text-gray-700"></i>
+  <div class="filter-shell border border-slate-200 rounded-[28px] shadow-lg mb-6 overflow-hidden">
+    <div class="filter-hero px-6 py-5 border-b border-white/40">
+      <h2 class="text-2xl font-bold text-slate-900 flex items-center">
+        <i class="fas fa-filter me-3 text-teal-700"></i>
         Filter Activities
       </h2>
+      <p class="filter-subtitle">Choose activity, quarter, and month to keep the target sheet focused and easy to review.</p>
     </div>
-    <div class="p-6">
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Select Activity</label>
-          <select id="activityFilter" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+    <div class="p-6 md:p-7">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+        <div class="filter-field">
+          <label class="block text-xs font-semibold text-slate-600 uppercase tracking-[0.18em] mb-2">Select Activity</label>
+          <select id="activityFilter" class="dashboard-select w-full">
             <option value="">All Activities</option>
           </select>
         </div>
+
+        <div class="filter-field">
+          <label class="block text-xs font-semibold text-slate-600 uppercase tracking-[0.18em] mb-2">Select Quarter</label>
+          <select id="quarterFilter" class="dashboard-select w-full">
+            <option value="april-june">April - June</option>
+            <option value="july-september">July - September</option>
+            <option value="october-december">October - December</option>
+            <option value="january-march">January - March</option>
+          </select>
+        </div>
         
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Select Month</label>
-          <select id="monthFilter" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+        <div class="filter-field">
+          <label class="block text-xs font-semibold text-slate-600 uppercase tracking-[0.18em] mb-2">Select Month</label>
+          <select id="monthFilter" class="dashboard-select w-full">
+            <option value="">All Months In Quarter</option>
             <option value="april">April</option>
             <option value="may">May</option>
             <option value="june">June</option>
@@ -34,12 +46,9 @@
           </select>
         </div>
         
-        <div class="flex gap-2">
-          <button id="showSelected" class="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors">
+        <div class="flex gap-3 filter-actions">
+          <button id="showSelected" class="dashboard-action-btn dashboard-action-btn-primary">
             <i class="fas fa-eye me-1"></i> Show Selected
-          </button>
-          <button id="showAll" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
-            <i class="fas fa-list me-1"></i> Show All
           </button>
         </div>
       </div>
@@ -110,33 +119,49 @@
         </div>
       </div>
 
-      <div class="bg-white border border-gray-200 rounded-xl shadow-lg mt-4">
-        <div class="bg-gray-100 px-6 py-4 border-b border-gray-200 rounded-t-xl">
-          <h2 class="text-3xl font-bold text-gray-800 flex items-center">
-            <i class="fas fa-users me-2 text-gray-700"></i>
+      <div class="submission-shell border border-slate-200 rounded-[28px] shadow-lg mt-4 overflow-hidden">
+        <div class="submission-hero px-6 py-5 border-b border-slate-200/80">
+          <h2 class="text-3xl font-bold text-slate-900 flex items-center">
+            <i class="fas fa-users me-3 text-sky-700"></i>
             Monthly Activity Target Submit 
           </h2>
+          <p class="submission-subtitle">Clean quarter-wise entry sheet with saved achievements visible and ready for update.</p>
         </div>
 
         <div class="p-6">
-          <div class="table-wrapper overflow-auto bg-white rounded-lg border border-gray-200 shadow-sm">
+          <div class="table-wrapper overflow-auto rounded-[24px] border border-slate-200 shadow-sm">
             <table class="table table-hover w-full min-w-full" id="activityTable">
               <thead class="bg-gray-800">
+                <% quarter_groups = [
+                  { label: "April - June", months: ["April", "May", "June"] },
+                  { label: "July - September", months: ["July", "August", "September"] },
+                  { label: "October - December", months: ["October", "November", "December"] },
+                  { label: "January - March", months: ["January", "February", "March"] }
+                ] %>
                 <tr>
-                  <th rowspan="2" class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Department</th>
-                  <th rowspan="2" class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Employee Name</th>
-                  <th rowspan="2" class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Activity</th>
-                  <th rowspan="2" class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Theme</th>
-                  <th rowspan="2" class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Unit</th>
-                  <% ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"].each do |month| %>
-                    <th colspan="3" class="px-4 py-3 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 bg-gray-700 month-header" data-month="<%= month.downcase %>"><%= month %></th>
+                  <th rowspan="3" class="activity-column px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Activity</th>
+                  <th rowspan="3" class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Theme</th>
+                  <th rowspan="3" class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Unit</th>
+                  <% quarter_groups.each do |quarter| %>
+                    <th colspan="9" class="px-4 py-3 text-center text-xs font-semibold text-white uppercase tracking-widest border-r border-gray-500 bg-gray-900 quarter-header" data-quarter="<%= quarter[:label].parameterize %>">
+                      <%= quarter[:label] %>
+                    </th>
+                  <% end %>
+                </tr>
+                <tr>
+                  <% quarter_groups.each do |quarter| %>
+                    <% quarter[:months].each do |month| %>
+                      <th colspan="3" class="px-4 py-3 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 bg-gray-700 month-header" data-month="<%= month.downcase %>" data-quarter="<%= quarter[:label].parameterize %>"><%= month %></th>
+                    <% end %>
                   <% end %>
                 </tr>
                 <tr class="bg-gray-700">
-                  <% 12.times do %>
-                    <th class="px-3 py-2 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 month-subheader">Target</th>
-                    <th class="px-3 py-2 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 month-subheader">Achievement</th>
-                    <th class="px-3 py-2 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 month-subheader">Remarks</th>
+                  <% quarter_groups.each do |quarter| %>
+                    <% quarter[:months].each do |month| %>
+                      <th class="px-3 py-2 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 month-subheader" data-month="<%= month.downcase %>" data-quarter="<%= quarter[:label].parameterize %>">Target</th>
+                      <th class="px-3 py-2 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 month-subheader" data-month="<%= month.downcase %>" data-quarter="<%= quarter[:label].parameterize %>">Achievement</th>
+                      <th class="px-3 py-2 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 month-subheader" data-month="<%= month.downcase %>" data-quarter="<%= quarter[:label].parameterize %>">Remarks</th>
+                    <% end %>
                   <% end %>
                 </tr>
               </thead>
@@ -145,6 +170,7 @@
                   <%
                     # Create target data for JavaScript filtering
                     months = [:april, :may, :june, :july, :august, :september, :october, :november, :december, :january, :february, :march]
+                    achievements_by_month = detail.achievements.index_by { |achievement| achievement.month.to_s.downcase }
                     target_data = {}
                     has_any_target = false
                     
@@ -162,15 +188,14 @@
                       data-targets='<%= target_data.to_json.html_safe %>'
                       data-has-any-target="<%= has_any_target %>">
                     
-                    <td class="px-4 py-3 text-sm text-gray-800 font-medium border-r border-gray-200"><%= detail.department.department_type %></td>
-                    <td class="px-4 py-3 text-sm text-gray-800 font-medium border-r border-gray-200"><%= detail.employee_detail&.employee_name || 'N/A' %></td>
-                    <td class="px-4 py-3 text-sm text-gray-800 border-r border-gray-200"><%= detail.activity.activity_name %></td>
+                    <td class="activity-cell px-4 py-3 text-sm text-gray-800 border-r border-gray-200"><%= detail.activity.activity_name %></td>
                     <td class="px-4 py-3 text-sm text-gray-800 border-r border-gray-200"><%= detail.activity.theme_name.presence || 'No Theme' %></td>
                     <td class="px-4 py-3 text-sm text-gray-800 border-r border-gray-200 text-center"><%= detail.activity.unit %></td>
 
                     <% months.each do |month| %>
                       <% target_value = detail.send(month) %>
                       <% has_target = target_value.present? && target_value.to_s != '0' %>
+                      <% existing_achievement = achievements_by_month[month.to_s] %>
                       
                       <td class="px-3 py-3 text-sm text-gray-800 text-center border-r border-gray-200 bg-gray-50 month-cell" data-month="<%= month %>" data-has-target="<%= has_target %>">
                         <span class="<%= has_target ? 'text-gray-800 font-medium' : 'text-gray-400' %>">
@@ -182,6 +207,7 @@
                           type="text" 
                           name="achievement[<%= detail.id %>][<%= month.to_s.downcase %>][achievement]" 
                           placeholder="Achievement" 
+                          value="<%= existing_achievement&.achievement %>"
                           class="achievement-input border border-gray-300 p-2 rounded-lg w-full bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-indigo-200 transition-all duration-200 text-sm"
                           <%= 'disabled' unless has_target %>
                         />
@@ -193,7 +219,7 @@
                           rows="1"
                           class="remarks-textarea border border-gray-300 p-1 rounded-lg w-full bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all duration-200 text-xs resize-none"
                           <%= 'disabled' unless has_target %>
-                        ></textarea>
+                        ><%= existing_achievement&.employee_remarks %></textarea>
                       </td>
                     <% end %>
                   </tr>
@@ -245,6 +271,10 @@
   .activity-row[data-filtered-hidden="true"] {
     display: none !important;
   }
+
+  .quarter-header[data-quarter-hidden="true"] {
+    display: none !important;
+  }
   
   .month-header[data-month-hidden="true"],
   .month-subheader[data-month-hidden="true"] {
@@ -260,13 +290,35 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const activityFilter = document.getElementById('activityFilter');
+    const quarterFilter = document.getElementById('quarterFilter');
     const monthFilter = document.getElementById('monthFilter');
     const showSelectedBtn = document.getElementById('showSelected');
     const showAllBtn = document.getElementById('showAll');
     const activityRows = document.querySelectorAll('.activity-row');
+    const quarterHeaders = document.querySelectorAll('.quarter-header');
     const monthHeaders = document.querySelectorAll('.month-header');
     const monthSubheaders = document.querySelectorAll('.month-subheader');
     const monthCells = document.querySelectorAll('.month-cell');
+    const quarterMonths = {
+        'april-june': ['april', 'may', 'june'],
+        'july-september': ['july', 'august', 'september'],
+        'october-december': ['october', 'november', 'december'],
+        'january-march': ['january', 'february', 'march']
+    };
+    const monthToQuarter = {
+        april: 'april-june',
+        may: 'april-june',
+        june: 'april-june',
+        july: 'july-september',
+        august: 'july-september',
+        september: 'july-september',
+        october: 'october-december',
+        november: 'october-december',
+        december: 'october-december',
+        january: 'january-march',
+        february: 'january-march',
+        march: 'january-march'
+    };
 
     // Populate activity filter dropdown
     function populateActivityFilter() {
@@ -301,98 +353,96 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function filterByMonth(selectedMonth) {
+    function filterByQuarter(selectedQuarter, selectedMonth) {
         const months = ['april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december', 'january', 'february', 'march'];
+        const activeQuarterMonths = quarterMonths[selectedQuarter] || quarterMonths['april-june'];
         
-        if (!selectedMonth) {
-            // Show all months
-            monthHeaders.forEach(header => header.removeAttribute('data-month-hidden'));
-            monthSubheaders.forEach(subheader => subheader.removeAttribute('data-month-hidden'));
-            monthCells.forEach(cell => cell.removeAttribute('data-month-hidden'));
+        quarterHeaders.forEach(header => {
+            if (header.dataset.quarter === selectedQuarter) {
+                header.removeAttribute('data-quarter-hidden');
+            } else {
+                header.setAttribute('data-quarter-hidden', 'true');
+            }
+        });
+
+        months.forEach(month => {
+            const shouldShowMonth = selectedMonth ? month === selectedMonth : activeQuarterMonths.includes(month);
             
-            // Show all rows that have any valid target (not 0, empty, or null)
-            activityRows.forEach(row => {
-                try {
-                    const targets = JSON.parse(row.dataset.targets || '{}');
-                    const hasAnyValidTarget = Object.values(targets).some(target => 
-                        target && target !== '' && target !== '0' && target !== null && target !== undefined
-                    );
-                    
-                    if (hasAnyValidTarget) {
-                        row.removeAttribute('data-filtered-hidden');
+            monthHeaders.forEach(header => {
+                if (header.dataset.month === month) {
+                    if (shouldShowMonth) {
+                        header.removeAttribute('data-month-hidden');
                     } else {
-                        row.setAttribute('data-filtered-hidden', 'true');
+                        header.setAttribute('data-month-hidden', 'true');
                     }
-                } catch (e) {
-                    console.error('Error parsing targets:', e);
-                    row.setAttribute('data-filtered-hidden', 'true');
                 }
             });
-        } else {
-            // Hide all months except selected
-            months.forEach(month => {
-                const shouldHide = month !== selectedMonth;
-                
-                monthHeaders.forEach(header => {
-                    if (header.dataset.month === month) {
-                        if (shouldHide) {
-                            header.setAttribute('data-month-hidden', 'true');
-                        } else {
-                            header.removeAttribute('data-month-hidden');
-                        }
-                    }
-                });
-                
-                monthSubheaders.forEach(subheader => {
-                    if (subheader.dataset && subheader.dataset.month === month) {
-                        if (shouldHide) {
-                            subheader.setAttribute('data-month-hidden', 'true');
-                        } else {
-                            subheader.removeAttribute('data-month-hidden');
-                        }
-                    }
-                });
-                
-                monthCells.forEach(cell => {
-                    if (cell.dataset.month === month) {
-                        if (shouldHide) {
-                            cell.setAttribute('data-month-hidden', 'true');
-                        } else {
-                            cell.removeAttribute('data-month-hidden');
-                        }
-                    }
-                });
-            });
 
-            // Filter rows based on selected month target
-            activityRows.forEach(row => {
-                try {
-                    const targets = JSON.parse(row.dataset.targets || '{}');
+            monthSubheaders.forEach(subheader => {
+                if (subheader.dataset && subheader.dataset.month === month) {
+                    if (shouldShowMonth) {
+                        subheader.removeAttribute('data-month-hidden');
+                    } else {
+                        subheader.setAttribute('data-month-hidden', 'true');
+                    }
+                }
+            });
+            
+            monthCells.forEach(cell => {
+                if (cell.dataset.month === month) {
+                    if (shouldShowMonth) {
+                        cell.removeAttribute('data-month-hidden');
+                    } else {
+                        cell.setAttribute('data-month-hidden', 'true');
+                    }
+                }
+            });
+        });
+
+        activityRows.forEach(row => {
+            try {
+                const targets = JSON.parse(row.dataset.targets || '{}');
+
+                if (selectedMonth) {
                     const targetValue = targets[selectedMonth];
-                    
-                    // Check if target exists and has a valid value (not empty, not 0, not null)
                     const hasTargetForMonth = targetValue && 
                                            targetValue !== '' && 
                                            targetValue !== '0' && 
                                            targetValue !== null && 
                                            targetValue !== undefined;
-                    
+
                     if (hasTargetForMonth) {
                         row.removeAttribute('data-filtered-hidden');
                     } else {
                         row.setAttribute('data-filtered-hidden', 'true');
                     }
-                } catch (e) {
-                    console.error('Error parsing targets:', e);
-                    row.setAttribute('data-filtered-hidden', 'true');
+                } else {
+                    const hasQuarterTarget = activeQuarterMonths.some(month => {
+                        const target = targets[month];
+                        return target && target !== '' && target !== '0' && target !== null && target !== undefined;
+                    });
+
+                    if (hasQuarterTarget) {
+                        row.removeAttribute('data-filtered-hidden');
+                    } else {
+                        row.setAttribute('data-filtered-hidden', 'true');
+                    }
                 }
-            });
-        }
+            } catch (e) {
+                console.error('Error parsing targets:', e);
+                row.setAttribute('data-filtered-hidden', 'true');
+            }
+        });
     }
 
     function applyFilters() {
         const selectedActivity = activityFilter.value;
+        const selectedQuarter = quarterFilter.value || 'april-june';
         const selectedMonth = monthFilter.value;
+
+        if (selectedMonth && monthToQuarter[selectedMonth] !== selectedQuarter) {
+            quarterFilter.value = monthToQuarter[selectedMonth];
+        }
 
         // Reset all filters first
         activityRows.forEach(row => {
@@ -400,13 +450,14 @@ document.addEventListener('DOMContentLoaded', function() {
             row.removeAttribute('data-filtered-hidden');
         });
 
+        quarterHeaders.forEach(header => header.removeAttribute('data-quarter-hidden'));
         monthHeaders.forEach(header => header.removeAttribute('data-month-hidden'));
         monthSubheaders.forEach(subheader => subheader.removeAttribute('data-month-hidden'));
         monthCells.forEach(cell => cell.removeAttribute('data-month-hidden'));
 
         // Apply filters
         filterByActivity(selectedActivity);
-        filterByMonth(selectedMonth);
+        filterByQuarter(quarterFilter.value || selectedQuarter, selectedMonth);
 
         // Update visibility
         updateRowVisibility();
@@ -427,25 +478,34 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function showAll() {
         activityFilter.value = '';
+        quarterFilter.value = 'april-june';
         monthFilter.value = '';
         applyFilters();
     }
 
     // Event listeners
-    showSelectedBtn.addEventListener('click', applyFilters);
-    showAllBtn.addEventListener('click', showAll);
+    if (showSelectedBtn) showSelectedBtn.addEventListener('click', applyFilters);
+    if (showAllBtn) showAllBtn.addEventListener('click', showAll);
     
     activityFilter.addEventListener('change', applyFilters);
+    quarterFilter.addEventListener('change', function() {
+        const selectedMonth = monthFilter.value;
+        const selectedQuarter = quarterFilter.value;
+
+        if (selectedMonth && monthToQuarter[selectedMonth] !== selectedQuarter) {
+            monthFilter.value = '';
+        }
+
+        applyFilters();
+    });
     monthFilter.addEventListener('change', applyFilters);
 
     // Initialize
     populateActivityFilter();
     
-    // Initially hide rows with no targets
-    updateRowVisibility();
-    
-    // Apply initial filtering to hide rows with no valid targets
-    filterByMonth('');
+    quarterFilter.value = 'april-june';
+    monthFilter.value = '';
+    applyFilters();
 });
 </script>
 
@@ -458,17 +518,95 @@ document.addEventListener('DOMContentLoaded', function() {
   margin-left: 240px;
   padding: 2rem;
   overflow-x: auto;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  background:
+    radial-gradient(circle at top left, rgba(20, 184, 166, 0.14), transparent 22%),
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.12), transparent 26%),
+    linear-gradient(180deg, #f7fafc 0%, #eef4f8 100%);
+}
+
+.filter-shell,
+.submission-shell {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+}
+
+.filter-hero {
+  background: linear-gradient(135deg, #dff6f3 0%, #d8e8fb 55%, #eef4ff 100%);
+}
+
+.submission-hero {
+  background: linear-gradient(135deg, #ffffff 0%, #f7fafc 55%, #edf4ff 100%);
+}
+
+.filter-subtitle,
+.submission-subtitle {
+  margin-top: 0.45rem;
+  color: #475569;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.filter-field {
+  position: relative;
+}
+
+.dashboard-select {
+  width: 100%;
+  min-height: 3.25rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 16px;
+  padding: 0.8rem 1rem;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  color: #0f172a;
+  font-size: 0.98rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.dashboard-select:focus {
+  outline: none;
+  border-color: #14b8a6;
+  box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.15);
+  transform: translateY(-1px);
+}
+
+.filter-actions {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.dashboard-action-btn {
+  min-height: 3rem;
+  padding: 0.85rem 1.3rem;
+  border-radius: 16px;
+  border: 1px solid transparent;
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.dashboard-action-btn-primary {
+  background: linear-gradient(135deg, #0f766e 0%, #155e75 100%);
+  color: #ffffff;
+  box-shadow: 0 12px 24px rgba(15, 118, 110, 0.18);
+}
+
+.dashboard-action-btn-secondary {
+  background: linear-gradient(135deg, #334155 0%, #475569 100%);
+  color: #ffffff;
+  box-shadow: 0 12px 24px rgba(51, 65, 85, 0.18);
 }
 
 .table-wrapper {
   overflow-x: auto;
-  border-radius: 0.75rem;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbfd 100%);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
 }
 
 .table {
-  min-width: 1800px; /* Increased width for status column */
+  min-width: 1800px;
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
@@ -477,85 +615,113 @@ document.addEventListener('DOMContentLoaded', function() {
 .table th, .table td {
   padding: 12px 16px;
   text-align: center;
-  border-right: 1px solid #e5e7eb;
+  border-right: 1px solid #dbe5f0;
   white-space: nowrap;
   vertical-align: middle;
 }
 
+.table .activity-column,
+.table .activity-cell {
+  width: 260px;
+  min-width: 260px;
+  max-width: 260px;
+}
+
+.table .activity-cell {
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  text-align: left;
+  line-height: 1.5;
+}
+
 .table th {
-  background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+  background: linear-gradient(135deg, #273447 0%, #1e293b 100%);
   color: white;
   font-weight: 600;
   text-transform: uppercase;
   font-size: 0.75rem;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
+}
+
+.table tbody tr:nth-child(odd) td {
+  background: rgba(248, 250, 252, 0.88);
+}
+
+.table tbody tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.95);
 }
 
 .table tbody tr:hover {
-  background-color: #f9fafb !important;
+  background-color: #f0f9ff !important;
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 12px 24px rgba(14, 116, 144, 0.08);
+}
+
+.table tbody tr:hover td {
+  background: linear-gradient(180deg, #f8fdff 0%, #eef8ff 100%) !important;
 }
 
 .achievement-input {
   width: 100%;
   min-width: 120px;
-  padding: 8px 12px;
+  padding: 10px 12px;
   font-size: 14px;
-  border: 2px solid #d1d5db;
-  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
   box-sizing: border-box;
   transition: all 0.3s ease;
-  background-color: #f9fafb;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  color: #0f172a;
+  box-shadow: inset 0 1px 2px rgba(148, 163, 184, 0.12);
 }
 
 .remarks-textarea {
   width: 100%;
   min-width: 120px;
-  padding: 6px 8px;
+  padding: 8px 10px;
   font-size: 12px;
-  border: 2px solid #d1d5db;
-  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
   box-sizing: border-box;
   transition: all 0.3s ease;
-  background-color: #f9fafb;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   resize: vertical;
-  min-height: 24px;
+  min-height: 42px;
+  color: #0f172a;
+  box-shadow: inset 0 1px 2px rgba(148, 163, 184, 0.12);
 }
 
 .achievement-input:focus, .remarks-textarea:focus {
   outline: none;
-  border-color: #6366f1;
+  border-color: #0ea5e9;
   background-color: white;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-  transform: scale(1.02);
+  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.14);
+  transform: translateY(-1px);
 }
 
 .achievement-input:hover, .remarks-textarea:hover {
-  border-color: #9ca3af;
+  border-color: #94a3b8;
   background-color: white;
 }
 
 .main-content h2 {
   font-size: 2rem;
   font-weight: 700;
-  color: #1f2937;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  color: #0f172a;
+  text-shadow: none;
 }
 
-/* Enhanced card styling */
 .bg-white {
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
 }
 
-/* Button enhancements */
 input[type="submit"]:hover, button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.16);
 }
 
-/* Achievement badges */
 .bg-green-50 {
   background-color: #f0fdf4;
   border: 1px solid #bbf7d0;
@@ -571,15 +737,22 @@ input[type="submit"]:hover, button:hover {
   white-space: nowrap;
 }
 
-/* Responsive improvements */
 @media (max-width: 768px) {
   .main-content {
     margin-left: 0;
     padding: 1rem;
   }
+
+  .filter-actions {
+    justify-content: stretch;
+  }
+
+  .dashboard-action-btn {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
-/* Subtle animations */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
@@ -599,7 +772,6 @@ input[type="submit"]:hover, button:hover {
   color: #6b7280;
 }
 
-/* Enhanced hover effects for table rows */
 tbody tr {
   transition: all 0.2s ease;
 }
@@ -608,14 +780,15 @@ tbody tr:hover {
   background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%) !important;
 }
 
-/* Submit button additional styling */
 input[type="submit"] {
   cursor: pointer;
   font-weight: 600;
   letter-spacing: 0.025em;
+  background: linear-gradient(135deg, #0f766e 0%, #155e75 100%);
+  border: none;
+  box-shadow: 0 14px 30px rgba(15, 118, 110, 0.24);
 }
 
-/* Message display styling */
 #successMessage, #errorMessage, #warningMessage {
   animation: slideDown 0.3s ease-out;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -633,7 +806,6 @@ input[type="submit"] {
   }
 }
 
-/* Enhanced button states */
 #submitBtn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -645,7 +817,6 @@ input[type="submit"] {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
 }
 
-/* Loading spinner animation */
 .fa-spinner {
   animation: spin 1s linear infinite;
 }
@@ -974,6 +1145,26 @@ document.addEventListener('turbo:load', function() {
             'april': 0, 'may': 1, 'june': 2, 'july': 3, 'august': 4, 'september': 5,
             'october': 6, 'november': 7, 'december': 8, 'january': 9, 'february': 10, 'march': 11
         };
+        const quarterMonths = {
+            'april-june': ['april', 'may', 'june'],
+            'july-september': ['july', 'august', 'september'],
+            'october-december': ['october', 'november', 'december'],
+            'january-march': ['january', 'february', 'march']
+        };
+        const monthToQuarter = {
+            april: 'april-june',
+            may: 'april-june',
+            june: 'april-june',
+            july: 'july-september',
+            august: 'july-september',
+            september: 'july-september',
+            october: 'october-december',
+            november: 'october-december',
+            december: 'october-december',
+            january: 'january-march',
+            february: 'january-march',
+            march: 'january-march'
+        };
         
         // FIXED: Function to update status based on month filter
         function updateStatusBasedOnMonth() {
@@ -1150,11 +1341,18 @@ document.addEventListener('turbo:load', function() {
         
         function filterTable() {
             const activityFilter = document.getElementById('activityFilter');
+            const quarterFilter = document.getElementById('quarterFilter');
             const monthFilter = document.getElementById('monthFilter');
-            if (!activityFilter || !monthFilter) return; // Guard clause
+            if (!activityFilter || !quarterFilter || !monthFilter) return; // Guard clause
 
             const selectedActivity = activityFilter.value;
+            const selectedQuarter = quarterFilter.value || 'april-june';
             const selectedMonth = monthFilter.value;
+            const activeQuarterMonths = quarterMonths[selectedQuarter] || quarterMonths['april-june'];
+
+            if (selectedMonth && monthToQuarter[selectedMonth] !== selectedQuarter) {
+                quarterFilter.value = monthToQuarter[selectedMonth];
+            }
             
             // Filter activity rows
             document.querySelectorAll('.activity-row').forEach(row => {
@@ -1169,27 +1367,40 @@ document.addEventListener('turbo:load', function() {
                 const shouldShowRow = !selectedActivity || rowActivity === selectedActivity;
                 row.style.display = shouldShowRow ? '' : 'none';
             });
+
+            document.querySelectorAll('.quarter-header').forEach(header => {
+                const shouldShowQuarter = header.dataset.quarter === (quarterFilter.value || selectedQuarter);
+                header.style.display = shouldShowQuarter ? '' : 'none';
+            });
             
             // Filter month columns
             if (selectedMonth) {
-                const selectedIndex = monthMapping[selectedMonth];
-                
                 document.querySelectorAll('.month-header, .submitted-month-header').forEach((header, index) => {
-                    header.style.display = index === selectedIndex ? '' : 'none';
+                    const monthName = header.dataset.month || Object.keys(monthMapping)[index];
+                    header.style.display = monthName === selectedMonth ? '' : 'none';
                 });
                 
                 document.querySelectorAll('.month-subheader, .submitted-month-subheader').forEach((subheader, index) => {
-                    const monthIndex = Math.floor(index / 3);
-                    subheader.style.display = monthIndex === selectedIndex ? '' : 'none';
+                    const monthName = subheader.dataset.month || Object.keys(monthMapping)[Math.floor(index / 3)];
+                    subheader.style.display = monthName === selectedMonth ? '' : 'none';
                 });
                 
                 document.querySelectorAll('.month-cell, .submitted-month-cell').forEach(cell => {
                     cell.style.display = cell.dataset.month === selectedMonth ? '' : 'none';
                 });
             } else {
-                // Show all month columns
-                document.querySelectorAll('.month-header, .submitted-month-header, .month-subheader, .submitted-month-subheader, .month-cell, .submitted-month-cell').forEach(el => {
-                    el.style.display = '';
+                document.querySelectorAll('.month-header, .submitted-month-header').forEach((header, index) => {
+                    const monthName = header.dataset.month || Object.keys(monthMapping)[index];
+                    header.style.display = activeQuarterMonths.includes(monthName) ? '' : 'none';
+                });
+
+                document.querySelectorAll('.month-subheader, .submitted-month-subheader').forEach((subheader, index) => {
+                    const monthName = subheader.dataset.month || Object.keys(monthMapping)[Math.floor(index / 3)];
+                    subheader.style.display = activeQuarterMonths.includes(monthName) ? '' : 'none';
+                });
+
+                document.querySelectorAll('.month-cell, .submitted-month-cell').forEach(cell => {
+                    cell.style.display = activeQuarterMonths.includes(cell.dataset.month) ? '' : 'none';
                 });
             }
             
@@ -1199,8 +1410,10 @@ document.addEventListener('turbo:load', function() {
 
         function resetAllFilters() {
              const activityFilter = document.getElementById('activityFilter');
+             const quarterFilter = document.getElementById('quarterFilter');
              const monthFilter = document.getElementById('monthFilter');
              if (activityFilter) activityFilter.value = '';
+             if (quarterFilter) quarterFilter.value = 'april-june';
              if (monthFilter) monthFilter.value = '';
              filterTable(); // Apply the reset state
         }
@@ -1217,13 +1430,31 @@ document.addEventListener('turbo:load', function() {
         const showAllBtn = document.getElementById('showAll');
         const clearFiltersBtn = document.getElementById('clearFilters');
         const activityFilterSelect = document.getElementById('activityFilter');
+        const quarterFilterSelect = document.getElementById('quarterFilter');
         const monthFilterSelect = document.getElementById('monthFilter');
 
         if (showSelectedBtn) showSelectedBtn.addEventListener('click', filterTable);
         if (showAllBtn) showAllBtn.addEventListener('click', resetAllFilters);
         if (clearFiltersBtn) clearFiltersBtn.addEventListener('click', resetAllFilters);
         if (activityFilterSelect) activityFilterSelect.addEventListener('change', filterTable);
+        if (quarterFilterSelect) {
+            quarterFilterSelect.addEventListener('change', function() {
+                const monthFilter = document.getElementById('monthFilter');
+                if (monthFilter && monthFilter.value && monthToQuarter[monthFilter.value] !== quarterFilterSelect.value) {
+                    monthFilter.value = '';
+                }
+                filterTable();
+            });
+        }
         if (monthFilterSelect) monthFilterSelect.addEventListener('change', filterTable);
+
+        if (quarterFilterSelect && !quarterFilterSelect.value) {
+            quarterFilterSelect.value = 'april-june';
+        }
+        if (monthFilterSelect && monthToQuarter[monthFilterSelect.value] !== (quarterFilterSelect && quarterFilterSelect.value)) {
+            monthFilterSelect.value = '';
+        }
+        filterTable();
     }
     
     // Run the setup function for the page

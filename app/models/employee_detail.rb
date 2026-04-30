@@ -1,4 +1,7 @@
 class EmployeeDetail < ApplicationRecord
+  DEFAULT_PORTAL_PASSWORD = "123456".freeze
+  DEFAULT_PORTAL_ROLE = "employee".freeze
+
   has_many :user_details, dependent: :destroy
   has_many :target_submissions, dependent: :destroy
   has_many :sms_logs, dependent: :destroy
@@ -7,6 +10,7 @@ class EmployeeDetail < ApplicationRecord
   has_many :user_training_assignments, dependent: :destroy
   has_many :assigned_trainings, through: :user_training_assignments, source: :training
   after_initialize :set_default_status, if: :new_record?
+  after_commit :sync_portal_account, on: [ :create, :update ]
   # belongs_to :department  # only if you have a departments table and department_id column
 
   # Mobile number validation removed as requested
@@ -54,5 +58,61 @@ scope :l1_pending_records, -> { where(status: [ "pending", "returned" ]) }
 
   def set_default_status
    self.status ||= "pending"
+  end
+
+  def ensure_portal_user!
+    return unless portal_account_ready?
+
+    normalized_email = employee_email.to_s.strip.downcase
+    normalized_code = employee_code.to_s.strip
+    account = matching_portal_user(normalized_email, normalized_code)
+
+    if account
+      account.email = normalized_email
+      account.employee_code = normalized_code
+      account.role = DEFAULT_PORTAL_ROLE if account.role.blank?
+      account.password = DEFAULT_PORTAL_PASSWORD if account.encrypted_password.blank?
+      account.password_confirmation = DEFAULT_PORTAL_PASSWORD if account.encrypted_password.blank?
+      account.save! if account.changed?
+    else
+      account = User.create!(
+        email: normalized_email,
+        employee_code: normalized_code,
+        role: DEFAULT_PORTAL_ROLE,
+        password: DEFAULT_PORTAL_PASSWORD,
+        password_confirmation: DEFAULT_PORTAL_PASSWORD
+      )
+    end
+
+    update_column(:user_id, account.id) if persisted? && user_id != account.id
+    account
+  end
+
+  private
+
+  def sync_portal_account
+    ensure_portal_user!
+  rescue ActiveRecord::RecordInvalid => e
+    Rails.logger.error("EmployeeDetail##{id} portal account sync failed: #{e.message}")
+  end
+
+  def portal_account_ready?
+    employee_email.present? && employee_code.present?
+  end
+
+  def matching_portal_user(normalized_email, normalized_code)
+    linked_user = user
+
+    if linked_user.present? && linked_user_matches?(linked_user, normalized_email, normalized_code)
+      return linked_user
+    end
+
+    User.find_by("lower(email) = ?", normalized_email) ||
+      User.find_by("lower(employee_code) = ?", normalized_code.downcase)
+  end
+
+  def linked_user_matches?(linked_user, normalized_email, normalized_code)
+    linked_user.email.to_s.strip.downcase == normalized_email ||
+      linked_user.employee_code.to_s.strip.downcase == normalized_code.downcase
   end
 end
