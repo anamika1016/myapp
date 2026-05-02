@@ -52,7 +52,7 @@ class HomeController < ApplicationController
     end
 
     workbook.add_worksheet(name: "Score Range") do |sheet|
-      sheet.add_row [ "Score Range", "Band", "Rating", "Recommended Action" ]
+      sheet.add_row [ "Total / 25 Range", "Band", "Rating", "Recommended Action" ]
       score_range_rows.each do |row|
         sheet.add_row [ row[:score_range], row[:band], row[:rating], row[:action] ]
       end
@@ -104,13 +104,13 @@ class HomeController < ApplicationController
 
     workbook.add_worksheet(name: "Line Manager Feedback") do |sheet|
       if @dashboard_mode == :admin
-        sheet.add_row [ "Employee", "Code", "Professionalism & Conduct (1-5)", "Quality & Accuracy of Work Output (1-5)", "Initiative & Problem-Solving (1-5)", "Adherence to PAPL Values & Culture (1-5)", "Cross-functional Collaboration (1-5)", "Time Management & Reliability (1-5)", "Growth Mindset & Development (1-5)", "Mgr Score /10", "Manager Remarks" ]
+        criteria_headers = manager_feedback_criteria_for(nil).map { |criterion| "#{criterion[:label]} (1-5)" }
+        sheet.add_row [ "Employee", "Code", *criteria_headers, "Mgr Score /10", "Manager Remarks" ]
         @employee_rows.each do |row|
           criteria = row[:manager_feedback][:criteria]
           sheet.add_row [
             row[:employee_name], row[:employee_code],
-            criteria[0][:score], criteria[1][:score], criteria[2][:score], criteria[3][:score],
-            criteria[4][:score], criteria[5][:score], criteria[6][:score],
+            *criteria.map { |criterion| criterion[:score] },
             row[:pulse_assessment_score], row[:pulse_assessment_remarks]
           ]
         end
@@ -213,13 +213,13 @@ class HomeController < ApplicationController
     when "remarks"
       workbook.add_worksheet(name: "Line Manager Feedback") do |sheet|
         if @dashboard_mode == :admin
-          sheet.add_row [ "Employee", "Code", "Professionalism & Conduct (1-5)", "Quality & Accuracy of Work Output (1-5)", "Initiative & Problem-Solving (1-5)", "Adherence to PAPL Values & Culture (1-5)", "Cross-functional Collaboration (1-5)", "Time Management & Reliability (1-5)", "Growth Mindset & Development (1-5)", "Mgr Score /10", "Manager Remarks" ]
+          criteria_headers = manager_feedback_criteria_for(nil).map { |criterion| "#{criterion[:label]} (1-5)" }
+          sheet.add_row [ "Employee", "Code", *criteria_headers, "Mgr Score /10", "Manager Remarks" ]
           @employee_rows.each do |row|
             criteria = row[:manager_feedback][:criteria]
             sheet.add_row [
               row[:employee_name], row[:employee_code],
-              criteria[0][:score], criteria[1][:score], criteria[2][:score], criteria[3][:score],
-              criteria[4][:score], criteria[5][:score], criteria[6][:score],
+              *criteria.map { |criterion| criterion[:score] },
               row[:pulse_assessment_score], row[:pulse_assessment_remarks]
             ]
           end
@@ -283,7 +283,7 @@ class HomeController < ApplicationController
         initiative_leadership: initiative_leadership,
         remarks: assessment_params[:remarks].presence, professionalism_conduct: assessment_params[:professionalism_conduct].presence,
         work_quality_accuracy: assessment_params[:work_quality_accuracy].presence, initiative_problem_solving: assessment_params[:initiative_problem_solving].presence,
-        papl_values_culture: assessment_params[:papl_values_culture].presence, collaboration: assessment_params[:collaboration].presence,
+        papl_values_culture: nil, collaboration: nil,
         time_management_reliability: assessment_params[:time_management_reliability].presence, growth_mindset_development: assessment_params[:growth_mindset_development].presence
       )
       manager_feedback = manager_feedback_summary_for(assessment)
@@ -360,11 +360,11 @@ class HomeController < ApplicationController
 
   def score_range_rows
     [
-      { score_range: "≥ 90%", band: "Outstanding", rating: "5 (★★★★★)", rating_value: 5, stars: "★★★★★", className: "stars-5", action: "Accelerated growth track / highest increment" },
-      { score_range: "75 - 89%", band: "Exceeds Expectations", rating: "4 (★★★★)", rating_value: 4, stars: "★★★★", className: "stars-4", action: "Merit increment + recognition award" },
-      { score_range: "60 - 74%", band: "Meets Expectations", rating: "3 (★★★)", rating_value: 3, stars: "★★★", className: "stars-3", action: "Standard increment as per policy" },
-      { score_range: "45 - 59%", band: "Needs Improvement", rating: "2 (★★)", rating_value: 2, stars: "★★", className: "stars-2", action: "PIP + structured coaching plan" },
-      { score_range: "< 45%", band: "Unsatisfactory", rating: "1 (★)", rating_value: 1, stars: "★", className: "stars-1", action: "Formal PIP / disciplinary review" }
+      { score_range: "23 - 25", band: "Outstanding", rating: "5 (★★★★★)", rating_value: 5, stars: "★★★★★", className: "stars-5", action: "Accelerated growth track / highest increment" },
+      { score_range: "19 - 22", band: "Exceeds Expectations", rating: "4 (★★★★)", rating_value: 4, stars: "★★★★", className: "stars-4", action: "Merit increment + recognition award" },
+      { score_range: "15 - 18", band: "Meets Expectations", rating: "3 (★★★)", rating_value: 3, stars: "★★★", className: "stars-3", action: "Standard increment as per policy" },
+      { score_range: "11 - 14", band: "Needs Improvement", rating: "2 (★★)", rating_value: 2, stars: "★★", className: "stars-2", action: "PIP + structured coaching plan" },
+      { score_range: "< 11", band: "Unsatisfactory", rating: "1 (★)", rating_value: 1, stars: "★", className: "stars-1", action: "Formal PIP / disciplinary review" }
     ]
   end
 
@@ -424,20 +424,21 @@ class HomeController < ApplicationController
 
   def manager_feedback_raw_percentage(a)
     return 0.0 if a.blank? || assessment_blank?(a)
-    w = { professionalism_conduct: 15, work_quality_accuracy: 15, initiative_problem_solving: 15, papl_values_culture: 15, collaboration: 15, time_management_reliability: 15, growth_mindset_development: 10 }
-    val = w.sum { |f, v| (a.send(f).to_f / 5.0) * v }
-    (val * 0.10).round(2)
+    criteria = manager_feedback_criteria_for(a)
+    return 0.0 unless criteria.any?
+
+    raw_total = criteria.sum { |criterion| criterion[:weighted_score].to_f }
+    total_weight = criteria.sum { |criterion| criterion[:weight].to_f }
+    ((raw_total / total_weight) * 10.0).round(2)
   end
 
   def manager_feedback_criteria_for(assessment)
     [
-      { key: :professionalism_conduct, label: "Professionalism & Conduct", weight: 15 },
-      { key: :work_quality_accuracy, label: "Quality & Accuracy of Work Output", weight: 15 },
-      { key: :initiative_problem_solving, label: "Initiative & Problem-Solving", weight: 15 },
-      { key: :papl_values_culture, label: "Adherence to PAPL Values & Culture", weight: 15 },
-      { key: :collaboration, label: "Cross-functional Collaboration", weight: 15 },
-      { key: :time_management_reliability, label: "Time Management & Reliability", weight: 15 },
-      { key: :growth_mindset_development, label: "Growth Mindset & Development", weight: 10 }
+      { key: :professionalism_conduct, label: "Professionalism & Conduct", weight: 20 },
+      { key: :work_quality_accuracy, label: "Quality & Accuracy of Work Output", weight: 20 },
+      { key: :initiative_problem_solving, label: "Initiative & Problem-Solving", weight: 20 },
+      { key: :time_management_reliability, label: "Time Management & Reliability", weight: 20 },
+      { key: :growth_mindset_development, label: "Growth Mindset & Development", weight: 20 }
     ].map do |criterion|
       score = assessment&.public_send(criterion[:key])
       weighted_score = score.present? ? ((score.to_f / 5.0) * criterion[:weight]).round(2) : nil
@@ -448,13 +449,17 @@ class HomeController < ApplicationController
 
   def manager_feedback_summary_for(assessment)
     criteria = manager_feedback_criteria_for(assessment)
-    raw_total = criteria.sum { |criterion| criterion[:weighted_score].to_f }.round(2)
+    raw_weighted_total = criteria.sum { |criterion| criterion[:weighted_score].to_f }.round(2)
+    total_weight = criteria.sum { |criterion| criterion[:weight].to_f }.round(2)
     has_scores = criteria.any? { |criterion| criterion[:score].present? }
+    raw_total = has_scores && total_weight.positive? ? ((raw_weighted_total / total_weight) * 100.0).round(2) : 0.0
     score_on_ten = has_scores ? (raw_total / 10.0).round(1) : nil
 
     {
       criteria: criteria,
+      raw_weighted_total: raw_weighted_total,
       raw_total: raw_total,
+      total_weight: total_weight,
       score_on_ten: score_on_ten,
       weighted_score: score_on_ten.present? ? ((score_on_ten / 10.0) * 10.0).round(2) : nil,
       available: has_scores
@@ -497,7 +502,7 @@ class HomeController < ApplicationController
   end
 
   def assessment_blank?(p)
-    [ :values_alignment, :technical_knowledge, :customer_field_engagement, :execution_accountability, :initiative_leadership, :remarks, :professionalism_conduct, :work_quality_accuracy, :initiative_problem_solving, :papl_values_culture, :collaboration, :time_management_reliability, :growth_mindset_development ].all? { |f| p[f].blank? }
+    [ :values_alignment, :technical_knowledge, :customer_field_engagement, :execution_accountability, :initiative_leadership, :remarks, :professionalism_conduct, :work_quality_accuracy, :initiative_problem_solving, :time_management_reliability, :growth_mindset_development ].all? { |f| p[f].blank? }
   end
 
   def numeric_score_or_nil(value)
@@ -529,6 +534,7 @@ class HomeController < ApplicationController
       pulse_raw_percentage: pulse_raw_percentage(ts) || 0.0,
       pulse_category: pulse_category_details(ts),
       pulse_assessment_remarks: pa&.remarks, pulse_assessment_score: manager_feedback[:score_on_ten] || pa&.remark_score,
+      manager_feedback_total: manager_feedback_total_for_assessment(pa),
       manager_feedback: manager_feedback,
       manager_feedback_raw: pa ? manager_feedback_raw_percentage(pa) : 0.0,
       manager_raw_percentage: manager_feedback[:raw_total].to_f,
@@ -559,10 +565,17 @@ class HomeController < ApplicationController
     scores.compact.sum(&:to_f).round(1)
   end
 
+  def manager_feedback_total_for_assessment(assessment)
+    criteria = manager_feedback_criteria_for(assessment)
+    return nil if criteria.all? { |criterion| criterion[:score].blank? }
+
+    criteria.sum { |criterion| criterion[:score].to_f }.round(1)
+  end
+
   def build_l1_pulse_row(ed)
     a = l1_assessment_for(ed)
     ts = pulse_total_for_assessment(a)
-    { employee_detail_id: ed.id, employee_name: ed.employee_name, employee_code: ed.employee_code, department: ed.user_details.first&.department&.department_type || ed.department, assessment: a, total_score: ts, pulse_weighted: pulse_weighted_score(ts), pulse_category: pulse_category_details(ts), manager_feedback_raw: manager_feedback_raw_percentage(a) }
+    { employee_detail_id: ed.id, employee_name: ed.employee_name, employee_code: ed.employee_code, department: ed.user_details.first&.department&.department_type || ed.department, assessment: a, total_score: ts, pulse_weighted: pulse_weighted_score(ts), pulse_category: pulse_category_details(ts), manager_feedback_total: manager_feedback_total_for_assessment(a), manager_feedback_raw: manager_feedback_raw_percentage(a) }
   end
 
   def pulse_team_average(rows)
@@ -594,7 +607,7 @@ class HomeController < ApplicationController
   end
 
   def l1_managed_employee_details
-    EmployeeDetail.includes(:l1_pulse_assessments, user_details: [ :department, achievements: :achievement_remark ]).order(:employee_name).then { |s| (current_user.hod? || current_user.admin?) ? s : s.where("l1_code = :c OR l1_employer_name = :e", c: current_user.employee_code, e: current_user.email) }
+    EmployeeDetail.includes(:l1_pulse_assessments, user_details: [ :department, achievements: :achievement_remark ]).order(Arel.sql("LOWER(employee_name) ASC")).then { |s| (current_user.hod? || current_user.admin?) ? s : s.where("l1_code = :c OR l1_employer_name = :e", c: current_user.employee_code, e: current_user.email) }
   end
 
   def ensure_l1_pulse_access!

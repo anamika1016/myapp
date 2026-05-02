@@ -8,7 +8,7 @@ class EmployeeDetailsController < ApplicationController
   def index
     @employee_detail = EmployeeDetail.new
     @q = EmployeeDetail.ransack(params[:q])
-    @employee_details = @q.result.order(created_at: :desc).page(params[:page]).per(10)
+    @employee_details = @q.result.order(Arel.sql("LOWER(employee_name) ASC")).page(params[:page]).per(10)
   end
 
   def create
@@ -18,7 +18,7 @@ class EmployeeDetailsController < ApplicationController
     if @employee_detail.save
       redirect_to employee_details_path, notice: "Employee created successfully."
     else
-      @employee_details = @q.result.order(created_at: :desc).page(params[:page]).per(10)
+      @employee_details = @q.result.order(Arel.sql("LOWER(employee_name) ASC")).page(params[:page]).per(10)
       flash.now[:alert] = "Failed to create employee."
       render :index, status: :unprocessable_entity
     end

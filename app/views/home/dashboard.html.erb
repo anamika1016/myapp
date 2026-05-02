@@ -52,13 +52,30 @@
     </div>
 
     <%
+      fmt_pct = ->(value, precision = 2) { "#{number_with_precision(value, precision: precision, strip_insignificant_zeros: true)}%" }
+      fmt_num = ->(value, precision = 1) { number_with_precision(value, precision: precision, strip_insignificant_zeros: true) }
       quarter_summaries = Array(@quarter_summaries)
       manager_feedback = @dashboard_manager_feedback || {}
-      manager_criteria = Array(manager_feedback[:criteria])
+      manager_criteria = Array(manager_feedback[:criteria]).map do |criterion|
+        score = criterion[:score]
+        criterion.merge(
+          weight: 2,
+          weighted_score: score.present? ? ((score.to_f / 5.0) * 2.0).round(2) : nil
+        )
+      end
       employee_department = @dashboard_employee_department.presence || @user_details&.first&.department&.department_type.presence || @employee_detail&.department.presence || "N/A"
-      pulse_dimensions = pulse_dimension_rows_for(@dashboard_pulse_scores)
+      pulse_dimensions = pulse_dimension_rows_for(@dashboard_pulse_scores).map do |dimension|
+        score = dimension[:score]
+        dimension.merge(
+          weight: 3,
+          weighted_score: score.present? ? ((score.to_f / 5.0) * 3.0).round(2) : nil
+        )
+      end
       pulse_raw_percentage = if @dashboard_pulse_available && @dashboard_pulse_scores&.dig(:total_score).present?
         ((@dashboard_pulse_scores[:total_score].to_f / 25.0) * 100.0).round(2)
+      end
+      pulse_total_score = if @dashboard_pulse_scores&.dig(:total_score).present?
+        fmt_num.call(@dashboard_pulse_scores[:total_score], 1)
       end
       composite_pulse_percentage = pulse_raw_percentage.to_f
       composite_manager_percentage = manager_feedback[:raw_total].to_f
@@ -99,9 +116,9 @@
                     <td><%= row[:employee_code] %></td>
                     <td><%= row[:department] %></td>
                     <% row[:quarter_summaries].each do |quarter| %>
-                      <td><span class="score-chip"><%= quarter[:percentage] %>%</span></td>
+                      <td><span class="score-chip"><%= fmt_pct.call(quarter[:percentage], 1) %></span></td>
                     <% end %>
-                    <td><span class="score-chip percentage-chip"><%= row[:annual_percentage] %>%</span></td>
+                    <td><span class="score-chip percentage-chip"><%= fmt_pct.call(row[:annual_percentage], 1) %></span></td>
                   </tr>
                 <% end %>
               </tbody>
@@ -129,7 +146,7 @@
           </div>
           <div class="stat-card final-card">
             <span>Section A Score</span>
-            <strong><%= number_with_precision(@annual_percentage, precision: 1) %>%</strong>
+            <strong><%= fmt_pct.call(@annual_percentage, 1) %></strong>
             <small class="stat-subtext">KRA weightage 75%</small>
           </div>
         </div>
@@ -171,7 +188,7 @@
                   <% quarter_summaries.each do |quarter| %>
                     <tr>
                       <td><strong><%= quarter[:name] %></strong></td>
-                      <td><span class="score-chip"><%= number_with_precision(quarter[:percentage], precision: 1) %>%</span></td>
+                      <td><span class="score-chip"><%= fmt_pct.call(quarter[:percentage], 1) %></span></td>
                     </tr>
                   <% end %>
                 <% else %>
@@ -183,7 +200,7 @@
               <tfoot>
                 <tr>
                   <td><strong>Annual Average</strong></td>
-                  <td><span class="score-chip percentage-chip"><%= number_with_precision(@annual_percentage, precision: 1) %>%</span></td>
+                  <td><span class="score-chip percentage-chip"><%= fmt_pct.call(@annual_percentage, 1) %></span></td>
                 </tr>
               </tfoot>
             </table>
@@ -202,7 +219,7 @@
             <table class="guide-table">
               <thead>
                 <tr>
-                  <th>Score Range</th>
+                  <th>Total / 25 Range</th>
                   <th>Band</th>
                   <th>Rating</th>
                   <th>Recommended Action</th>
@@ -237,9 +254,7 @@
                 <thead>
                   <tr>
                     <th>Pulse Dimension</th>
-                    <th>Wt %</th>
                     <th>Score (1-5)</th>
-                    <th>Wtd Score</th>
                     <th>Rating</th>
                   </tr>
                 </thead>
@@ -247,9 +262,7 @@
                   <% pulse_dimensions.each do |dimension| %>
                     <tr>
                       <td><%= dimension[:label] %></td>
-                      <td><%= dimension[:weight] %>%</td>
                       <td><%= dimension[:score].presence || "-" %></td>
-                      <td><%= dimension[:weighted_score].present? ? "#{number_with_precision(dimension[:weighted_score], precision: 2)}%" : "-" %></td>
                       <td>
                         <% if dimension[:rating_text].present? && dimension[:score].present? %>
                           <% rating_details = score_rating_details(dimension[:score]) %>
@@ -264,16 +277,15 @@
                 <tfoot>
                   <tr>
                     <td><strong>PULSE TOTAL</strong></td>
-                    <td>100%</td>
-                    <td colspan="3"><strong><%= pulse_raw_percentage.present? ? "Pulse Raw -> #{number_with_precision(pulse_raw_percentage, precision: 2)}%" : "Pending assessment" %></strong></td>
+                    <td colspan="2"><strong><%= pulse_raw_percentage.present? ? "Total -> #{pulse_total_score}/25 | Pulse Raw -> #{fmt_pct.call(pulse_raw_percentage)}" : "Pending assessment" %></strong></td>
                   </tr>
                 </tfoot>
               </table>
             </div>
 
             <div class="metric-summary-row">
-              <span class="summary-chip neutral-summary-chip"><%= pulse_raw_percentage.present? ? "Raw #{number_with_precision(pulse_raw_percentage, precision: 2)}%" : "Raw Pending" %></span>
-              <span class="summary-chip pulse-summary-chip">Weighted <%= number_with_precision(@dashboard_summary_scores[:pulse_score], precision: 2) %>/15</span>
+              <span class="summary-chip neutral-summary-chip"><%= pulse_raw_percentage.present? ? "Raw #{fmt_pct.call(pulse_raw_percentage)}" : "Raw Pending" %></span>
+              <span class="summary-chip pulse-summary-chip">Weighted <%= fmt_num.call(@dashboard_summary_scores[:pulse_score], 2) %>/15</span>
               <% if @dashboard_pulse_category.present? %>
                 <span class="summary-chip annual-summary-chip"><%= @dashboard_pulse_category[:category] %></span>
               <% end %>
@@ -294,9 +306,7 @@
                 <thead>
                   <tr>
                     <th>Assessment Criteria</th>
-                    <th>Wt %</th>
                     <th>Score (1-5)</th>
-                    <th>Wtd Score</th>
                     <th>Rating</th>
                   </tr>
                 </thead>
@@ -305,9 +315,7 @@
                     <% rating_details = score_rating_details(criterion[:score]) %>
                     <tr>
                       <td><%= criterion[:label] %></td>
-                      <td><%= criterion[:weight] %>%</td>
                       <td><%= criterion[:score].presence || "-" %></td>
-                      <td><%= criterion[:weighted_score].present? ? "#{number_with_precision(criterion[:weighted_score], precision: 2)}%" : "-" %></td>
                       <td>
                         <% if rating_details.present? %>
                           <span class="star-rating <%= rating_details[:className] %>"><strong><%= rating_details[:rating] %></strong> (<%= rating_details[:stars] %>)</span>
@@ -321,17 +329,16 @@
                 <tfoot>
                   <tr>
                     <td><strong>MANAGER TOTAL</strong></td>
-                    <td>100%</td>
-                    <td colspan="3"><strong><%= manager_feedback[:available] ? "Mgr Raw -> #{number_with_precision(manager_feedback[:raw_total], precision: 2)}%" : "Pending assessment" %></strong></td>
+                    <td colspan="2"><strong><%= manager_feedback[:available] ? "Total -> #{fmt_num.call(@dashboard_pulse_remark_score, 1)}/10 | Mgr Raw -> #{fmt_pct.call(manager_feedback[:raw_total])}" : "Pending assessment" %></strong></td>
                   </tr>
                 </tfoot>
               </table>
             </div>
 
             <div class="metric-summary-row">
-              <span class="summary-chip neutral-summary-chip"><%= manager_feedback[:available] ? "Raw #{number_with_precision(manager_feedback[:raw_total], precision: 2)}%" : "Raw Pending" %></span>
-              <span class="summary-chip remarks-summary-chip">Weighted <%= number_with_precision(@dashboard_summary_scores[:remarks_score], precision: 2) %>/10</span>
-              <span class="summary-chip annual-summary-chip">Score <%= @dashboard_pulse_remark_score.present? ? "#{number_with_precision(@dashboard_pulse_remark_score, precision: 1)}/10" : "Pending" %></span>
+              <span class="summary-chip neutral-summary-chip"><%= manager_feedback[:available] ? "Raw #{fmt_pct.call(manager_feedback[:raw_total])}" : "Raw Pending" %></span>
+              <span class="summary-chip remarks-summary-chip">Weighted <%= fmt_num.call(@dashboard_summary_scores[:remarks_score], 2) %>/10</span>
+              <span class="summary-chip annual-summary-chip">Score <%= @dashboard_pulse_remark_score.present? ? "#{fmt_num.call(@dashboard_pulse_remark_score, 1)}/10" : "Pending" %></span>
             </div>
 
             <div class="single-remark-box employee-remark-box">
@@ -368,21 +375,21 @@
                 <tbody>
                   <tr>
                     <td>A - KRA</td>
-                    <td><%= number_with_precision(@annual_percentage, precision: 2) %>%</td>
+                    <td><%= fmt_pct.call(@annual_percentage) %></td>
                     <td>75%</td>
-                    <td><span class="summary-chip annual-summary-chip"><%= number_with_precision(@dashboard_summary_scores[:annual_score], precision: 2) %>%</span></td>
+                    <td><span class="summary-chip annual-summary-chip"><%= fmt_pct.call(@dashboard_summary_scores[:annual_score], 0) %></span></td>
                   </tr>
                   <tr>
                     <td>B - Pulse Check</td>
-                    <td><%= number_with_precision(composite_pulse_percentage, precision: 2) %>%</td>
+                    <td><%= fmt_pct.call(composite_pulse_percentage) %></td>
                     <td>15%</td>
-                    <td><span class="summary-chip pulse-summary-chip"><%= number_with_precision(@dashboard_summary_scores[:pulse_score], precision: 2) %>%</span></td>
+                    <td><span class="summary-chip pulse-summary-chip"><%= fmt_pct.call(@dashboard_summary_scores[:pulse_score], 0) %></span></td>
                   </tr>
                   <tr>
                     <td>C - Manager Feedback</td>
-                    <td><%= number_with_precision(composite_manager_percentage, precision: 2) %>%</td>
+                    <td><%= fmt_pct.call(composite_manager_percentage) %></td>
                     <td>10%</td>
-                    <td><span class="summary-chip remarks-summary-chip"><%= number_with_precision(@dashboard_summary_scores[:remarks_score], precision: 2) %>%</span></td>
+                    <td><span class="summary-chip remarks-summary-chip"><%= fmt_pct.call(@dashboard_summary_scores[:remarks_score], 0) %></span></td>
                   </tr>
                 </tbody>
               </table>
@@ -390,7 +397,7 @@
 
             <div class="employee-final-card">
               <span class="final-card-label">Final Composite Score</span>
-              <strong><%= number_with_precision(@dashboard_summary_scores[:final_total], precision: 2) %>%</strong>
+              <strong><%= fmt_pct.call(@dashboard_summary_scores[:final_total], 0) %></strong>
               <div class="employee-final-band"><%= employee_composite[:band] %></div>
               <div class="employee-final-rating">Rating <%= employee_composite[:rating] %> / 5</div>
               <p><%= employee_composite[:action] %></p>
@@ -418,7 +425,7 @@
         <table class="guide-table">
           <thead>
             <tr>
-              <th>Score Range</th>
+              <th>Total / 25 Range</th>
               <th>Band</th>
               <th>Rating</th>
               <th>Recommended Action</th>
@@ -469,7 +476,6 @@
             <tr>
               <th>Staff Name</th>
               <th>Role</th>
-              <th>Wt %</th>
               <% pulse_group_rows_for(@dashboard_pulse_scores).each do |dimension| %>
                 <th><%= dimension[:label] %> (1-5)</th>
               <% end %>
@@ -485,12 +491,11 @@
                 <tr>
                   <td><%= row[:employee_name] %></td>
                   <td><%= row[:role] %></td>
-                  <td><%= row[:summary_scores][:pulse_score] %>%</td>
                   <% grouped_scores.each do |dimension| %>
-                    <td><%= dimension[:score] %></td>
+                    <td><%= dimension[:score].present? ? fmt_num.call(dimension[:score], 1) : "-" %></td>
                   <% end %>
-                  <td class="pulse-total"><%= row[:pulse_scores][:total_score] %></td>
-                  <td class="pulse-total"><%= row[:summary_scores][:pulse_score] %>%</td>
+                  <td class="pulse-total"><%= row[:pulse_scores][:total_score].present? ? fmt_num.call(row[:pulse_scores][:total_score], 1) : "-" %></td>
+                  <td class="pulse-total"><%= "#{row[:summary_scores][:pulse_score].to_f.round}%" %></td>
                   <td><%= row[:pulse_available] ? pulse_category_markup.call(row[:pulse_scores][:total_score]) : "" %></td>
                 </tr>
               <% end %>
@@ -499,12 +504,11 @@
               <tr>
                 <td><%= @employee_detail&.employee_name.presence || current_user.email %></td>
                 <td><%= @user_details.first&.department&.department_type.presence || @employee_detail&.department.presence || "N/A" %></td>
-                <td><%= @dashboard_summary_scores[:pulse_score] %>%</td>
                 <% grouped_scores.each do |dimension| %>
-                  <td><%= dimension[:score] %></td>
+                  <td><%= dimension[:score].present? ? fmt_num.call(dimension[:score], 1) : "-" %></td>
                 <% end %>
-                <td class="pulse-total"><%= @dashboard_pulse_scores[:total_score] %></td>
-                <td class="pulse-total"><%= @dashboard_summary_scores[:pulse_score] %>%</td>
+                <td class="pulse-total"><%= @dashboard_pulse_scores[:total_score].present? ? fmt_num.call(@dashboard_pulse_scores[:total_score], 1) : "-" %></td>
+                <td class="pulse-total"><%= "#{@dashboard_summary_scores[:pulse_score].to_f.round}%" %></td>
                 <td><%= @dashboard_pulse_available ? pulse_category_markup.call(@dashboard_pulse_scores[:total_score]) : "" %></td>
               </tr>
             <% end %>
@@ -513,12 +517,11 @@
             <tfoot style="background: rgba(18, 56, 77, 0.05); font-weight: bold; border-top: 2px solid #cbd5e1;">
               <tr>
                 <td colspan="2">TEAM AVERAGE</td>
-                <td><%= team_average[:pulse_score] %>%</td>
                 <% team_average[:grouped_scores].each do |dimension| %>
-                  <td><%= dimension[:score] %></td>
+                  <td><%= dimension[:score].present? ? fmt_num.call(dimension[:score], 1) : "-" %></td>
                 <% end %>
-                <td class="pulse-total"><%= team_average[:total_score] %></td>
-                <td class="pulse-total"><%= team_average[:pulse_score] %>%</td>
+                <td class="pulse-total"><%= fmt_num.call(team_average[:total_score], 1) %></td>
+                <td class="pulse-total"><%= "#{team_average[:pulse_score].to_f.round}%" %></td>
                 <td><%= team_average[:category][:stars] %> <%= team_average[:category][:category] %></td>
               </tr>
             </tfoot>
@@ -546,10 +549,9 @@
                 <th>Professionalism & Conduct (1-5)</th>
                 <th>Quality & Accuracy of Work Output (1-5)</th>
                 <th>Initiative & Problem-Solving (1-5)</th>
-                <th>Adherence to PAPL Values & Culture (1-5)</th>
-                <th>Cross-functional Collaboration (1-5)</th>
                 <th>Time Management & Reliability (1-5)</th>
                 <th>Growth Mindset & Development (1-5)</th>
+                <th>Total /25</th>
                 <th>Mgr Score /10</th>
                 <th>Manager Remarks</th>
               </tr>
@@ -560,14 +562,11 @@
                 <tr>
                   <td><strong><%= row[:employee_name] %></strong></td>
                   <td><%= row[:employee_code] %></td>
-                  <td class="pulse-remark-score-cell"><%= criteria[0][:score].presence || "-" %></td>
-                  <td class="pulse-remark-score-cell"><%= criteria[1][:score].presence || "-" %></td>
-                  <td class="pulse-remark-score-cell"><%= criteria[2][:score].presence || "-" %></td>
-                  <td class="pulse-remark-score-cell"><%= criteria[3][:score].presence || "-" %></td>
-                  <td class="pulse-remark-score-cell"><%= criteria[4][:score].presence || "-" %></td>
-                  <td class="pulse-remark-score-cell"><%= criteria[5][:score].presence || "-" %></td>
-                  <td class="pulse-remark-score-cell"><%= criteria[6][:score].presence || "-" %></td>
-                  <td class="pulse-remark-score-cell"><%= row[:pulse_assessment_score].present? ? "#{number_with_precision(row[:pulse_assessment_score], precision: 1)}/10" : "-" %></td>
+                  <% criteria.each do |criterion| %>
+                    <td class="pulse-remark-score-cell"><%= criterion[:score].presence || "-" %></td>
+                  <% end %>
+                  <td class="pulse-remark-score-cell"><%= row[:manager_feedback_total].present? ? "#{fmt_num.call(row[:manager_feedback_total], 1)}/25" : "-" %></td>
+                  <td class="pulse-remark-score-cell"><%= row[:pulse_assessment_score].present? ? "#{fmt_num.call(row[:pulse_assessment_score], 1)}/10" : "-" %></td>
                   <td><%= row[:pulse_assessment_remarks].presence || "-" %></td>
                 </tr>
               <% end %>
@@ -633,19 +632,19 @@
               <% @employee_rows.each do |row| %>
                 <tr>
                   <td><strong><%= row[:employee_name] %></strong></td>
-                  <td><span class="summary-chip neutral-summary-chip"><%= number_with_precision(row[:annual_percentage], precision: 2) %>%</span></td>
-                  <td><span class="summary-chip neutral-summary-chip"><%= number_with_precision(row[:pulse_raw_percentage], precision: 2) %>%</span></td>
-                  <td><span class="summary-chip neutral-summary-chip"><%= number_with_precision(row[:manager_raw_percentage], precision: 2) %>%</span></td>
-                  <td><span class="summary-chip total-summary-chip"><%= number_with_precision(row[:summary_scores][:final_total], precision: 2) %>%</span></td>
+                  <td><span class="summary-chip neutral-summary-chip"><%= fmt_pct.call(row[:annual_percentage], 0) %></span></td>
+                  <td><span class="summary-chip neutral-summary-chip"><%= fmt_pct.call(row[:pulse_raw_percentage], 0) %></span></td>
+                  <td><span class="summary-chip neutral-summary-chip"><%= fmt_pct.call(row[:manager_raw_percentage], 0) %></span></td>
+                  <td><span class="summary-chip total-summary-chip"><%= fmt_pct.call(row[:summary_scores][:final_total], 0) %></span></td>
                 </tr>
               <% end %>
             <% elsif @employee_detail.present? %>
               <tr>
                 <td><strong><%= @employee_detail&.employee_name.presence || current_user.email %></strong></td>
-                <td><span class="summary-chip neutral-summary-chip"><%= number_with_precision(@annual_percentage, precision: 2) %>%</span></td>
-                <td><span class="summary-chip neutral-summary-chip"><%= number_with_precision(composite_pulse_percentage, precision: 2) %>%</span></td>
-                <td><span class="summary-chip neutral-summary-chip"><%= number_with_precision(composite_manager_percentage, precision: 2) %>%</span></td>
-                <td><span class="summary-chip total-summary-chip"><%= number_with_precision(@dashboard_summary_scores[:final_total], precision: 2) %>%</span></td>
+                <td><span class="summary-chip neutral-summary-chip"><%= fmt_pct.call(@annual_percentage, 0) %></span></td>
+                <td><span class="summary-chip neutral-summary-chip"><%= fmt_pct.call(composite_pulse_percentage, 0) %></span></td>
+                <td><span class="summary-chip neutral-summary-chip"><%= fmt_pct.call(composite_manager_percentage, 0) %></span></td>
+                <td><span class="summary-chip total-summary-chip"><%= fmt_pct.call(@dashboard_summary_scores[:final_total], 0) %></span></td>
               </tr>
             <% end %>
           </tbody>
@@ -653,10 +652,10 @@
             <tfoot style="background: rgba(18, 56, 77, 0.05); font-weight: bold; border-top: 2px solid #cbd5e1;">
               <tr>
                 <td>TEAM AVERAGE</td>
-                <td><span class="summary-chip neutral-summary-chip"><%= number_with_precision((@employee_rows.sum { |r| r[:annual_percentage].to_f } / @employee_rows.size), precision: 2) %>%</span></td>
-                <td><span class="summary-chip neutral-summary-chip"><%= number_with_precision((@employee_rows.sum { |r| r[:pulse_raw_percentage].to_f } / @employee_rows.size), precision: 2) %>%</span></td>
-                <td><span class="summary-chip neutral-summary-chip"><%= number_with_precision((@employee_rows.sum { |r| r[:manager_raw_percentage].to_f } / @employee_rows.size), precision: 2) %>%</span></td>
-                <td><span class="summary-chip total-summary-chip"><%= number_with_precision((@employee_rows.sum { |r| r[:summary_scores][:final_total].to_f } / @employee_rows.size), precision: 2) %>%</span></td>
+                <td><span class="summary-chip neutral-summary-chip"><%= fmt_pct.call((@employee_rows.sum { |r| r[:annual_percentage].to_f } / @employee_rows.size), 0) %></span></td>
+                <td><span class="summary-chip neutral-summary-chip"><%= fmt_pct.call((@employee_rows.sum { |r| r[:pulse_raw_percentage].to_f } / @employee_rows.size), 0) %></span></td>
+                <td><span class="summary-chip neutral-summary-chip"><%= fmt_pct.call((@employee_rows.sum { |r| r[:manager_raw_percentage].to_f } / @employee_rows.size), 0) %></span></td>
+                <td><span class="summary-chip total-summary-chip"><%= fmt_pct.call((@employee_rows.sum { |r| r[:summary_scores][:final_total].to_f } / @employee_rows.size), 0) %></span></td>
               </tr>
             </tfoot>
           <% end %>

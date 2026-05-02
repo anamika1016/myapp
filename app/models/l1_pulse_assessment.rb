@@ -6,8 +6,7 @@ class L1PulseAssessment < ApplicationRecord
   validates :values_alignment, :technical_knowledge, :customer_field_engagement,
             :execution_accountability, :initiative_leadership,
             :professionalism_conduct, :work_quality_accuracy, :initiative_problem_solving,
-            :papl_values_culture, :collaboration, :time_management_reliability,
-            :growth_mindset_development,
+            :time_management_reliability, :growth_mindset_development,
             numericality: { only_integer: true, greater_than_or_equal_to: 1, less_than_or_equal_to: 5 },
             allow_nil: true
   validates :remark_score,

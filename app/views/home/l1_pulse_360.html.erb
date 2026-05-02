@@ -54,7 +54,7 @@
             <table class="guide-table">
               <thead>
                 <tr>
-                  <th>Score Range</th>
+                  <th>Total / 25 Range</th>
                   <th>Band</th>
                   <th>Rating</th>
                   <th>Recommended Action</th>
@@ -64,8 +64,8 @@
                 <% score_range_rows.each do |row| %>
                   <tr class="guide-row guide-row-<%= row[:rating_value] %>">
                     <td><%= row[:score_range] %></td>
-                    <td><strong><%= row[:band] %></strong></td>
-                    <td><%= row[:rating_value] %> (<%= row[:stars] %>)</td>
+                    <td><strong class="rating-band rating-band-<%= row[:rating_value] %>"><%= row[:band] %></strong></td>
+                    <td><span class="rating-pill rating-pill-<%= row[:rating_value] %>"><%= row[:rating_value] %> (<%= row[:stars] %>)</span></td>
                     <td><%= row[:action] %></td>
                   </tr>
                 <% end %>
@@ -101,11 +101,11 @@
                 <% @pulse_rows.each do |row| %>
                   <% assessment = row[:assessment] %>
                   <% cat = row[:pulse_category] %>
-                  <% values_alignment = assessment.values_alignment %>
-                  <% technical_knowledge = assessment.technical_knowledge %>
-                  <% customer_field_engagement = assessment.customer_field_engagement %>
-                  <% execution_accountability = assessment.execution_accountability %>
-                  <% initiative_leadership = assessment.initiative_leadership %>
+                  <% values_alignment = assessment.values_alignment.present? ? (assessment.values_alignment.to_f % 1 == 0 ? assessment.values_alignment.to_i : assessment.values_alignment) : nil %>
+                  <% technical_knowledge = assessment.technical_knowledge.present? ? (assessment.technical_knowledge.to_f % 1 == 0 ? assessment.technical_knowledge.to_i : assessment.technical_knowledge) : nil %>
+                  <% customer_field_engagement = assessment.customer_field_engagement.present? ? (assessment.customer_field_engagement.to_f % 1 == 0 ? assessment.customer_field_engagement.to_i : assessment.customer_field_engagement) : nil %>
+                  <% execution_accountability = assessment.execution_accountability.present? ? (assessment.execution_accountability.to_f % 1 == 0 ? assessment.execution_accountability.to_i : assessment.execution_accountability) : nil %>
+                  <% initiative_leadership = assessment.initiative_leadership.present? ? (assessment.initiative_leadership.to_f % 1 == 0 ? assessment.initiative_leadership.to_i : assessment.initiative_leadership) : nil %>
                   <tr class="pulse-input-row" data-employee-id="<%= row[:employee_detail_id] %>">
                     <td class="staff-name sticky-col">
                       <strong><%= row[:employee_name] %></strong>
@@ -116,12 +116,12 @@
                     <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][customer_field_engagement]", customer_field_engagement, min: 1, max: 5, step: 1, class: "pulse-input pulse-bg-light", data: { pulse_score: true } %></td>
                     <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][execution_accountability]", execution_accountability, min: 1, max: 5, step: 1, class: "pulse-input pulse-bg-light", data: { pulse_score: true } %></td>
                     <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][initiative_leadership]", initiative_leadership, min: 1, max: 5, step: 1, class: "pulse-input pulse-bg-light", data: { pulse_score: true } %></td>
-                    <td class="total-cell" data-pulse-raw-total><%= row[:total_score] %></td>
-                    <td class="total-cell" data-pulse-weighted><%= row[:pulse_weighted] %></td>
+                    <td class="total-cell" data-pulse-raw-total><%= row[:total_score].present? ? (row[:total_score].to_f % 1 == 0 ? row[:total_score].to_i : row[:total_score]) : "" %></td>
+                    <td class="total-cell" data-pulse-weighted><%= row[:pulse_weighted].present? ? "#{row[:pulse_weighted].round}%" : "0%" %></td>
                     <td class="category-cell-mini">
-                      <div class="cat-action-box" data-cat-box>
+                      <div class="cat-action-box <%= cat&.dig(:className) %>-box" data-cat-box>
                         <span class="stars <%= cat&.dig(:className) %>" data-pulse-stars><%= cat&.dig(:stars) %></span>
-                        <strong data-pulse-category-name><%= cat&.dig(:category) %></strong>
+                        <strong class="rating-band <%= cat&.dig(:className) %>-text" data-pulse-category-name><%= cat&.dig(:category) %></strong>
                         <small data-pulse-action><%= cat&.dig(:action) %></small>
                       </div>
                     </td>
@@ -145,13 +145,12 @@
               <thead>
                 <tr>
                   <th class="sticky-col">Employee Name</th>
-                  <th>Professionalism & Conduct (15%)</th>
-                  <th>Quality & Accuracy of Work Output (15%)</th>
-                  <th>Initiative & Problem-Solving (15%)</th>
-                  <th>Adherence to PAPL Values & Culture (15%)</th>
-                  <th>Cross-functional Collaboration (15%)</th>
-                  <th>Time Management & Reliability (15%)</th>
-                  <th>Growth Mindset & Development (10%)</th>
+                  <th>Professionalism & Conduct (20%)</th>
+                  <th>Quality & Accuracy of Work Output (20%)</th>
+                  <th>Initiative & Problem-Solving (20%)</th>
+                  <th>Time Management & Reliability (20%)</th>
+                  <th>Growth Mindset & Development (20%)</th>
+                  <th class="total-col">Total / 25</th>
                   <th class="total-col">Wt % / 10%</th>
                   <th class="remarks-th">L1 Remarks</th>
                 </tr>
@@ -163,14 +162,13 @@
                     <td class="staff-name sticky-col">
                       <strong><%= row[:employee_name] %></strong>
                     </td>
-                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][professionalism_conduct]", assessment.professionalism_conduct, min: 1, max: 5, step: 1, class: "pulse-input mgr-bg-light", data: { manager_score: true, weight: 15 } %></td>
-                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][work_quality_accuracy]", assessment.work_quality_accuracy, min: 1, max: 5, step: 1, class: "pulse-input mgr-bg-light", data: { manager_score: true, weight: 15 } %></td>
-                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][initiative_problem_solving]", assessment.initiative_problem_solving, min: 1, max: 5, step: 1, class: "pulse-input mgr-bg-light", data: { manager_score: true, weight: 15 } %></td>
-                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][papl_values_culture]", assessment.papl_values_culture, min: 1, max: 5, step: 1, class: "pulse-input mgr-bg-light", data: { manager_score: true, weight: 15 } %></td>
-                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][collaboration]", assessment.collaboration, min: 1, max: 5, step: 1, class: "pulse-input mgr-bg-light", data: { manager_score: true, weight: 15 } %></td>
+                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][professionalism_conduct]", assessment.professionalism_conduct, min: 1, max: 5, step: 1, class: "pulse-input mgr-bg-light", data: { manager_score: true, weight: 20 } %></td>
+                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][work_quality_accuracy]", assessment.work_quality_accuracy, min: 1, max: 5, step: 1, class: "pulse-input mgr-bg-light", data: { manager_score: true, weight: 20 } %></td>
+                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][initiative_problem_solving]", assessment.initiative_problem_solving, min: 1, max: 5, step: 1, class: "pulse-input mgr-bg-light", data: { manager_score: true, weight: 20 } %></td>
                     <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][time_management_reliability]", assessment.time_management_reliability, min: 1, max: 5, step: 1, class: "pulse-input mgr-bg-light", data: { manager_score: true, weight: 15 } %></td>
                     <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][growth_mindset_development]", assessment.growth_mindset_development, min: 1, max: 5, step: 1, class: "pulse-input mgr-bg-light", data: { manager_score: true, weight: 10 } %></td>
-                    <td class="mgr-raw-cell" data-mgr-raw><%= row[:manager_feedback_raw] %>%</td>
+                    <td class="total-cell" data-mgr-total><%= row[:manager_feedback_total].present? ? (row[:manager_feedback_total].to_f % 1 == 0 ? row[:manager_feedback_total].to_i : row[:manager_feedback_total]) : "" %></td>
+                    <td class="mgr-raw-cell" data-mgr-raw><%= row[:manager_feedback_raw].present? ? "#{row[:manager_feedback_raw].round}%" : "0%" %></td>
                     <td>
                       <%= text_area_tag "pulse_assessments[#{row[:employee_detail_id]}][remarks]", assessment.remarks, rows: 1, class: "pulse-remarks-input", placeholder: "Final remarks..." %>
                     </td>
@@ -711,6 +709,46 @@
     text-align: left;
   }
 
+  .stars-5-box {
+    border-color: #f8d48c;
+    background: linear-gradient(180deg, #fff8e8 0%, #ffefc3 100%);
+  }
+
+  .stars-4-box {
+    border-color: #fec89a;
+    background: linear-gradient(180deg, #fff5ec 0%, #ffe1c7 100%);
+  }
+
+  .stars-3-box {
+    border-color: #a9c9ff;
+    background: linear-gradient(180deg, #f2f7ff 0%, #dbeafe 100%);
+  }
+
+  .stars-2-box {
+    border-color: #d1b8ff;
+    background: linear-gradient(180deg, #f7f2ff 0%, #ece2ff 100%);
+  }
+
+  .stars-1-box {
+    border-color: #ffc1c1;
+    background: linear-gradient(180deg, #fff1f1 0%, #ffe0e0 100%);
+  }
+
+  .rating-band,
+  .rating-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.28rem 0.65rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    font-weight: 800;
+  }
+
+  .rating-pill {
+    font-size: 0.9rem;
+  }
+
   .cat-action-box strong {
     display: block;
     margin: 0.35rem 0 0.2rem;
@@ -731,13 +769,54 @@
     font-size: 1rem;
     font-weight: 800;
     letter-spacing: 0.1em;
+    padding: 0.22rem 0.52rem;
+    border-radius: 999px;
   }
 
-  .stars-5 { color: #f59e0b; }
-  .stars-4 { color: #fb923c; }
-  .stars-3 { color: #3b82f6; }
-  .stars-2 { color: #8b5cf6; }
-  .stars-1 { color: #ef4444; }
+  .rating-band-5,
+  .rating-pill-5,
+  .stars-5-text,
+  .stars-5 {
+    color: #a16207;
+    background: rgba(251, 191, 36, 0.16);
+    border-color: rgba(245, 158, 11, 0.24);
+  }
+
+  .rating-band-4,
+  .rating-pill-4,
+  .stars-4-text,
+  .stars-4 {
+    color: #c2410c;
+    background: rgba(251, 146, 60, 0.14);
+    border-color: rgba(249, 115, 22, 0.22);
+  }
+
+  .rating-band-3,
+  .rating-pill-3,
+  .stars-3-text,
+  .stars-3 {
+    color: #1d4ed8;
+    background: rgba(59, 130, 246, 0.14);
+    border-color: rgba(37, 99, 235, 0.2);
+  }
+
+  .rating-band-2,
+  .rating-pill-2,
+  .stars-2-text,
+  .stars-2 {
+    color: #7c3aed;
+    background: rgba(139, 92, 246, 0.14);
+    border-color: rgba(124, 58, 237, 0.2);
+  }
+
+  .rating-band-1,
+  .rating-pill-1,
+  .stars-1-text,
+  .stars-1 {
+    color: #dc2626;
+    background: rgba(239, 68, 68, 0.14);
+    border-color: rgba(220, 38, 38, 0.22);
+  }
 
   .remarks-th {
     min-width: 320px;
@@ -879,8 +958,8 @@
             pTotal += parseFloat(i.value);
           }
         });
-        rowB.querySelector("[data-pulse-raw-total]").textContent = hasPulseScores ? pTotal.toFixed(1) : "";
-        rowB.querySelector("[data-pulse-weighted]").textContent = hasPulseScores ? ((pTotal / 25.0) * 15.0).toFixed(2) : "0.0";
+        rowB.querySelector("[data-pulse-raw-total]").textContent = hasPulseScores ? (Number.isInteger(pTotal) ? String(pTotal) : pTotal.toFixed(1)) : "";
+        rowB.querySelector("[data-pulse-weighted]").textContent = hasPulseScores ? Math.round((pTotal / 25.0) * 15.0) + "%" : "0%";
 
         const starsNode = rowB.querySelector("[data-pulse-stars]");
         const categoryNode = rowB.querySelector("[data-pulse-category-name]");
@@ -901,15 +980,22 @@
       }
 
       if (rowC) {
+        let mgrTotal = 0;
         let mgrWeighted = 0;
+        let mgrTotalWeight = 0;
         let hasMgr = false;
         rowC.querySelectorAll("[data-manager-score]").forEach(i => {
           if(i.value) {
             hasMgr = true;
-            mgrWeighted += (parseInt(i.value)/5.0) * parseFloat(i.dataset.weight);
+            mgrTotal += parseFloat(i.value);
+            const weight = parseFloat(i.dataset.weight);
+            mgrWeighted += (parseInt(i.value, 10) / 5.0) * weight;
+            mgrTotalWeight += weight;
           }
         });
-        rowC.querySelector("[data-mgr-raw]").textContent = (hasMgr ? (mgrWeighted * 0.10).toFixed(2) : "0.00") + "%";
+        rowC.querySelector("[data-mgr-total]").textContent = hasMgr ? (Number.isInteger(mgrTotal) ? String(mgrTotal) : mgrTotal.toFixed(1)) : "";
+        const mgrScoreOnTen = hasMgr && mgrTotalWeight > 0 ? ((mgrWeighted / mgrTotalWeight) * 10.0) : 0;
+        rowC.querySelector("[data-mgr-raw]").textContent = Math.round(mgrScoreOnTen) + "%";
       }
     }
 
