@@ -281,6 +281,7 @@ class HomeController < ApplicationController
         customer_field_engagement: customer_field_engagement,
         execution_accountability: execution_accountability,
         initiative_leadership: initiative_leadership,
+        pulse_remarks: assessment_params[:pulse_remarks].presence,
         remarks: assessment_params[:remarks].presence, professionalism_conduct: assessment_params[:professionalism_conduct].presence,
         work_quality_accuracy: assessment_params[:work_quality_accuracy].presence, initiative_problem_solving: assessment_params[:initiative_problem_solving].presence,
         papl_values_culture: nil, collaboration: nil,
@@ -332,7 +333,17 @@ class HomeController < ApplicationController
   def pulse_category_details(ts)
     return nil if ts.blank?
 
-    case pulse_raw_percentage(ts).to_f
+    category_details_from_percentage(pulse_raw_percentage(ts).to_f)
+  end
+
+  def manager_feedback_category_details(raw_percentage)
+    return nil if raw_percentage.blank?
+
+    category_details_from_percentage(raw_percentage.to_f)
+  end
+
+  def category_details_from_percentage(raw_percentage)
+    case raw_percentage
     when 90..100 then { stars: "★★★★★", category: "Outstanding", action: "Accelerated growth track / highest increment", className: "stars-5" }
     when 75...90 then { stars: "★★★★", category: "Exceeds Expectations", action: "Merit increment + recognition award", className: "stars-4" }
     when 60...75 then { stars: "★★★", category: "Meets Expectations", action: "Standard increment as per policy", className: "stars-3" }
@@ -360,7 +371,7 @@ class HomeController < ApplicationController
 
   def score_range_rows
     [
-      { score_range: "23 - 25", band: "Outstanding", rating: "5 (★★★★★)", rating_value: 5, stars: "★★★★★", className: "stars-5", action: "Accelerated growth track / highest increment" },
+      { score_range: "> 23", band: "Outstanding", rating: "5 (★★★★★)", rating_value: 5, stars: "★★★★★", className: "stars-5", action: "Accelerated growth track / highest increment" },
       { score_range: "19 - 22", band: "Exceeds Expectations", rating: "4 (★★★★)", rating_value: 4, stars: "★★★★", className: "stars-4", action: "Merit increment + recognition award" },
       { score_range: "15 - 18", band: "Meets Expectations", rating: "3 (★★★)", rating_value: 3, stars: "★★★", className: "stars-3", action: "Standard increment as per policy" },
       { score_range: "11 - 14", band: "Needs Improvement", rating: "2 (★★)", rating_value: 2, stars: "★★", className: "stars-2", action: "PIP + structured coaching plan" },
@@ -502,7 +513,7 @@ class HomeController < ApplicationController
   end
 
   def assessment_blank?(p)
-    [ :values_alignment, :technical_knowledge, :customer_field_engagement, :execution_accountability, :initiative_leadership, :remarks, :professionalism_conduct, :work_quality_accuracy, :initiative_problem_solving, :time_management_reliability, :growth_mindset_development ].all? { |f| p[f].blank? }
+    [ :values_alignment, :technical_knowledge, :customer_field_engagement, :execution_accountability, :initiative_leadership, :pulse_remarks, :remarks, :professionalism_conduct, :work_quality_accuracy, :initiative_problem_solving, :time_management_reliability, :growth_mindset_development ].all? { |f| p[f].blank? }
   end
 
   def numeric_score_or_nil(value)
@@ -533,6 +544,7 @@ class HomeController < ApplicationController
       pulse_scores: ps, pulse_available: pulse_available, pulse_weighted: ws_pulse,
       pulse_raw_percentage: pulse_raw_percentage(ts) || 0.0,
       pulse_category: pulse_category_details(ts),
+      pulse_remarks: pa&.pulse_remarks,
       pulse_assessment_remarks: pa&.remarks, pulse_assessment_score: manager_feedback[:score_on_ten] || pa&.remark_score,
       manager_feedback_total: manager_feedback_total_for_assessment(pa),
       manager_feedback: manager_feedback,
@@ -575,7 +587,9 @@ class HomeController < ApplicationController
   def build_l1_pulse_row(ed)
     a = l1_assessment_for(ed)
     ts = pulse_total_for_assessment(a)
-    { employee_detail_id: ed.id, employee_name: ed.employee_name, employee_code: ed.employee_code, department: ed.user_details.first&.department&.department_type || ed.department, assessment: a, total_score: ts, pulse_weighted: pulse_weighted_score(ts), pulse_category: pulse_category_details(ts), manager_feedback_total: manager_feedback_total_for_assessment(a), manager_feedback_raw: manager_feedback_raw_percentage(a) }
+    manager_summary = manager_feedback_summary_for(a)
+    manager_raw = manager_feedback_raw_percentage(a)
+    { employee_detail_id: ed.id, employee_name: ed.employee_name, employee_code: ed.employee_code, department: ed.user_details.first&.department&.department_type || ed.department, assessment: a, total_score: ts, pulse_weighted: pulse_weighted_score(ts), pulse_category: pulse_category_details(ts), pulse_remarks: a.pulse_remarks, manager_feedback_total: manager_feedback_total_for_assessment(a), manager_feedback_raw: manager_raw, manager_feedback_category: manager_summary[:available] ? manager_feedback_category_details(manager_summary[:raw_total]) : nil }
   end
 
   def pulse_team_average(rows)
@@ -638,6 +652,7 @@ class HomeController < ApplicationController
     @dashboard_pulse_scores = ps
     @dashboard_pulse_category = pulse_category_details(ps[:total_score])
     @dashboard_pulse_available = ps[:total_score].present?
+    @dashboard_pulse_section_remarks = pa&.pulse_remarks
     @dashboard_pulse_remarks = pa&.remarks
     @dashboard_pulse_remark_score = manager_feedback[:score_on_ten] || pa&.remark_score
     @dashboard_manager_feedback = manager_feedback

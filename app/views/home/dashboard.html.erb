@@ -290,6 +290,15 @@
                 <span class="summary-chip annual-summary-chip"><%= @dashboard_pulse_category[:category] %></span>
               <% end %>
             </div>
+
+            <div class="single-remark-box employee-remark-box">
+              <div class="dashboard-remark-heading">Pulse Remarks</div>
+              <% if @dashboard_pulse_section_remarks.present? %>
+                <p><%= @dashboard_pulse_section_remarks %></p>
+              <% else %>
+                <p class="empty-state">No pulse remarks available yet.</p>
+              <% end %>
+            </div>
           </div>
 
           <div class="remarks-panel employee-manager-panel" id="pulse-remarks-section">
@@ -477,10 +486,11 @@
               <th>Staff Name</th>
               <th>Role</th>
               <% pulse_group_rows_for(@dashboard_pulse_scores).each do |dimension| %>
-                <th><%= dimension[:label] %> (1-5)</th>
+              <th><%= dimension[:label] %> (1-5)</th>
               <% end %>
               <th>Total /25</th>
               <th>15% Computed</th>
+              <th>Pulse Remarks</th>
               <th>Category & Action</th>
             </tr>
           </thead>
@@ -496,6 +506,7 @@
                   <% end %>
                   <td class="pulse-total"><%= row[:pulse_scores][:total_score].present? ? fmt_num.call(row[:pulse_scores][:total_score], 1) : "-" %></td>
                   <td class="pulse-total"><%= "#{row[:summary_scores][:pulse_score].to_f.round}%" %></td>
+                  <td><%= row[:pulse_remarks].presence || "-" %></td>
                   <td><%= row[:pulse_available] ? pulse_category_markup.call(row[:pulse_scores][:total_score]) : "" %></td>
                 </tr>
               <% end %>
@@ -509,6 +520,7 @@
                 <% end %>
                 <td class="pulse-total"><%= @dashboard_pulse_scores[:total_score].present? ? fmt_num.call(@dashboard_pulse_scores[:total_score], 1) : "-" %></td>
                 <td class="pulse-total"><%= "#{@dashboard_summary_scores[:pulse_score].to_f.round}%" %></td>
+                <td><%= @dashboard_pulse_section_remarks.presence || "-" %></td>
                 <td><%= @dashboard_pulse_available ? pulse_category_markup.call(@dashboard_pulse_scores[:total_score]) : "" %></td>
               </tr>
             <% end %>
@@ -522,6 +534,7 @@
                 <% end %>
                 <td class="pulse-total"><%= fmt_num.call(team_average[:total_score], 1) %></td>
                 <td class="pulse-total"><%= "#{team_average[:pulse_score].to_f.round}%" %></td>
+                <td>-</td>
                 <td><%= team_average[:category][:stars] %> <%= team_average[:category][:category] %></td>
               </tr>
             </tfoot>

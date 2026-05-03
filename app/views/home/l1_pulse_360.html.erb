@@ -94,6 +94,7 @@
                   <th class="metric-th">Initiative &amp; Leadership</th>
                   <th class="total-col">Total / 25</th>
                   <th class="total-col">Wt % / 15%</th>
+                  <th class="remarks-th">Pulse Remarks</th>
                   <th class="category-col">Category & Action</th>
                 </tr>
               </thead>
@@ -118,6 +119,9 @@
                     <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][initiative_leadership]", initiative_leadership, min: 1, max: 5, step: 1, class: "pulse-input pulse-bg-light", data: { pulse_score: true } %></td>
                     <td class="total-cell" data-pulse-raw-total><%= row[:total_score].present? ? (row[:total_score].to_f % 1 == 0 ? row[:total_score].to_i : row[:total_score]) : "" %></td>
                     <td class="total-cell" data-pulse-weighted><%= row[:pulse_weighted].present? ? "#{row[:pulse_weighted].round}%" : "0%" %></td>
+                    <td>
+                      <%= text_area_tag "pulse_assessments[#{row[:employee_detail_id]}][pulse_remarks]", assessment.pulse_remarks, rows: 1, class: "pulse-remarks-input", placeholder: "Pulse remarks..." %>
+                    </td>
                     <td class="category-cell-mini">
                       <div class="cat-action-box <%= cat&.dig(:className) %>-box" data-cat-box>
                         <span class="stars <%= cat&.dig(:className) %>" data-pulse-stars><%= cat&.dig(:stars) %></span>
@@ -153,11 +157,13 @@
                   <th class="total-col">Total / 25</th>
                   <th class="total-col">Wt % / 10%</th>
                   <th class="remarks-th">L1 Remarks</th>
+                  <th class="category-col">Category & Action</th>
                 </tr>
               </thead>
               <tbody>
                 <% @pulse_rows.each do |row| %>
                   <% assessment = row[:assessment] %>
+                  <% mgr_cat = row[:manager_feedback_category] %>
                   <tr class="mgr-input-row" data-employee-id="<%= row[:employee_detail_id] %>">
                     <td class="staff-name sticky-col">
                       <strong><%= row[:employee_name] %></strong>
@@ -171,6 +177,13 @@
                     <td class="mgr-raw-cell" data-mgr-raw><%= row[:manager_feedback_raw].present? ? "#{row[:manager_feedback_raw].round}%" : "0%" %></td>
                     <td>
                       <%= text_area_tag "pulse_assessments[#{row[:employee_detail_id]}][remarks]", assessment.remarks, rows: 1, class: "pulse-remarks-input", placeholder: "Final remarks..." %>
+                    </td>
+                    <td class="category-cell-mini">
+                      <div class="cat-action-box <%= mgr_cat&.dig(:className) %>-box" data-mgr-cat-box>
+                        <span class="stars <%= mgr_cat&.dig(:className) %>" data-mgr-stars><%= mgr_cat&.dig(:stars) %></span>
+                        <strong class="rating-band <%= mgr_cat&.dig(:className) %>-text" data-mgr-category-name><%= mgr_cat&.dig(:category) %></strong>
+                        <small data-mgr-action><%= mgr_cat&.dig(:action) %></small>
+                      </div>
                     </td>
                   </tr>
                 <% end %>
@@ -945,6 +958,14 @@
       return { stars: "★", category: "Unsatisfactory", action: "Formal PIP / disciplinary review", className: "stars-1" };
     }
 
+    function getCategoryFromPercentage(rawPercentage) {
+      if (rawPercentage >= 90) return { stars: "★★★★★", category: "Outstanding", action: "Accelerated growth track / highest increment", className: "stars-5" };
+      if (rawPercentage >= 75) return { stars: "★★★★", category: "Exceeds Expectations", action: "Merit increment + recognition award", className: "stars-4" };
+      if (rawPercentage >= 60) return { stars: "★★★", category: "Meets Expectations", action: "Standard increment as per policy", className: "stars-3" };
+      if (rawPercentage >= 45) return { stars: "★★", category: "Needs Improvement", action: "PIP + structured coaching plan", className: "stars-2" };
+      return { stars: "★", category: "Unsatisfactory", action: "Formal PIP / disciplinary review", className: "stars-1" };
+    }
+
     function updateRow(rowId) {
       const rowB = document.querySelector(`.pulse-input-row[data-employee-id="${rowId}"]`);
       const rowC = document.querySelector(`.mgr-input-row[data-employee-id="${rowId}"]`);
@@ -996,6 +1017,27 @@
         rowC.querySelector("[data-mgr-total]").textContent = hasMgr ? (Number.isInteger(mgrTotal) ? String(mgrTotal) : mgrTotal.toFixed(1)) : "";
         const mgrScoreOnTen = hasMgr && mgrTotalWeight > 0 ? ((mgrWeighted / mgrTotalWeight) * 10.0) : 0;
         rowC.querySelector("[data-mgr-raw]").textContent = Math.round(mgrScoreOnTen) + "%";
+        const mgrStarsNode = rowC.querySelector("[data-mgr-stars]");
+        const mgrCategoryNode = rowC.querySelector("[data-mgr-category-name]");
+        const mgrActionNode = rowC.querySelector("[data-mgr-action]");
+        const mgrCatBox = rowC.querySelector("[data-mgr-cat-box]");
+
+        if (hasMgr) {
+          const mgrCat = getCategoryFromPercentage(mgrScoreOnTen * 10.0);
+          mgrStarsNode.textContent = mgrCat.stars;
+          mgrStarsNode.className = "stars " + mgrCat.className;
+          mgrCategoryNode.textContent = mgrCat.category;
+          mgrCategoryNode.className = "rating-band " + mgrCat.className + "-text";
+          mgrActionNode.textContent = mgrCat.action;
+          mgrCatBox.className = "cat-action-box " + mgrCat.className + "-box";
+        } else {
+          mgrStarsNode.textContent = "";
+          mgrStarsNode.className = "stars";
+          mgrCategoryNode.textContent = "";
+          mgrCategoryNode.className = "rating-band";
+          mgrActionNode.textContent = "";
+          mgrCatBox.className = "cat-action-box";
+        }
       }
     }
 
