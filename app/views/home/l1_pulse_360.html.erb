@@ -3,14 +3,13 @@
     <div class="l1-pulse-header-card">
       <div class="l1-pulse-hero-copy">
         <span class="l1-pulse-kicker">L1 Dashboard</span>
-        <h1>L1 Assessment (Pulse + Manager Feedback)</h1>
+        <h1>L1 Assessment (Pulse-360)</h1>
         <p>
-          Combined assessment including PULSE-360 (15%) and LINE MANAGER FEEDBACK (10%). Total overall contribution: 25%.
+          PULSE-360 assessment contributes 25% to the final review block.
         </p>
         <div class="l1-pulse-chip-row">
           <span class="l1-pulse-chip chip-kra">KRA 75%</span>
-          <span class="l1-pulse-chip chip-pulse">Pulse 15%</span>
-          <span class="l1-pulse-chip chip-manager">Manager 10%</span>
+          <span class="l1-pulse-chip chip-pulse">Pulse 25%</span>
           <span class="l1-pulse-chip chip-total">Composite 100%</span>
         </div>
       </div>
@@ -23,18 +22,13 @@
         </div>
         <div class="l1-pulse-mini-stat stat-pulse">
           <span>Pulse Weight</span>
-          <strong>15%</strong>
+          <strong>25%</strong>
           <small>Section B contribution</small>
-        </div>
-        <div class="l1-pulse-mini-stat stat-manager">
-          <span>Manager Weight</span>
-          <strong>10%</strong>
-          <small>Section C contribution</small>
         </div>
         <div class="l1-pulse-mini-stat stat-total">
           <span>Review Block</span>
           <strong>25%</strong>
-          <small>Combined L1 score</small>
+          <small>Pulse contribution</small>
         </div>
       </div>
     </div>
@@ -78,7 +72,7 @@
         <div class="l1-pulse-card glass-panel">
           <div class="l1-pulse-card-header">
             <span class="section-tag pulse-tag">Section B</span>
-            <h2>PULSE-360 SURVEY SCORE (Weightage : 15%)</h2>
+            <h2>PULSE-360 SURVEY SCORE (Weightage : 25%)</h2>
             <p>Please provide scores (1-5) under the five Section B headings. Category will update dynamically.</p>
           </div>
 
@@ -93,7 +87,7 @@
                   <th class="metric-th">Execution &amp; Accountability</th>
                   <th class="metric-th">Initiative &amp; Leadership</th>
                   <th class="total-col">Total / 25</th>
-                  <th class="total-col">Wt % / 15%</th>
+                  <th class="total-col">Wt % / 25%</th>
                   <th class="remarks-th">Pulse Remarks</th>
                   <th class="category-col">Category & Action</th>
                 </tr>
@@ -133,65 +127,6 @@
                 <% end %>
               </tbody>
             </table>
-          </div>
-        </div>
-
-        <%# SECTION C: LINE MANAGER FEEDBACK %>
-        <div class="l1-pulse-card glass-panel mgr-section">
-          <div class="l1-pulse-card-header">
-            <span class="section-tag mgr-tag">Section C</span>
-            <h2>LINE MANAGER FEEDBACK (Weightage : 10%)</h2>
-            <p>Please provide scores (1-5) for managerial criteria and final remarks.</p>
-          </div>
-
-          <div class="l1-pulse-table-wrap">
-            <table class="l1-pulse-table mgr-theme-table">
-              <thead>
-                <tr>
-                  <th class="sticky-col">Employee Name</th>
-                  <th>Professionalism & Conduct (20%)</th>
-                  <th>Quality & Accuracy of Work Output (20%)</th>
-                  <th>Initiative & Problem-Solving (20%)</th>
-                  <th>Time Management & Reliability (20%)</th>
-                  <th>Growth Mindset & Development (20%)</th>
-                  <th class="total-col">Total / 25</th>
-                  <th class="total-col">Wt % / 10%</th>
-                  <th class="remarks-th">L1 Remarks</th>
-                  <th class="category-col">Category & Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                <% @pulse_rows.each do |row| %>
-                  <% assessment = row[:assessment] %>
-                  <% mgr_cat = row[:manager_feedback_category] %>
-                  <tr class="mgr-input-row" data-employee-id="<%= row[:employee_detail_id] %>">
-                    <td class="staff-name sticky-col">
-                      <strong><%= row[:employee_name] %></strong>
-                    </td>
-                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][professionalism_conduct]", assessment.professionalism_conduct, min: 1, max: 5, step: 1, class: "pulse-input mgr-bg-light", data: { manager_score: true, weight: 20 } %></td>
-                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][work_quality_accuracy]", assessment.work_quality_accuracy, min: 1, max: 5, step: 1, class: "pulse-input mgr-bg-light", data: { manager_score: true, weight: 20 } %></td>
-                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][initiative_problem_solving]", assessment.initiative_problem_solving, min: 1, max: 5, step: 1, class: "pulse-input mgr-bg-light", data: { manager_score: true, weight: 20 } %></td>
-                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][time_management_reliability]", assessment.time_management_reliability, min: 1, max: 5, step: 1, class: "pulse-input mgr-bg-light", data: { manager_score: true, weight: 15 } %></td>
-                    <td><%= number_field_tag "pulse_assessments[#{row[:employee_detail_id]}][growth_mindset_development]", assessment.growth_mindset_development, min: 1, max: 5, step: 1, class: "pulse-input mgr-bg-light", data: { manager_score: true, weight: 10 } %></td>
-                    <td class="total-cell" data-mgr-total><%= row[:manager_feedback_total].present? ? (row[:manager_feedback_total].to_f % 1 == 0 ? row[:manager_feedback_total].to_i : row[:manager_feedback_total]) : "" %></td>
-                    <td class="mgr-raw-cell" data-mgr-raw><%= row[:manager_feedback_raw].present? ? "#{row[:manager_feedback_raw].round}%" : "0%" %></td>
-                    <td>
-                      <%= text_area_tag "pulse_assessments[#{row[:employee_detail_id]}][remarks]", assessment.remarks, rows: 1, class: "pulse-remarks-input", placeholder: "Final remarks..." %>
-                    </td>
-                    <td class="category-cell-mini">
-                      <div class="cat-action-box <%= mgr_cat&.dig(:className) %>-box" data-mgr-cat-box>
-                        <span class="stars <%= mgr_cat&.dig(:className) %>" data-mgr-stars><%= mgr_cat&.dig(:stars) %></span>
-                        <strong class="rating-band <%= mgr_cat&.dig(:className) %>-text" data-mgr-category-name><%= mgr_cat&.dig(:category) %></strong>
-                        <small data-mgr-action><%= mgr_cat&.dig(:action) %></small>
-                      </div>
-                    </td>
-                  </tr>
-                <% end %>
-              </tbody>
-            </table>
-          </div>
-          <div class="mgr-legend">
-            Scale: 1=Needs Improvement 3=Meets Expectations 5=Exceptional
           </div>
         </div>
 
@@ -760,6 +695,8 @@
 
   .rating-pill {
     font-size: 0.9rem;
+    font-weight: 800;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.38);
   }
 
   .cat-action-box strong {
@@ -791,8 +728,8 @@
   .stars-5-text,
   .stars-5 {
     color: #a16207;
-    background: rgba(251, 191, 36, 0.16);
-    border-color: rgba(245, 158, 11, 0.24);
+    background: linear-gradient(180deg, rgba(254, 243, 199, 0.95) 0%, rgba(253, 230, 138, 0.95) 100%);
+    border-color: rgba(245, 158, 11, 0.32);
   }
 
   .rating-band-4,
@@ -800,8 +737,8 @@
   .stars-4-text,
   .stars-4 {
     color: #c2410c;
-    background: rgba(251, 146, 60, 0.14);
-    border-color: rgba(249, 115, 22, 0.22);
+    background: linear-gradient(180deg, rgba(255, 237, 213, 0.95) 0%, rgba(254, 215, 170, 0.95) 100%);
+    border-color: rgba(249, 115, 22, 0.3);
   }
 
   .rating-band-3,
@@ -809,8 +746,8 @@
   .stars-3-text,
   .stars-3 {
     color: #1d4ed8;
-    background: rgba(59, 130, 246, 0.14);
-    border-color: rgba(37, 99, 235, 0.2);
+    background: linear-gradient(180deg, rgba(219, 234, 254, 0.98) 0%, rgba(191, 219, 254, 0.95) 100%);
+    border-color: rgba(37, 99, 235, 0.28);
   }
 
   .rating-band-2,
@@ -818,8 +755,8 @@
   .stars-2-text,
   .stars-2 {
     color: #7c3aed;
-    background: rgba(139, 92, 246, 0.14);
-    border-color: rgba(124, 58, 237, 0.2);
+    background: linear-gradient(180deg, rgba(237, 233, 254, 0.98) 0%, rgba(221, 214, 254, 0.95) 100%);
+    border-color: rgba(124, 58, 237, 0.28);
   }
 
   .rating-band-1,
@@ -827,8 +764,8 @@
   .stars-1-text,
   .stars-1 {
     color: #dc2626;
-    background: rgba(239, 68, 68, 0.14);
-    border-color: rgba(220, 38, 38, 0.22);
+    background: linear-gradient(180deg, rgba(254, 226, 226, 0.98) 0%, rgba(254, 202, 202, 0.95) 100%);
+    border-color: rgba(220, 38, 38, 0.3);
   }
 
   .remarks-th {
@@ -854,18 +791,6 @@
     outline: none;
     border-color: #2563eb;
     box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
-  }
-
-  .mgr-legend {
-    margin-top: 1rem;
-    padding: 1rem 1.15rem;
-    border-radius: 20px;
-    border: 1px solid #f3d7b9;
-    background: linear-gradient(180deg, #fffaf4 0%, #fff3e5 100%);
-    text-align: center;
-    color: #9a3412;
-    font-weight: 700;
-    font-style: italic;
   }
 
   .l1-pulse-save-bar {
@@ -958,18 +883,9 @@
       return { stars: "★", category: "Unsatisfactory", action: "Formal PIP / disciplinary review", className: "stars-1" };
     }
 
-    function getCategoryFromPercentage(rawPercentage) {
-      if (rawPercentage >= 90) return { stars: "★★★★★", category: "Outstanding", action: "Accelerated growth track / highest increment", className: "stars-5" };
-      if (rawPercentage >= 75) return { stars: "★★★★", category: "Exceeds Expectations", action: "Merit increment + recognition award", className: "stars-4" };
-      if (rawPercentage >= 60) return { stars: "★★★", category: "Meets Expectations", action: "Standard increment as per policy", className: "stars-3" };
-      if (rawPercentage >= 45) return { stars: "★★", category: "Needs Improvement", action: "PIP + structured coaching plan", className: "stars-2" };
-      return { stars: "★", category: "Unsatisfactory", action: "Formal PIP / disciplinary review", className: "stars-1" };
-    }
-
     function updateRow(rowId) {
       const rowB = document.querySelector(`.pulse-input-row[data-employee-id="${rowId}"]`);
-      const rowC = document.querySelector(`.mgr-input-row[data-employee-id="${rowId}"]`);
-      
+
       if (rowB) {
         let pTotal = 0;
         let hasPulseScores = false;
@@ -980,7 +896,7 @@
           }
         });
         rowB.querySelector("[data-pulse-raw-total]").textContent = hasPulseScores ? (Number.isInteger(pTotal) ? String(pTotal) : pTotal.toFixed(1)) : "";
-        rowB.querySelector("[data-pulse-weighted]").textContent = hasPulseScores ? Math.round((pTotal / 25.0) * 15.0) + "%" : "0%";
+        rowB.querySelector("[data-pulse-weighted]").textContent = hasPulseScores ? Math.round((pTotal / 25.0) * 25.0) + "%" : "0%";
 
         const starsNode = rowB.querySelector("[data-pulse-stars]");
         const categoryNode = rowB.querySelector("[data-pulse-category-name]");
@@ -997,46 +913,6 @@
           starsNode.className = "stars";
           categoryNode.textContent = "";
           actionNode.textContent = "";
-        }
-      }
-
-      if (rowC) {
-        let mgrTotal = 0;
-        let mgrWeighted = 0;
-        let mgrTotalWeight = 0;
-        let hasMgr = false;
-        rowC.querySelectorAll("[data-manager-score]").forEach(i => {
-          if(i.value) {
-            hasMgr = true;
-            mgrTotal += parseFloat(i.value);
-            const weight = parseFloat(i.dataset.weight);
-            mgrWeighted += (parseInt(i.value, 10) / 5.0) * weight;
-            mgrTotalWeight += weight;
-          }
-        });
-        rowC.querySelector("[data-mgr-total]").textContent = hasMgr ? (Number.isInteger(mgrTotal) ? String(mgrTotal) : mgrTotal.toFixed(1)) : "";
-        const mgrScoreOnTen = hasMgr && mgrTotalWeight > 0 ? ((mgrWeighted / mgrTotalWeight) * 10.0) : 0;
-        rowC.querySelector("[data-mgr-raw]").textContent = Math.round(mgrScoreOnTen) + "%";
-        const mgrStarsNode = rowC.querySelector("[data-mgr-stars]");
-        const mgrCategoryNode = rowC.querySelector("[data-mgr-category-name]");
-        const mgrActionNode = rowC.querySelector("[data-mgr-action]");
-        const mgrCatBox = rowC.querySelector("[data-mgr-cat-box]");
-
-        if (hasMgr) {
-          const mgrCat = getCategoryFromPercentage(mgrScoreOnTen * 10.0);
-          mgrStarsNode.textContent = mgrCat.stars;
-          mgrStarsNode.className = "stars " + mgrCat.className;
-          mgrCategoryNode.textContent = mgrCat.category;
-          mgrCategoryNode.className = "rating-band " + mgrCat.className + "-text";
-          mgrActionNode.textContent = mgrCat.action;
-          mgrCatBox.className = "cat-action-box " + mgrCat.className + "-box";
-        } else {
-          mgrStarsNode.textContent = "";
-          mgrStarsNode.className = "stars";
-          mgrCategoryNode.textContent = "";
-          mgrCategoryNode.className = "rating-band";
-          mgrActionNode.textContent = "";
-          mgrCatBox.className = "cat-action-box";
         }
       }
     }

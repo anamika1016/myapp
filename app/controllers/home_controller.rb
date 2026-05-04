@@ -63,7 +63,7 @@ class HomeController < ApplicationController
         sheet.add_row [
           "Staff Name", "Role", "Wt %", "Values Alignment (1-5)", "Technical Knowledge (1-5)",
           "Customer & Field Engagement (1-5)", "Execution & Accountability (1-5)", "Initiative & Leadership (1-5)",
-          "Total /25", "15% Computed", "Category & Action"
+          "Total /25", "25% Computed", "Category & Action"
         ]
         @employee_rows.each do |row|
           category = row[:pulse_category]
@@ -102,40 +102,12 @@ class HomeController < ApplicationController
       end
     end
 
-    workbook.add_worksheet(name: "Line Manager Feedback") do |sheet|
-      if @dashboard_mode == :admin
-        criteria_headers = manager_feedback_criteria_for(nil).map { |criterion| "#{criterion[:label]} (1-5)" }
-        sheet.add_row [ "Employee", "Code", *criteria_headers, "Mgr Score /10", "Manager Remarks" ]
-        @employee_rows.each do |row|
-          criteria = row[:manager_feedback][:criteria]
-          sheet.add_row [
-            row[:employee_name], row[:employee_code],
-            *criteria.map { |criterion| criterion[:score] },
-            row[:pulse_assessment_score], row[:pulse_assessment_remarks]
-          ]
-        end
-      else
-        sheet.add_row [ "Assessment Criteria", "Wt %", "Score (1-5)", "Wtd Score", "Rating" ]
-        Array(@dashboard_manager_feedback[:criteria]).each do |criterion|
-          sheet.add_row [
-            criterion[:label], "#{criterion[:weight]}%", criterion[:score],
-            criterion[:weighted_score].present? ? "#{criterion[:weighted_score]}%" : "-",
-            score_rating_text(criterion[:score])
-          ]
-        end
-        sheet.add_row [ "MANAGER TOTAL", "100%", "", @dashboard_manager_feedback[:available] ? "Mgr Raw -> #{@dashboard_manager_feedback[:raw_total]}%" : "Pending assessment", @dashboard_pulse_remark_score.present? ? "Score #{@dashboard_pulse_remark_score}/10" : "Pending" ]
-        sheet.add_row []
-        sheet.add_row [ "Manager Remarks", @dashboard_pulse_remarks.presence || "No manager remarks available yet." ]
-      end
-    end
-
     workbook.add_worksheet(name: "Composite Score") do |sheet|
       if @dashboard_mode == :admin
-        sheet.add_row [ "User", "KRA %", "Pulse %", "Manager %", "Final Total" ]
+        sheet.add_row [ "User", "KRA %", "Pulse %", "Final Total" ]
         @employee_rows.each do |row|
           sheet.add_row [
             row[:employee_name], formatted_percent(row[:annual_percentage]), formatted_percent(row[:pulse_raw_percentage]),
-            formatted_percent(row[:manager_raw_percentage]),
             formatted_percent(row[:summary_scores][:final_total])
           ]
         end
@@ -144,7 +116,6 @@ class HomeController < ApplicationController
             "TEAM AVERAGE",
             formatted_percent((@employee_rows.sum { |r| r[:annual_percentage].to_f } / @employee_rows.size)),
             formatted_percent((@employee_rows.sum { |r| r[:pulse_raw_percentage].to_f } / @employee_rows.size)),
-            formatted_percent((@employee_rows.sum { |r| r[:manager_raw_percentage].to_f } / @employee_rows.size)),
             formatted_percent((@employee_rows.sum { |r| r[:summary_scores][:final_total].to_f } / @employee_rows.size))
           ]
         end
@@ -192,7 +163,7 @@ class HomeController < ApplicationController
     when "pulse"
       workbook.add_worksheet(name: "Pulse Score") do |sheet|
         if @dashboard_mode == :admin
-          sheet.add_row [ "Staff Name", "Role", "Wt %", "Values Alignment (1-5)", "Technical Knowledge (1-5)", "Customer & Field Engagement (1-5)", "Execution & Accountability (1-5)", "Initiative & Leadership (1-5)", "Total /25", "15% Computed", "Category & Action" ]
+          sheet.add_row [ "Staff Name", "Role", "Wt %", "Values Alignment (1-5)", "Technical Knowledge (1-5)", "Customer & Field Engagement (1-5)", "Execution & Accountability (1-5)", "Initiative & Leadership (1-5)", "Total /25", "25% Computed", "Category & Action" ]
           @employee_rows.each do |row|
             category = row[:pulse_category]
             grouped_scores = pulse_group_rows_for(row[:pulse_scores])
@@ -210,38 +181,15 @@ class HomeController < ApplicationController
           sheet.add_row [ "PULSE TOTAL", "100%", "", pulse_raw.present? ? "Pulse Raw -> #{pulse_raw}%" : "Pending assessment", @dashboard_pulse_category&.dig(:category) || "Pending" ]
         end
       end
-    when "remarks"
-      workbook.add_worksheet(name: "Line Manager Feedback") do |sheet|
-        if @dashboard_mode == :admin
-          criteria_headers = manager_feedback_criteria_for(nil).map { |criterion| "#{criterion[:label]} (1-5)" }
-          sheet.add_row [ "Employee", "Code", *criteria_headers, "Mgr Score /10", "Manager Remarks" ]
-          @employee_rows.each do |row|
-            criteria = row[:manager_feedback][:criteria]
-            sheet.add_row [
-              row[:employee_name], row[:employee_code],
-              *criteria.map { |criterion| criterion[:score] },
-              row[:pulse_assessment_score], row[:pulse_assessment_remarks]
-            ]
-          end
-        else
-          sheet.add_row [ "Assessment Criteria", "Wt %", "Score (1-5)", "Wtd Score", "Rating" ]
-          Array(@dashboard_manager_feedback[:criteria]).each do |criterion|
-            sheet.add_row [ criterion[:label], "#{criterion[:weight]}%", criterion[:score], criterion[:weighted_score].present? ? "#{criterion[:weighted_score]}%" : "-", score_rating_text(criterion[:score]) ]
-          end
-          sheet.add_row [ "MANAGER TOTAL", "100%", "", @dashboard_manager_feedback[:available] ? "Mgr Raw -> #{@dashboard_manager_feedback[:raw_total]}%" : "Pending assessment", @dashboard_pulse_remark_score.present? ? "Score #{@dashboard_pulse_remark_score}/10" : "Pending" ]
-          sheet.add_row []
-          sheet.add_row [ "Manager Remarks", @dashboard_pulse_remarks.presence || "No manager remarks available yet." ]
-        end
-      end
     when "summary"
       workbook.add_worksheet(name: "Composite Score") do |sheet|
         if @dashboard_mode == :admin
-          sheet.add_row [ "User", "KRA %", "Pulse %", "Manager %", "Final Total" ]
+          sheet.add_row [ "User", "KRA %", "Pulse %", "Final Total" ]
           @employee_rows.each do |row|
-            sheet.add_row [ row[:employee_name], formatted_percent(row[:annual_percentage]), formatted_percent(row[:pulse_raw_percentage]), formatted_percent(row[:manager_raw_percentage]), formatted_percent(row[:summary_scores][:final_total]) ]
+            sheet.add_row [ row[:employee_name], formatted_percent(row[:annual_percentage]), formatted_percent(row[:pulse_raw_percentage]), formatted_percent(row[:summary_scores][:final_total]) ]
           end
           if @employee_rows.any?
-            sheet.add_row [ "TEAM AVERAGE", formatted_percent((@employee_rows.sum { |r| r[:annual_percentage].to_f } / @employee_rows.size)), formatted_percent((@employee_rows.sum { |r| r[:pulse_raw_percentage].to_f } / @employee_rows.size)), formatted_percent((@employee_rows.sum { |r| r[:manager_raw_percentage].to_f } / @employee_rows.size)), formatted_percent((@employee_rows.sum { |r| r[:summary_scores][:final_total].to_f } / @employee_rows.size)) ]
+            sheet.add_row [ "TEAM AVERAGE", formatted_percent((@employee_rows.sum { |r| r[:annual_percentage].to_f } / @employee_rows.size)), formatted_percent((@employee_rows.sum { |r| r[:pulse_raw_percentage].to_f } / @employee_rows.size)), formatted_percent((@employee_rows.sum { |r| r[:summary_scores][:final_total].to_f } / @employee_rows.size)) ]
           end
         else
           sheet.add_row [ "Section", "Raw Score", "Section Weight", "Weighted Contribution" ]
@@ -268,7 +216,13 @@ class HomeController < ApplicationController
       next unless employee_detail
       next if assessment_blank?(assessment_params)
 
-      assessment = L1PulseAssessment.find_or_initialize_by(employee_detail_id: employee_detail.id, l1_user_id: current_user.id)
+      assessment = if current_user.hod? || current_user.admin?
+        latest_filled_l1_assessment_for(employee_detail) ||
+          employee_detail.l1_pulse_assessments.max_by(&:updated_at) ||
+          L1PulseAssessment.new(employee_detail_id: employee_detail.id, l1_user_id: current_user.id)
+      else
+        L1PulseAssessment.find_or_initialize_by(employee_detail_id: employee_detail.id, l1_user_id: current_user.id)
+      end
       values_alignment = assessment_params[:values_alignment].presence
       technical_knowledge = assessment_params[:technical_knowledge].presence
       customer_field_engagement = assessment_params[:customer_field_engagement].presence
@@ -401,7 +355,7 @@ class HomeController < ApplicationController
   def pulse_weighted_score(total_score)
     return 0.0 if total_score.blank?
 
-    ((total_score.to_f / 25.0) * 15.0).round(2)
+    ((total_score.to_f / 25.0) * 25.0).round(2)
   end
 
   def pulse_dimension_rows_for(pulse_scores)
@@ -428,8 +382,7 @@ class HomeController < ApplicationController
 
     [
       [ "A - KRA", @annual_percentage.present? ? "#{@annual_percentage}%" : "-", "75%", @dashboard_summary_scores[:annual_score].present? ? "#{@dashboard_summary_scores[:annual_score]}%" : "-" ],
-      [ "B - Pulse Check", pulse_raw.present? ? "#{pulse_raw}%" : "Pending", "15%", @dashboard_summary_scores[:pulse_score].present? ? "#{@dashboard_summary_scores[:pulse_score]}%" : "-" ],
-      [ "C - Manager Feedback", @dashboard_manager_feedback[:available] ? "#{@dashboard_manager_feedback[:raw_total]}%" : "Pending", "10%", @dashboard_summary_scores[:remarks_score].present? ? "#{@dashboard_summary_scores[:remarks_score]}%" : "-" ]
+      [ "B - Pulse Check", pulse_raw.present? ? "#{pulse_raw}%" : "Pending", "25%", @dashboard_summary_scores[:pulse_score].present? ? "#{@dashboard_summary_scores[:pulse_score]}%" : "-" ]
     ]
   end
 
@@ -477,14 +430,12 @@ class HomeController < ApplicationController
     }
   end
 
-  def weighted_summary_scores(annual_percentage:, pulse_total_score:, remark_score:)
+  def weighted_summary_scores(annual_percentage:, pulse_total_score:, remark_score: nil)
     ap = annual_percentage.to_f
     ps = pulse_total_score.present? ? pulse_total_score.to_f : 0.0
-    rs = remark_score.present? ? remark_score.to_f : 0.0
     ws_annual = (ap * 0.75).round(2)
     ws_pulse = pulse_weighted_score(ps)
-    ws_remarks = ((rs.to_f / 10.0) * 10.0).round(2)
-    { annual_score: ws_annual, pulse_score: ws_pulse, remarks_score: ws_remarks, final_total: (ws_annual + ws_pulse + ws_remarks).round(2) }
+    { annual_score: ws_annual, pulse_score: ws_pulse, remarks_score: 0.0, final_total: (ws_annual + ws_pulse).round(2) }
   end
 
   def pulse_scores_from_assessment(a)
@@ -560,13 +511,13 @@ class HomeController < ApplicationController
   end
 
   def l1_assessment_for(ed)
-    current_assessment = ed.l1_pulse_assessments.find { |assessment| assessment.l1_user_id == current_user.id }
-    return current_assessment if current_assessment.present?
-
     if current_user.hod? || current_user.admin?
-      latest_filled_l1_assessment_for(ed) || ed.l1_pulse_assessments.build(l1_user_id: current_user.id)
+      latest_filled_l1_assessment_for(ed) ||
+        ed.l1_pulse_assessments.max_by(&:updated_at) ||
+        ed.l1_pulse_assessments.build(l1_user_id: current_user.id)
     else
-      ed.l1_pulse_assessments.build(l1_user_id: current_user.id)
+      ed.l1_pulse_assessments.find { |assessment| assessment.l1_user_id == current_user.id } ||
+        ed.l1_pulse_assessments.build(l1_user_id: current_user.id)
     end
   end
 

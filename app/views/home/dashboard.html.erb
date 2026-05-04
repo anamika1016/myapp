@@ -13,11 +13,9 @@
           <%= link_to "Annual Review", "#annual-review-section", class: "hero-tag hero-menu-tag" %>
           <% if @dashboard_mode == :admin %>
             <%= link_to "Pulse Score", "#pulse-score-section", class: "hero-tag hero-menu-tag" %>
-            <%= link_to "Line Manager Feedback", "#pulse-remarks-section", class: "hero-tag hero-menu-tag" %>
           <% else %>
             <%= link_to "Score Range", "#action-guidance-section", class: "hero-tag hero-menu-tag" %>
             <%= link_to "Pulse Check", "#pulse-score-section", class: "hero-tag hero-menu-tag" %>
-            <%= link_to "Line Manager Feedback ", "#pulse-remarks-section", class: "hero-tag hero-menu-tag" %>
           <% end %>
           <%= link_to "COMPOSITE PERFORMANCE SCORE", "#summary-box-section", class: "hero-tag hero-menu-tag" %>
           <%= link_to "Export Excel", export_dashboard_xlsx_path(format: :xlsx), class: "hero-tag export-tag" %>
@@ -55,14 +53,6 @@
       fmt_pct = ->(value, precision = 2) { "#{number_with_precision(value, precision: precision, strip_insignificant_zeros: true)}%" }
       fmt_num = ->(value, precision = 1) { number_with_precision(value, precision: precision, strip_insignificant_zeros: true) }
       quarter_summaries = Array(@quarter_summaries)
-      manager_feedback = @dashboard_manager_feedback || {}
-      manager_criteria = Array(manager_feedback[:criteria]).map do |criterion|
-        score = criterion[:score]
-        criterion.merge(
-          weight: 2,
-          weighted_score: score.present? ? ((score.to_f / 5.0) * 2.0).round(2) : nil
-        )
-      end
       employee_department = @dashboard_employee_department.presence || @user_details&.first&.department&.department_type.presence || @employee_detail&.department.presence || "N/A"
       pulse_dimensions = pulse_dimension_rows_for(@dashboard_pulse_scores).map do |dimension|
         score = dimension[:score]
@@ -78,7 +68,20 @@
         fmt_num.call(@dashboard_pulse_scores[:total_score], 1)
       end
       composite_pulse_percentage = pulse_raw_percentage.to_f
-      composite_manager_percentage = manager_feedback[:raw_total].to_f
+      render_rating_badge = lambda do |rating_details|
+        next "-" unless rating_details.present?
+
+        stars_markup = (1..rating_details[:rating].to_i).map do |index|
+          %(<span class="star-icon star-icon-#{index}">★</span>)
+        end.join
+
+        %(
+          <span class="star-rating #{rating_details[:className]}">
+            <strong>#{rating_details[:rating]}</strong>
+            <span class="star-cluster">(<span class="star-seq">#{stars_markup}</span>)</span>
+          </span>
+        ).html_safe
+      end
       employee_composite = if @dashboard_mode != :admin && @dashboard_summary_scores.present?
         composite_category_details(@dashboard_summary_scores[:final_total])
       end
@@ -230,7 +233,7 @@
                   <tr>
                     <td><%= row[:score_range] %></td>
                     <td><%= row[:band] %></td>
-                    <td><span class="star-rating <%= row[:className] %>"><strong><%= row[:rating_value] %></strong> (<%= row[:stars] %>)</span></td>
+                    <td><%= render_rating_badge.call(score_rating_details(row[:rating_value])) %></td>
                     <td><%= row[:action] %></td>
                   </tr>
                 <% end %>
@@ -243,7 +246,7 @@
           <div class="pulse-score-card employee-pulse-card" id="pulse-score-section">
             <div class="box-header employee-section-header">
               <div>
-                <h2>SECTION B - PULSE CHECK / Weightage : 15%</h2>
+                <h2>SECTION B - PULSE CHECK / Weightage : 25%</h2>
                 <p>Pulse survey scores with raw percentage and overall category.</p>
               </div>
               <%= link_to "Export", export_dashboard_section_xlsx_path("pulse", format: :xlsx), class: "section-export-btn pulse-export-btn" %>
@@ -266,7 +269,7 @@
                       <td>
                         <% if dimension[:rating_text].present? && dimension[:score].present? %>
                           <% rating_details = score_rating_details(dimension[:score]) %>
-                          <span class="star-rating <%= rating_details[:className] %>"><strong><%= rating_details[:rating] %></strong> (<%= rating_details[:stars] %>)</span>
+                          <%= render_rating_badge.call(rating_details) %>
                         <% else %>
                           -
                         <% end %>
@@ -285,7 +288,7 @@
 
             <div class="metric-summary-row">
               <span class="summary-chip neutral-summary-chip"><%= pulse_raw_percentage.present? ? "Raw #{fmt_pct.call(pulse_raw_percentage)}" : "Raw Pending" %></span>
-              <span class="summary-chip pulse-summary-chip">Weighted <%= fmt_num.call(@dashboard_summary_scores[:pulse_score], 2) %>/15</span>
+              <span class="summary-chip pulse-summary-chip">Weighted <%= fmt_num.call(@dashboard_summary_scores[:pulse_score], 2) %>/25</span>
               <% if @dashboard_pulse_category.present? %>
                 <span class="summary-chip annual-summary-chip"><%= @dashboard_pulse_category[:category] %></span>
               <% end %>
@@ -301,71 +304,13 @@
             </div>
           </div>
 
-          <div class="remarks-panel employee-manager-panel" id="pulse-remarks-section">
-            <div class="box-header">
-              <div>
-                <h2>SECTION C - LINE MANAGER FEEDBACK / Weightage : 10%</h2>
-                <p>Manager criteria scores and final remarks from the latest assessment.</p>
-              </div>
-              <%= link_to "Export", export_dashboard_section_xlsx_path("remarks", format: :xlsx), class: "section-export-btn" %>
-            </div>
-
-            <div class="table-wrap">
-              <table class="compact-metric-table employee-metric-table manager-feedback-table">
-                <thead>
-                  <tr>
-                    <th>Assessment Criteria</th>
-                    <th>Score (1-5)</th>
-                    <th>Rating</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <% manager_criteria.each do |criterion| %>
-                    <% rating_details = score_rating_details(criterion[:score]) %>
-                    <tr>
-                      <td><%= criterion[:label] %></td>
-                      <td><%= criterion[:score].presence || "-" %></td>
-                      <td>
-                        <% if rating_details.present? %>
-                          <span class="star-rating <%= rating_details[:className] %>"><strong><%= rating_details[:rating] %></strong> (<%= rating_details[:stars] %>)</span>
-                        <% else %>
-                          -
-                        <% end %>
-                      </td>
-                    </tr>
-                  <% end %>
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <td><strong>MANAGER TOTAL</strong></td>
-                    <td colspan="2"><strong><%= manager_feedback[:available] ? "Total -> #{fmt_num.call(@dashboard_pulse_remark_score, 1)}/10 | Mgr Raw -> #{fmt_pct.call(manager_feedback[:raw_total])}" : "Pending assessment" %></strong></td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-
-            <div class="metric-summary-row">
-              <span class="summary-chip neutral-summary-chip"><%= manager_feedback[:available] ? "Raw #{fmt_pct.call(manager_feedback[:raw_total])}" : "Raw Pending" %></span>
-              <span class="summary-chip remarks-summary-chip">Weighted <%= fmt_num.call(@dashboard_summary_scores[:remarks_score], 2) %>/10</span>
-              <span class="summary-chip annual-summary-chip">Score <%= @dashboard_pulse_remark_score.present? ? "#{fmt_num.call(@dashboard_pulse_remark_score, 1)}/10" : "Pending" %></span>
-            </div>
-
-            <div class="single-remark-box employee-remark-box">
-              <div class="dashboard-remark-heading">Manager Remarks</div>
-              <% if @dashboard_pulse_remarks.present? %>
-                <p><%= @dashboard_pulse_remarks %></p>
-              <% else %>
-                <p class="empty-state">No manager remarks available yet.</p>
-              <% end %>
-            </div>
-          </div>
         </div>
 
         <div class="remarks-panel summary-panel employee-summary-panel" id="summary-box-section">
           <div class="box-header">
             <div>
               <h2>COMPOSITE PERFORMANCE SCORE</h2>
-              <p>KRA 75% + Pulse 15% + Line Manager Feedback 10% combined into one final score.</p>
+              <p>KRA 75% + Pulse 25% combined into one final score.</p>
             </div>
             <%= link_to "Export", export_dashboard_section_xlsx_path("summary", format: :xlsx), class: "section-export-btn" %>
           </div>
@@ -376,29 +321,23 @@
                 <thead>
                   <tr>
                     <th>Section</th>
-                    <th>Raw Score</th>
                     <th>Section Weight</th>
+                    <th>Raw Score</th>
                     <th>Weighted Contribution</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
                     <td>A - KRA</td>
-                    <td><%= fmt_pct.call(@annual_percentage) %></td>
                     <td>75%</td>
+                    <td><%= fmt_pct.call(@annual_percentage) %></td>
                     <td><span class="summary-chip annual-summary-chip"><%= fmt_pct.call(@dashboard_summary_scores[:annual_score], 0) %></span></td>
                   </tr>
                   <tr>
                     <td>B - Pulse Check</td>
+                    <td>25%</td>
                     <td><%= fmt_pct.call(composite_pulse_percentage) %></td>
-                    <td>15%</td>
                     <td><span class="summary-chip pulse-summary-chip"><%= fmt_pct.call(@dashboard_summary_scores[:pulse_score], 0) %></span></td>
-                  </tr>
-                  <tr>
-                    <td>C - Manager Feedback</td>
-                    <td><%= fmt_pct.call(composite_manager_percentage) %></td>
-                    <td>10%</td>
-                    <td><span class="summary-chip remarks-summary-chip"><%= fmt_pct.call(@dashboard_summary_scores[:remarks_score], 0) %></span></td>
                   </tr>
                 </tbody>
               </table>
@@ -445,7 +384,7 @@
               <tr>
                 <td><%= row[:score_range] %></td>
                 <td><%= row[:band] %></td>
-                <td><span class="star-rating <%= row[:className] %>" style="gap: 5px;"><strong><%= row[:rating_value] %></strong> (<%= row[:stars] %>)</span></td>
+                <td><%= render_rating_badge.call(score_rating_details(row[:rating_value])) %></td>
                 <td><%= row[:action] %></td>
               </tr>
             <% end %>
@@ -457,7 +396,7 @@
     <div class="pulse-score-card" id="pulse-score-section">
       <div class="box-header">
         <div>
-          <h2>SECTION B: PULSE-360 ASSESSMENT SCORE / Weightage : 15%</h2>
+          <h2>SECTION B: PULSE-360 ASSESSMENT SCORE / Weightage : 25%</h2>
           <p>All user pulse survey scores, total score, and category in one place.</p>
         </div>
         <%= link_to "Export", export_dashboard_section_xlsx_path("pulse", format: :xlsx), class: "section-export-btn pulse-export-btn" %>
@@ -489,7 +428,7 @@
               <th><%= dimension[:label] %> (1-5)</th>
               <% end %>
               <th>Total /25</th>
-              <th>15% Computed</th>
+              <th>25% Computed</th>
               <th>Pulse Remarks</th>
               <th>Category & Action</th>
             </tr>
@@ -543,88 +482,11 @@
       </div>
     </div>
 
-    <% if @dashboard_mode == :admin && @employee_rows.any? %>
-      <div class="remarks-panel pulse-remarks-panel" id="pulse-remarks-section">
-        <div class="box-header">
-          <div>
-            <h2>SECTION C: LINE MANAGER FEEDBACK / Weightage : 10%</h2>
-            <p>All user manager-feedback scores and remarks shown directly by criteria.</p>
-          </div>
-          <%= link_to "Export", export_dashboard_section_xlsx_path("remarks", format: :xlsx), class: "section-export-btn" %>
-        </div>
-
-        <div class="table-wrap pulse-remarks-wrap">
-          <table class="pulse-remarks-table">
-            <thead>
-              <tr>
-                <th>Employee</th>
-                <th>Code</th>
-                <th>Professionalism & Conduct (1-5)</th>
-                <th>Quality & Accuracy of Work Output (1-5)</th>
-                <th>Initiative & Problem-Solving (1-5)</th>
-                <th>Time Management & Reliability (1-5)</th>
-                <th>Growth Mindset & Development (1-5)</th>
-                <th>Total /25</th>
-                <th>Mgr Score /10</th>
-                <th>Manager Remarks</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% @employee_rows.each do |row| %>
-                <% criteria = row[:manager_feedback][:criteria] %>
-                <tr>
-                  <td><strong><%= row[:employee_name] %></strong></td>
-                  <td><%= row[:employee_code] %></td>
-                  <% criteria.each do |criterion| %>
-                    <td class="pulse-remark-score-cell"><%= criterion[:score].presence || "-" %></td>
-                  <% end %>
-                  <td class="pulse-remark-score-cell"><%= row[:manager_feedback_total].present? ? "#{fmt_num.call(row[:manager_feedback_total], 1)}/25" : "-" %></td>
-                  <td class="pulse-remark-score-cell"><%= row[:pulse_assessment_score].present? ? "#{fmt_num.call(row[:pulse_assessment_score], 1)}/10" : "-" %></td>
-                  <td><%= row[:pulse_assessment_remarks].presence || "-" %></td>
-                </tr>
-              <% end %>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    <% elsif @dashboard_mode != :admin && @employee_detail.present? %>
-      <div class="remarks-panel pulse-remarks-panel" id="pulse-remarks-section">
-        <div class="box-header">
-          <div>
-            <h2>LINE MANAGER FEEDBACK / 10%</h2>
-            <p>Latest manager feedback remarks and score.</p>
-          </div>
-          <%= link_to "Export", export_dashboard_section_xlsx_path("remarks", format: :xlsx), class: "section-export-btn" %>
-        </div>
-
-        <div class="single-remark-box">
-          <div class="pulse-remark-inline">
-            <div class="pulse-remark-text">
-              <% if @dashboard_pulse_remarks.present? %>
-                <p><%= @dashboard_pulse_remarks %></p>
-              <% else %>
-                <p>&nbsp;</p>
-              <% end %>
-            </div>
-
-            <div class="pulse-remark-score-box">
-              <span>Pulse Remarks Score</span>
-              <% if @dashboard_pulse_remark_score.present? %>
-                <strong><%= @dashboard_pulse_remark_score %>/10</strong>
-              <% else %>
-                <strong>&nbsp;</strong>
-              <% end %>
-            </div>
-          </div>
-        </div>
-      </div>
-    <% end %>
-
     <div class="remarks-panel summary-panel" id="summary-box-section">
       <div class="box-header">
         <div>
-          <h2><i class="fas fa-chart-line"></i> COMPOSITE PERFORMANCE SCORE — KRA 75% + Pulse 15% + Manager Feedback 10%</h2>
-          <p>User wise weighted total based on Annually / Weightage : 75%, PULSE-360 ASSESSMENT SCORE / Weightage : 15%, and Manager Feedback / Weightage : 10%.</p>
+          <h2><i class="fas fa-chart-line"></i> COMPOSITE PERFORMANCE SCORE — KRA 75% + Pulse 25%</h2>
+          <p>User wise weighted total based on Annually / Weightage : 75% and PULSE-360 ASSESSMENT SCORE / Weightage : 25%.</p>
         </div>
         <%= link_to "Export", export_dashboard_section_xlsx_path("summary", format: :xlsx), class: "section-export-btn" %>
       </div>
@@ -636,7 +498,6 @@
               <th>User</th>
               <th>SECTION A -KRA %</th>
               <th>SECTION B -Pulse %</th>
-              <th>SECTION C -Manager %</th>
               <th>Final Total</th>
             </tr>
           </thead>
@@ -647,7 +508,6 @@
                   <td><strong><%= row[:employee_name] %></strong></td>
                   <td><span class="summary-chip neutral-summary-chip"><%= fmt_pct.call(row[:annual_percentage], 0) %></span></td>
                   <td><span class="summary-chip neutral-summary-chip"><%= fmt_pct.call(row[:pulse_raw_percentage], 0) %></span></td>
-                  <td><span class="summary-chip neutral-summary-chip"><%= fmt_pct.call(row[:manager_raw_percentage], 0) %></span></td>
                   <td><span class="summary-chip total-summary-chip"><%= fmt_pct.call(row[:summary_scores][:final_total], 0) %></span></td>
                 </tr>
               <% end %>
@@ -656,7 +516,6 @@
                 <td><strong><%= @employee_detail&.employee_name.presence || current_user.email %></strong></td>
                 <td><span class="summary-chip neutral-summary-chip"><%= fmt_pct.call(@annual_percentage, 0) %></span></td>
                 <td><span class="summary-chip neutral-summary-chip"><%= fmt_pct.call(composite_pulse_percentage, 0) %></span></td>
-                <td><span class="summary-chip neutral-summary-chip"><%= fmt_pct.call(composite_manager_percentage, 0) %></span></td>
                 <td><span class="summary-chip total-summary-chip"><%= fmt_pct.call(@dashboard_summary_scores[:final_total], 0) %></span></td>
               </tr>
             <% end %>
@@ -667,7 +526,6 @@
                 <td>TEAM AVERAGE</td>
                 <td><span class="summary-chip neutral-summary-chip"><%= fmt_pct.call((@employee_rows.sum { |r| r[:annual_percentage].to_f } / @employee_rows.size), 0) %></span></td>
                 <td><span class="summary-chip neutral-summary-chip"><%= fmt_pct.call((@employee_rows.sum { |r| r[:pulse_raw_percentage].to_f } / @employee_rows.size), 0) %></span></td>
-                <td><span class="summary-chip neutral-summary-chip"><%= fmt_pct.call((@employee_rows.sum { |r| r[:manager_raw_percentage].to_f } / @employee_rows.size), 0) %></span></td>
                 <td><span class="summary-chip total-summary-chip"><%= fmt_pct.call((@employee_rows.sum { |r| r[:summary_scores][:final_total].to_f } / @employee_rows.size), 0) %></span></td>
               </tr>
             </tfoot>
@@ -1118,6 +976,8 @@
 
   .employee-pulse-card {
     padding: 1.5rem;
+    grid-column: 1 / -1;
+    width: 100%;
   }
 
   .employee-manager-panel {
@@ -1748,29 +1608,86 @@
   .star-rating {
     display: inline-flex;
     align-items: center;
-    gap: 0.1rem;
+    gap: 0.22rem;
+    padding: 0.38rem 0.72rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
     font-weight: 800;
     letter-spacing: 0.08em;
+    line-height: 1;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.38);
+  }
+
+  .star-rating strong {
+    color: inherit;
+  }
+
+  .star-cluster {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.08rem;
+    letter-spacing: 0;
+  }
+
+  .star-seq {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.05rem;
+  }
+
+  .star-icon {
+    display: inline-block;
+    line-height: 1;
+  }
+
+  .star-icon-1 {
+    color: #f59e0b;
+  }
+
+  .star-icon-2 {
+    color: #fb923c;
+  }
+
+  .star-icon-3 {
+    color: #3b82f6;
+  }
+
+  .star-icon-4 {
+    color: #8b5cf6;
+  }
+
+  .star-icon-5 {
+    color: #ef4444;
   }
 
   .stars-5 {
     color: #f59e0b;
+    background: linear-gradient(180deg, rgba(254, 243, 199, 0.95) 0%, rgba(253, 230, 138, 0.95) 100%);
+    border-color: rgba(245, 158, 11, 0.34);
   }
 
   .stars-4 {
     color: #fb923c;
+    background: linear-gradient(180deg, rgba(255, 237, 213, 0.95) 0%, rgba(254, 215, 170, 0.95) 100%);
+    border-color: rgba(251, 146, 60, 0.3);
   }
 
   .stars-3 {
     color: #3b82f6;
+    background: linear-gradient(180deg, rgba(219, 234, 254, 0.98) 0%, rgba(191, 219, 254, 0.95) 100%);
+    border-color: rgba(59, 130, 246, 0.3);
   }
 
   .stars-2 {
     color: #8b5cf6;
+    background: linear-gradient(180deg, rgba(237, 233, 254, 0.98) 0%, rgba(221, 214, 254, 0.95) 100%);
+    border-color: rgba(139, 92, 246, 0.3);
   }
 
   .stars-1 {
     color: #ef4444;
+    background: linear-gradient(180deg, rgba(254, 226, 226, 0.98) 0%, rgba(254, 202, 202, 0.95) 100%);
+    border-color: rgba(239, 68, 68, 0.32);
   }
 
   .category-label {
