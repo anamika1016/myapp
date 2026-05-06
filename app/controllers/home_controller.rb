@@ -3,7 +3,7 @@ require "axlsx"
 class HomeController < ApplicationController
   before_action :authenticate_user!
   before_action :ensure_l1_pulse_access!, only: [ :l1_pulse_360, :save_l1_pulse_360 ]
-  helper_method :composite_category_details, :pulse_category_details, :score_rating_details, :score_rating_text, :pulse_group_rows_for, :pulse_dimension_rows_for, :pulse_team_average, :score_range_rows, :employee_role_label
+  helper_method :composite_category_details, :pulse_category_details, :score_rating_details, :score_rating_text, :pulse_group_rows_for, :pulse_dimension_rows_for, :pulse_team_average, :score_range_rows, :employee_role_label, :pulse_formula_text, :composite_formula_text, :whole_number_score, :composite_display_total, :compact_number
 
   def index
   end
@@ -358,6 +358,13 @@ class HomeController < ApplicationController
     ((total_score.to_f / 25.0) * 25.0).round(2)
   end
 
+  def pulse_formula_text(total_score)
+    return "Pending pulse assessment" if total_score.blank?
+
+    raw_percentage = pulse_raw_percentage(total_score)
+    "#{whole_number_score(total_score)}/25 x 100 = #{whole_number_score(raw_percentage)}"
+  end
+
   def pulse_dimension_rows_for(pulse_scores)
     pulse_group_rows_for(pulse_scores).map do |dimension|
       score = dimension[:score]
@@ -436,6 +443,27 @@ class HomeController < ApplicationController
     ws_annual = (ap * 0.75).round(2)
     ws_pulse = pulse_weighted_score(ps)
     { annual_score: ws_annual, pulse_score: ws_pulse, remarks_score: 0.0, final_total: (ws_annual + ws_pulse).round(2) }
+  end
+
+  def composite_formula_text(annual_percentage:, pulse_total_score:)
+    ap = whole_number_score(annual_percentage)
+    pulse_percentage = whole_number_score(pulse_raw_percentage(pulse_total_score))
+    annual_contribution = (ap * 0.75).to_i
+    pulse_contribution = (pulse_percentage * 0.25).to_i
+    final_total = annual_contribution + pulse_contribution
+
+    "(#{ap} x 75%) + (#{pulse_percentage} x 25%) = #{annual_contribution} + #{pulse_contribution} = #{final_total}"
+  end
+
+  def whole_number_score(value)
+    value.to_f.to_i
+  end
+
+  def composite_display_total(annual_percentage:, pulse_total_score:)
+    ap = whole_number_score(annual_percentage)
+    pulse_percentage = whole_number_score(pulse_raw_percentage(pulse_total_score))
+
+    ((ap * 0.75) + (pulse_percentage * 0.25)).to_i
   end
 
   def pulse_scores_from_assessment(a)
@@ -565,6 +593,11 @@ class HomeController < ApplicationController
 
   def formatted_percent(value)
     "#{format('%.2f', value.to_f)}%"
+  end
+
+  def compact_number(value)
+    number = value.to_f
+    (number % 1).zero? ? number.to_i.to_s : format("%.2f", number).sub(/\.?0+$/, "")
   end
 
   def load_l1_pulse_rows

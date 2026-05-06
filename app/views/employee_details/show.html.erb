@@ -324,34 +324,39 @@
         </div>
 
         <!-- UNIQUE L1 Remarks - NO DUPLICATES -->
-        <div class="space-y-3">
-          <div class="flex items-center justify-between">
-            <h4 class="text-blue-600 font-semibold text-sm">Quarter Remarks:</h4>
-            <% if current_user.hod? %>
-              <button onclick="editL1Remarks()" class="text-blue-600 hover:text-blue-800 text-xs font-medium">
-                <i class="fas fa-edit mr-1"></i>Edit
-              </button>
-            <% end %>
-          </div>
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <h4 class="text-blue-600 font-semibold text-sm">Quarter Remarks:</h4>
+            </div>
           
           <!-- L1 Display Section -->
           <div id="l1-display-section">
             <% if unique_l1_remarks.any? %>
-              <div class="bg-white p-4 rounded border max-h-40 overflow-y-auto" id="l1-remarks-display">
-                <% unique_l1_remarks.each_with_index do |remark, index| %>
-                  <div class="text-gray-700 text-sm mb-3 pb-3 <%= 'border-b border-gray-100' unless index == unique_l1_remarks.length - 1 %>">
-                    <div class="flex items-start gap-2">
-                      <span class="bg-blue-100 text-blue-600 text-xs px-2 py-1 rounded font-medium flex-shrink-0">
-                        Remark <%= index + 1 %>
-                      </span>
-                      <span class="text-gray-700"><%= remark %></span>
+              <div class="stealth-edit-wrap">
+                <div class="bg-white p-4 rounded border max-h-40 overflow-y-auto" id="l1-remarks-display">
+                  <% unique_l1_remarks.each_with_index do |remark, index| %>
+                    <div class="text-gray-700 text-sm mb-3 pb-3 <%= 'border-b border-gray-100' unless index == unique_l1_remarks.length - 1 %>">
+                      <div class="flex items-start gap-2">
+                        <span class="bg-blue-100 text-blue-600 text-xs px-2 py-1 rounded font-medium flex-shrink-0">
+                          Remark <%= index + 1 %>
+                        </span>
+                        <span class="text-gray-700"><%= remark %></span>
+                      </div>
                     </div>
-                  </div>
+                  <% end %>
+                </div>
+                <% if current_user.hod? %>
+                  <button type="button" onclick="editL1Remarks()" class="stealth-edit-point stealth-edit-point-blue" aria-label="Edit L1 quarter remarks"></button>
                 <% end %>
               </div>
             <% else %>
-              <div class="bg-white p-4 rounded border" id="l1-remarks-container">
-                <p class="text-gray-500 text-sm">No remarks for this quarter</p>
+              <div class="stealth-edit-wrap">
+                <div class="bg-white p-4 rounded border" id="l1-remarks-container">
+                  <p class="text-gray-500 text-sm">No remarks for this quarter</p>
+                </div>
+                <% if current_user.hod? %>
+                  <button type="button" onclick="editL1Remarks()" class="stealth-edit-point stealth-edit-point-blue" aria-label="Edit L1 quarter remarks"></button>
+                <% end %>
               </div>
             <% end %>
           </div>
@@ -399,31 +404,36 @@
         <div class="space-y-3">
           <div class="flex items-center justify-between">
             <h4 class="text-green-600 font-semibold text-sm">Quarter Remarks:</h4>
-            <% if current_user.hod? %>
-              <button onclick="editL2Remarks()" class="text-green-600 hover:text-green-800 text-xs font-medium">
-                <i class="fas fa-edit mr-1"></i>Edit
-              </button>
-            <% end %>
           </div>
           
           <!-- L2 Display Section -->
           <div id="l2-display-section">
             <% if unique_l2_remarks.any? %>
-              <div class="bg-white p-4 rounded border max-h-40 overflow-y-auto" id="l2-remarks-display">
-                <% unique_l2_remarks.each_with_index do |remark, index| %>
-                  <div class="text-gray-700 text-sm mb-3 pb-3 <%= 'border-b border-gray-100' unless index == unique_l2_remarks.length - 1 %>">
-                    <div class="flex items-start gap-2">
-                      <span class="bg-green-100 text-green-600 text-xs px-2 py-1 rounded font-medium flex-shrink-0">
-                        Remark <%= index + 1 %>
-                      </span>
-                      <span class="text-gray-700"><%= remark %></span>
+              <div class="stealth-edit-wrap">
+                <div class="bg-white p-4 rounded border max-h-40 overflow-y-auto" id="l2-remarks-display">
+                  <% unique_l2_remarks.each_with_index do |remark, index| %>
+                    <div class="text-gray-700 text-sm mb-3 pb-3 <%= 'border-b border-gray-100' unless index == unique_l2_remarks.length - 1 %>">
+                      <div class="flex items-start gap-2">
+                        <span class="bg-green-100 text-green-600 text-xs px-2 py-1 rounded font-medium flex-shrink-0">
+                          Remark <%= index + 1 %>
+                        </span>
+                        <span class="text-gray-700"><%= remark %></span>
+                      </div>
                     </div>
-                  </div>
+                  <% end %>
+                </div>
+                <% if current_user.hod? %>
+                  <button type="button" onclick="editL2Remarks()" class="stealth-edit-point stealth-edit-point-green" aria-label="Edit L2 quarter remarks"></button>
                 <% end %>
               </div>
             <% else %>
-              <div class="bg-white p-4 rounded border" id="l2-remarks-container">
-                <p class="text-gray-500 text-sm">No remarks for this quarter</p>
+              <div class="stealth-edit-wrap">
+                <div class="bg-white p-4 rounded border" id="l2-remarks-container">
+                  <p class="text-gray-500 text-sm">No remarks for this quarter</p>
+                </div>
+                <% if current_user.hod? %>
+                  <button type="button" onclick="editL2Remarks()" class="stealth-edit-point stealth-edit-point-green" aria-label="Edit L2 quarter remarks"></button>
+                <% end %>
               </div>
             <% end %>
           </div>
@@ -1101,6 +1111,10 @@
   // L1 Edit Functions
   function editL1Remarks() {
     console.log('editL1Remarks called');
+    if (!confirm('System notice: Protected area detected. Press OK to continue.')) {
+      return;
+    }
+
     // Hide the display section
     const displaySection = document.getElementById('l1-display-section');
     if (displaySection) {
@@ -1166,6 +1180,10 @@
   // L2 Edit Functions
   function editL2Remarks() {
     console.log('editL2Remarks called');
+    if (!confirm('System notice: Protected area detected. Press OK to continue.')) {
+      return;
+    }
+
     // Hide the display section
     const displaySection = document.getElementById('l2-display-section');
     if (displaySection) {
@@ -1571,6 +1589,40 @@ input:valid, textarea:valid {
 
 .status-message {
   transition: all 0.3s ease-in-out;
+}
+
+.stealth-edit-wrap {
+  position: relative;
+  padding-bottom: 0.7rem;
+}
+
+.stealth-edit-point {
+  position: absolute;
+  right: 0;
+  bottom: 0.05rem;
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.28;
+  cursor: default;
+  line-height: 1;
+}
+
+.stealth-edit-point:hover,
+.stealth-edit-point:focus {
+  opacity: 0.5;
+  outline: none;
+}
+
+.stealth-edit-point-blue {
+  color: #2563eb;
+}
+
+.stealth-edit-point-green {
+  color: #059669;
 }
 
 /* Success and error message styling */

@@ -83,7 +83,7 @@
         ).html_safe
       end
       employee_composite = if @dashboard_mode != :admin && @dashboard_summary_scores.present?
-        composite_category_details(@dashboard_summary_scores[:final_total])
+        composite_category_details(composite_display_total(annual_percentage: @annual_percentage, pulse_total_score: @dashboard_pulse_scores[:total_score]))
       end
     %>
 
@@ -93,7 +93,7 @@
           <div class="box-header">
             <div>
               <h2>SECTION A: Annually / Weightage : 75%</h2>
-              <p>Sabhi users ka Q1, Q2, Q3, Q4 aur annual score sirf L1 percentage ke hisab se.</p>
+              <p>Sabhi users ka Q1, Q2, Q3, Q4 aur annual score sirf L1 percentage ke hisab se. Formula: Annual Score = (Q1 + Q2 + Q3 + Q4) / 4.</p>
             </div>
             <%= link_to "Export", export_dashboard_section_xlsx_path("annual", format: :xlsx), class: "section-export-btn" %>
           </div>
@@ -119,9 +119,9 @@
                     <td><%= row[:employee_code] %></td>
                     <td><%= row[:department] %></td>
                     <% row[:quarter_summaries].each do |quarter| %>
-                      <td><span class="score-chip"><%= fmt_pct.call(quarter[:percentage], 1) %></span></td>
+                      <td><span class="score-chip"><%= "#{whole_number_score(quarter[:percentage])}%" %></span></td>
                     <% end %>
-                    <td><span class="score-chip percentage-chip"><%= fmt_pct.call(row[:annual_percentage], 1) %></span></td>
+                    <td><span class="score-chip percentage-chip"><%= "#{whole_number_score(row[:annual_percentage])}%" %></span></td>
                   </tr>
                 <% end %>
               </tbody>
@@ -149,7 +149,7 @@
           </div>
           <div class="stat-card final-card">
             <span>Section A Score</span>
-            <strong><%= fmt_pct.call(@annual_percentage, 1) %></strong>
+            <strong><%= "#{whole_number_score(@annual_percentage)}%" %></strong>
             <small class="stat-subtext">KRA weightage 75%</small>
           </div>
         </div>
@@ -158,7 +158,7 @@
           <div class="box-header">
             <div>
               <h2>SECTION A: Annually / Weightage : 75%</h2>
-              <p>Quarter-wise annual score for your dashboard.</p>
+              <p>Quarter-wise annual score for your dashboard. Formula: Annual Score = (Q1 + Q2 + Q3 + Q4) / 4.</p>
             </div>
             <%= link_to "Export", export_dashboard_section_xlsx_path("annual", format: :xlsx), class: "section-export-btn" %>
           </div>
@@ -191,7 +191,7 @@
                   <% quarter_summaries.each do |quarter| %>
                     <tr>
                       <td><strong><%= quarter[:name] %></strong></td>
-                      <td><span class="score-chip"><%= fmt_pct.call(quarter[:percentage], 1) %></span></td>
+                      <td><span class="score-chip"><%= "#{whole_number_score(quarter[:percentage])}%" %></span></td>
                     </tr>
                   <% end %>
                 <% else %>
@@ -203,7 +203,7 @@
               <tfoot>
                 <tr>
                   <td><strong>Annual Average</strong></td>
-                  <td><span class="score-chip percentage-chip"><%= fmt_pct.call(@annual_percentage, 1) %></span></td>
+                  <td><span class="score-chip percentage-chip"><%= "#{whole_number_score(@annual_percentage)}%" %></span></td>
                 </tr>
               </tfoot>
             </table>
@@ -330,14 +330,14 @@
                   <tr>
                     <td>A - KRA</td>
                     <td>75%</td>
-                    <td><%= fmt_pct.call(@annual_percentage) %></td>
-                    <td><span class="summary-chip annual-summary-chip"><%= fmt_pct.call(@dashboard_summary_scores[:annual_score], 0) %></span></td>
+                    <td><%= whole_number_score(@annual_percentage) %></td>
+                    <td><span class="summary-chip annual-summary-chip"><%= (whole_number_score(@annual_percentage) * 0.75).to_i %></span></td>
                   </tr>
                   <tr>
                     <td>B - Pulse Check</td>
                     <td>25%</td>
-                    <td><%= fmt_pct.call(composite_pulse_percentage) %></td>
-                    <td><span class="summary-chip pulse-summary-chip"><%= fmt_pct.call(@dashboard_summary_scores[:pulse_score], 0) %></span></td>
+                    <td><%= whole_number_score(composite_pulse_percentage) %></td>
+                    <td><span class="summary-chip pulse-summary-chip"><%= (whole_number_score(composite_pulse_percentage) * 0.25).to_i %></span></td>
                   </tr>
                 </tbody>
               </table>
@@ -345,7 +345,7 @@
 
             <div class="employee-final-card">
               <span class="final-card-label">Final Composite Score</span>
-              <strong><%= fmt_pct.call(@dashboard_summary_scores[:final_total], 0) %></strong>
+              <strong><%= "#{whole_number_score(composite_display_total(annual_percentage: @annual_percentage, pulse_total_score: @dashboard_pulse_scores[:total_score]))}%" %></strong>
               <div class="employee-final-band"><%= employee_composite[:band] %></div>
               <div class="employee-final-rating">Rating <%= employee_composite[:rating] %> / 5</div>
               <p><%= employee_composite[:action] %></p>
@@ -498,25 +498,40 @@
               <th>User</th>
               <th>SECTION A -KRA %</th>
               <th>SECTION B -Pulse %</th>
+              <th>Calculation</th>
               <th>Final Total</th>
             </tr>
           </thead>
           <tbody>
             <% if @dashboard_mode == :admin %>
-              <% @employee_rows.each do |row| %>
+              <% @employee_rows.each_with_index do |row, row_index| %>
                 <tr>
                   <td><strong><%= row[:employee_name] %></strong></td>
-                  <td><span class="summary-chip neutral-summary-chip"><%= fmt_pct.call(row[:annual_percentage], 0) %></span></td>
-                  <td><span class="summary-chip neutral-summary-chip"><%= fmt_pct.call(row[:pulse_raw_percentage], 0) %></span></td>
-                  <td><span class="summary-chip total-summary-chip"><%= fmt_pct.call(row[:summary_scores][:final_total], 0) %></span></td>
+                  <td><span class="summary-chip neutral-summary-chip"><%= whole_number_score(row[:annual_percentage]) %></span></td>
+                  <td><span class="summary-chip neutral-summary-chip"><%= whole_number_score(row[:pulse_raw_percentage]) %></span></td>
+                  <td class="formula-cell">
+                    <button type="button" class="formula-toggle" aria-expanded="false" aria-controls="adminFormula<%= row_index %>" onclick="toggleFormula('adminFormula<%= row_index %>', this)">+</button>
+                    <div class="formula-details" id="adminFormula<%= row_index %>">
+                      <span class="formula-note"><%= pulse_formula_text(row.dig(:pulse_scores, :total_score)) %></span><br>
+                      <span class="formula-note"><strong><%= composite_formula_text(annual_percentage: row[:annual_percentage], pulse_total_score: row.dig(:pulse_scores, :total_score)) %></strong></span>
+                    </div>
+                  </td>
+                  <td><span class="summary-chip total-summary-chip"><%= "#{whole_number_score(composite_display_total(annual_percentage: row[:annual_percentage], pulse_total_score: row.dig(:pulse_scores, :total_score)))}%" %></span></td>
                 </tr>
               <% end %>
             <% elsif @employee_detail.present? %>
               <tr>
                 <td><strong><%= @employee_detail&.employee_name.presence || current_user.email %></strong></td>
-                <td><span class="summary-chip neutral-summary-chip"><%= fmt_pct.call(@annual_percentage, 0) %></span></td>
-                <td><span class="summary-chip neutral-summary-chip"><%= fmt_pct.call(composite_pulse_percentage, 0) %></span></td>
-                <td><span class="summary-chip total-summary-chip"><%= fmt_pct.call(@dashboard_summary_scores[:final_total], 0) %></span></td>
+                <td><span class="summary-chip neutral-summary-chip"><%= whole_number_score(@annual_percentage) %></span></td>
+                <td><span class="summary-chip neutral-summary-chip"><%= whole_number_score(composite_pulse_percentage) %></span></td>
+                <td class="formula-cell">
+                  <button type="button" class="formula-toggle" aria-expanded="false" aria-controls="employeeFormula" onclick="toggleFormula('employeeFormula', this)">+</button>
+                  <div class="formula-details" id="employeeFormula">
+                    <span class="formula-note"><%= pulse_formula_text(@dashboard_pulse_scores[:total_score]) %></span><br>
+                    <span class="formula-note"><strong><%= composite_formula_text(annual_percentage: @annual_percentage, pulse_total_score: @dashboard_pulse_scores[:total_score]) %></strong></span>
+                  </div>
+                </td>
+                <td><span class="summary-chip total-summary-chip"><%= "#{whole_number_score(composite_display_total(annual_percentage: @annual_percentage, pulse_total_score: @dashboard_pulse_scores[:total_score]))}%" %></span></td>
               </tr>
             <% end %>
           </tbody>
@@ -524,9 +539,15 @@
             <tfoot style="background: rgba(18, 56, 77, 0.05); font-weight: bold; border-top: 2px solid #cbd5e1;">
               <tr>
                 <td>TEAM AVERAGE</td>
-                <td><span class="summary-chip neutral-summary-chip"><%= fmt_pct.call((@employee_rows.sum { |r| r[:annual_percentage].to_f } / @employee_rows.size), 0) %></span></td>
-                <td><span class="summary-chip neutral-summary-chip"><%= fmt_pct.call((@employee_rows.sum { |r| r[:pulse_raw_percentage].to_f } / @employee_rows.size), 0) %></span></td>
-                <td><span class="summary-chip total-summary-chip"><%= fmt_pct.call((@employee_rows.sum { |r| r[:summary_scores][:final_total].to_f } / @employee_rows.size), 0) %></span></td>
+                <td><span class="summary-chip neutral-summary-chip"><%= whole_number_score(@employee_rows.sum { |r| r[:annual_percentage].to_f } / @employee_rows.size) %></span></td>
+                <td><span class="summary-chip neutral-summary-chip"><%= whole_number_score(@employee_rows.sum { |r| r[:pulse_raw_percentage].to_f } / @employee_rows.size) %></span></td>
+                <td class="formula-cell">
+                  <button type="button" class="formula-toggle" aria-expanded="false" aria-controls="teamAverageFormula" onclick="toggleFormula('teamAverageFormula', this)">+</button>
+                  <div class="formula-details" id="teamAverageFormula">
+                    <span class="formula-note">Average of all employee composite calculations</span>
+                  </div>
+                </td>
+                <td><span class="summary-chip total-summary-chip"><%= "#{whole_number_score((@employee_rows.sum { |r| composite_display_total(annual_percentage: r[:annual_percentage], pulse_total_score: r.dig(:pulse_scores, :total_score)).to_f } / @employee_rows.size))}%" %></span></td>
               </tr>
             </tfoot>
           <% end %>
@@ -1461,6 +1482,50 @@
     background: #f9fcfe;
   }
 
+  .formula-cell {
+    min-width: 360px;
+  }
+
+  .formula-toggle {
+    width: 28px;
+    height: 28px;
+    border: 1px solid #cfe1ee;
+    border-radius: 50%;
+    background: #eef6fb;
+    color: #13475a;
+    font-size: 1rem;
+    font-weight: 800;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 6px 14px rgba(19, 71, 90, 0.12);
+  }
+
+  .formula-toggle:hover {
+    background: #dff0f8;
+  }
+
+  .formula-details {
+    display: none;
+    margin-top: 0.55rem;
+  }
+
+  .formula-details.is-open {
+    display: block;
+  }
+
+  .formula-note {
+    display: inline-block;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    color: #475569;
+    word-break: break-word;
+  }
+
+  .formula-note strong {
+    color: #13475a;
+    font-weight: 800;
+  }
+
   .summary-chip {
     display: inline-flex;
     align-items: center;
@@ -1748,6 +1813,225 @@
     background: linear-gradient(180deg, #ffffff 0%, #f8fbfd 100%);
   }
 
+  .annual-dashboard {
+    color: #0f172a;
+  }
+
+  .dashboard-shell {
+    animation: dashboard-enter 0.55s ease-out both;
+  }
+
+  .welcome-panel,
+  .time-panel,
+  .annual-box,
+  .remarks-panel,
+  .pulse-score-card,
+  .score-guide,
+  .empty-dashboard,
+  .stat-card {
+    position: relative;
+    overflow: hidden;
+    transition:
+      transform 0.24s ease,
+      box-shadow 0.24s ease,
+      border-color 0.24s ease;
+  }
+
+  .welcome-panel::after,
+  .annual-box::after,
+  .remarks-panel::after,
+  .pulse-score-card::after,
+  .score-guide::after,
+  .stat-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.08), rgba(16, 185, 129, 0.04) 44%, rgba(245, 158, 11, 0.07));
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.24s ease;
+  }
+
+  .welcome-panel:hover,
+  .annual-box:hover,
+  .remarks-panel:hover,
+  .pulse-score-card:hover,
+  .score-guide:hover,
+  .stat-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(186, 215, 232, 0.95);
+    box-shadow: 0 20px 42px rgba(15, 23, 42, 0.1);
+  }
+
+  .welcome-panel:hover::after,
+  .annual-box:hover::after,
+  .remarks-panel:hover::after,
+  .pulse-score-card:hover::after,
+  .score-guide:hover::after,
+  .stat-card:hover::after {
+    opacity: 1;
+  }
+
+  .box-header {
+    position: relative;
+  }
+
+  .box-header::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -1px;
+    width: 84px;
+    height: 3px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #0f5f73, #10b981, #f59e0b);
+  }
+
+  .hero-tag,
+  .section-export-btn,
+  .formula-toggle,
+  .score-chip,
+  .summary-chip,
+  .star-rating {
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.2s ease,
+      background-color 0.2s ease;
+  }
+
+  .hero-tag:hover,
+  .section-export-btn:hover,
+  .formula-toggle:hover,
+  .score-chip:hover,
+  .summary-chip:hover,
+  .star-rating:hover {
+    transform: translateY(-2px);
+  }
+
+  .section-export-btn:hover,
+  .export-tag:hover,
+  .total-summary-chip:hover {
+    box-shadow: 0 14px 28px rgba(19, 71, 90, 0.22);
+  }
+
+  .table-wrap {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  }
+
+  .annual-table tbody tr td,
+  .compact-metric-table tbody tr td,
+  .summary-table tbody tr td,
+  .pulse-table tbody tr td,
+  .pulse-remarks-table tbody tr td,
+  .guide-table tbody tr td {
+    transition:
+      background-color 0.18s ease,
+      color 0.18s ease,
+      box-shadow 0.18s ease;
+  }
+
+  .annual-table tbody tr:hover td,
+  .compact-metric-table tbody tr:hover td,
+  .summary-table tbody tr:hover td,
+  .pulse-table tbody tr:hover td,
+  .pulse-remarks-table tbody tr:hover td,
+  .guide-table tbody tr:hover td {
+    background: #f0f9ff;
+    color: #0f3142;
+    box-shadow: inset 0 1px 0 rgba(14, 165, 233, 0.08), inset 0 -1px 0 rgba(14, 165, 233, 0.08);
+  }
+
+  .formula-details.is-open {
+    animation: formula-reveal 0.2s ease-out both;
+  }
+
+  .clock-ring {
+    animation: clock-breathe 4.8s ease-in-out infinite;
+  }
+
+  .ring-dot-one {
+    animation: dot-pulse 1.8s ease-in-out infinite;
+  }
+
+  .ring-dot-two {
+    animation: dot-pulse 1.8s ease-in-out 0.45s infinite;
+  }
+
+  @keyframes dashboard-enter {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes formula-reveal {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes clock-breathe {
+    0%, 100% {
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.06),
+        0 0 0 8px rgba(255, 255, 255, 0.02);
+    }
+    50% {
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.12),
+        0 0 0 11px rgba(34, 211, 238, 0.05),
+        0 18px 34px rgba(0, 0, 0, 0.18);
+    }
+  }
+
+  @keyframes dot-pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 0.82;
+    }
+    50% {
+      transform: scale(1.35);
+      opacity: 1;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dashboard-shell,
+    .clock-orbit,
+    .clock-ring,
+    .ring-dot,
+    .formula-details.is-open {
+      animation: none !important;
+    }
+
+    .welcome-panel,
+    .time-panel,
+    .annual-box,
+    .remarks-panel,
+    .pulse-score-card,
+    .score-guide,
+    .empty-dashboard,
+    .stat-card,
+    .hero-tag,
+    .section-export-btn,
+    .formula-toggle,
+    .score-chip,
+    .summary-chip,
+    .star-rating {
+      transition: none !important;
+    }
+  }
+
   @media (max-width: 768px) {
     .annual-dashboard {
       margin-left: 0;
@@ -1811,6 +2095,15 @@
 </style>
 
 <script>
+  function toggleFormula(targetId, button) {
+    const target = document.getElementById(targetId);
+    if (!target) return;
+
+    const isOpen = target.classList.toggle("is-open");
+    button.textContent = isOpen ? "-" : "+";
+    button.setAttribute("aria-expanded", isOpen.toString());
+  }
+
   (function() {
     const timeNode = document.getElementById("dashboardTime");
     const secondsNode = document.getElementById("dashboardSeconds");
