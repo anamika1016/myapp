@@ -1,5 +1,6 @@
 class ApplicationController < ActionController::Base
   before_action :authenticate_user!
+  before_action :sign_out_inactive_portal_user
   before_action :configure_permitted_parameters, if: :devise_controller?
 
   protected
@@ -12,6 +13,24 @@ class ApplicationController < ActionController::Base
   # Override Devise's after_sign_in_path_for to always redirect to dashboard
   def after_sign_in_path_for(resource)
     dashboard_path
+  end
+
+  def sign_out_inactive_portal_user
+    return unless user_signed_in?
+    return if devise_controller?
+    return if current_user.hod? || current_user.admin?
+
+    employee_detail = portal_employee_detail_for(current_user)
+    return unless employee_detail.present? && !employee_detail.portal_active?
+
+    sign_out(current_user)
+    redirect_to new_user_session_path, alert: "Your account is inactive. Please contact HOD."
+  end
+
+  def portal_employee_detail_for(user)
+    user.employee_detail ||
+      EmployeeDetail.find_by("lower(employee_email) = ?", user.email.to_s.downcase) ||
+      EmployeeDetail.find_by("lower(employee_code) = ?", user.employee_code.to_s.downcase)
   end
 
   def has_l1_responsibilities?

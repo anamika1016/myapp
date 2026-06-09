@@ -13,14 +13,14 @@
 
     <!-- Bulk Upload and Export Buttons -->
     <div class="w-full max-w-7xl mx-auto mt-4 flex justify-between items-center bg-white p-6 rounded-xl shadow">
-      <%= form_with url: import_employee_details_path, local: true, html: { multipart: true }, class: "flex space-x-4 items-center" do |f| %>
+      <%= form_with(url: import_employee_details_path, local: true, html: { multipart: true }, class: "flex space-x-4 items-center") do |f| %>
         <%= f.file_field :file, class: "block w-full border border-gray-300 rounded-lg px-4 py-2" %>
         <%= f.submit "Upload Excel", class: "bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-800" %>
       <% end %>
 
       <div class="flex space-x-4">
-        <%= link_to export_quarterly_xlsx_employee_details_path, 
-                    class: "inline-flex items-center px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md transition duration-200 transform hover:scale-105" do %>
+        <%= link_to(export_quarterly_xlsx_employee_details_path,
+                    class: "inline-flex items-center px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md transition duration-200 transform hover:scale-105") do %>
           <i class="fas fa-file-excel mr-2"></i>
           Export Quarterly L1 L2 Data
         <% end %>
@@ -57,7 +57,7 @@
       <!-- Heading and Search Box -->
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-2xl font-bold text-gray-800 border-b pb-2">Employee List</h2>
-      <%= search_form_for @q, url: employee_details_path, method: :get, html: { class: "flex items-center space-x-2", id: "search-form" } do |f| %>
+      <%= search_form_for(@q, url: employee_details_path, method: :get, html: { class: "flex items-center space-x-2", id: "search-form" }) do |f| %>
         <%= f.search_field :employee_name_or_employee_email_or_post_or_department_cont,
           placeholder: "Search anything...",
           class: "px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500",
@@ -67,10 +67,32 @@
 
       </div>
 
+      <%= form_with(url: bulk_update_portal_status_employee_details_path,
+                    method: :patch,
+                    local: true,
+                    data: { turbo: false },
+                    html: { id: "employee-bulk-status-form" },
+                    class: "mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3") do %>
+        <span class="text-sm font-semibold text-gray-700">Selected employees:</span>
+        <%= button_tag "Mark Active",
+                       type: "submit",
+                       name: "portal_active",
+                       value: "true",
+                       class: "rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700" %>
+        <%= button_tag "Mark Inactive",
+                       type: "submit",
+                       name: "portal_active",
+                       value: "false",
+                       class: "rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700" %>
+      <% end %>
+
       <div class="overflow-x-auto">
         <table class="table table-striped table-bordered min-w-full divide-y divide-gray-200 border text-sm">
           <thead class="bg-gray-50">
             <tr>
+              <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">
+                <input type="checkbox" id="select-all-employees" class="h-4 w-4 rounded border-gray-300 text-gray-700">
+              </th>
               <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Name</th>
               <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Email</th>
               <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Mobile</th>
@@ -80,12 +102,20 @@
               <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">L2 Code</th>
               <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">L2 Name</th>
               <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Department</th>
+              <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Login Status</th>
               <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
             <% @employee_details.each do |emp| %>
               <tr class="hover:bg-gray-50 transition">
+                <td class="px-4 py-4 whitespace-nowrap">
+                  <%= check_box_tag "employee_detail_ids[]",
+                                    emp.id,
+                                    false,
+                                    form: "employee-bulk-status-form",
+                                    class: "employee-select h-4 w-4 rounded border-gray-300 text-gray-700" %>
+                </td>
                 <td class="px-4 py-4 whitespace-nowrap text-gray-900"><%= emp.employee_name %></td>
                 <td class="px-4 py-4 whitespace-nowrap text-gray-900"><%= emp.employee_email %></td>
                 <td class="px-4 py-4 whitespace-nowrap text-gray-900"><%= emp.mobile_number %></td>
@@ -95,8 +125,20 @@
                 <td class="px-4 py-4 whitespace-nowrap text-gray-900"><%= emp.l2_code %></td>
                 <td class="px-4 py-4 whitespace-nowrap text-gray-900"><%= emp.l2_employer_name %></td>
                 <td class="px-4 py-4 whitespace-nowrap text-gray-900"><%= emp.department %></td>
+                <td class="px-4 py-4 whitespace-nowrap">
+                  <% if emp.portal_active? %>
+                    <span class="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">Active</span>
+                  <% else %>
+                    <span class="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">Inactive</span>
+                  <% end %>
+                </td>
                 <td class="px-4 py-4 whitespace-nowrap space-x-2">
                   <%= link_to 'Edit', edit_employee_detail_path(emp), class: "text-gray-700 hover:text-gray-900 font-medium" %>
+                  <%= button_to(emp.portal_active? ? "Inactive" : "Active",
+                                toggle_portal_status_employee_detail_path(emp),
+                                method: :patch,
+                                form: { class: "inline-block" },
+                                class: emp.portal_active? ? "text-orange-600 hover:text-orange-900 font-medium" : "text-green-600 hover:text-green-900 font-medium") %>
                   <%= link_to 'Delete', '#', 
                       onclick: "confirmDelete('#{emp.employee_name}', '#{employee_detail_path(emp)}')", 
                       class: "text-red-600 hover:text-red-900 font-medium cursor-pointer" %>
@@ -130,6 +172,27 @@
         }, 300); // delay (in ms) after typing stops
       });
     }
+  });
+
+  document.addEventListener("DOMContentLoaded", function () {
+    const selectAll = document.getElementById("select-all-employees");
+    const employeeCheckboxes = Array.from(document.querySelectorAll(".employee-select"));
+
+    if (selectAll) {
+      selectAll.addEventListener("change", function () {
+        employeeCheckboxes.forEach((checkbox) => {
+          checkbox.checked = selectAll.checked;
+        });
+      });
+    }
+
+    employeeCheckboxes.forEach((checkbox) => {
+      checkbox.addEventListener("change", function () {
+        const checkedCount = employeeCheckboxes.filter((item) => item.checked).length;
+        selectAll.checked = checkedCount === employeeCheckboxes.length && employeeCheckboxes.length > 0;
+        selectAll.indeterminate = checkedCount > 0 && checkedCount < employeeCheckboxes.length;
+      });
+    });
   });
 
   function confirmDelete(employeeName, deleteUrl) {

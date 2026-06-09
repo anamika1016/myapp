@@ -6,9 +6,15 @@ class Users::SessionsController < Devise::SessionsController
     submitted_password = params[:user][:password]
     # submitted_role = params[:user][:role]
     submitted_code = params[:user][:employee_code]&.strip
+    employee_detail = find_employee_detail(submitted_email, submitted_code)
 
     user = User.find_by("lower(email) = ?", submitted_email.downcase)
-    user ||= provision_employee_account(submitted_email, submitted_code)
+    user ||= provision_employee_account(employee_detail)
+
+    if user.nil? && employee_detail.present? && !employee_detail.portal_active?
+      flash[:alert] = "Your account is inactive. Please contact HOD."
+      redirect_to new_session_path(resource_name) and return
+    end
 
     if user.nil?
       flash[:alert] = "No account found with that email."
@@ -25,22 +31,43 @@ class Users::SessionsController < Devise::SessionsController
       redirect_to new_session_path(resource_name) and return
     end
 
+    employee_detail ||= find_employee_detail_for_user(user)
+    if employee_detail.present? && !employee_detail.portal_active?
+      flash[:alert] = "Your account is inactive. Please contact HOD."
+      redirect_to new_session_path(resource_name) and return
+    end
+
     sign_in(resource_name, user)
     redirect_to after_sign_in_path_for(user)
   end
 
   private
 
-  def provision_employee_account(submitted_email, submitted_code)
-    return if submitted_email.blank? || submitted_code.blank?
-
-    employee = EmployeeDetail.find_by("lower(employee_email) = ?", submitted_email.downcase)
+  def provision_employee_account(employee)
     return unless employee
-    return unless employee.employee_code.to_s.strip.casecmp?(submitted_code)
+    return unless employee.portal_active?
 
     employee.ensure_portal_user!
   rescue ActiveRecord::RecordInvalid => e
-    Rails.logger.error("Portal login auto-provision failed for #{submitted_email}: #{e.message}")
+    Rails.logger.error("Portal login auto-provision failed for #{employee.employee_email}: #{e.message}")
     nil
+  end
+
+  def find_employee_detail(submitted_email, submitted_code)
+    return if submitted_email.blank? || submitted_code.blank?
+
+    EmployeeDetail.find_by(
+      "lower(employee_email) = ? AND lower(employee_code) = ?",
+      submitted_email.downcase,
+      submitted_code.downcase
+    )
+  end
+
+  def find_employee_detail_for_user(user)
+    return unless user
+
+    user.employee_detail ||
+      EmployeeDetail.find_by("lower(employee_email) = ?", user.email.to_s.downcase) ||
+      EmployeeDetail.find_by("lower(employee_code) = ?", user.employee_code.to_s.downcase)
   end
 end

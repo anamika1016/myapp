@@ -32,6 +32,7 @@ class EmployeeDetail < ApplicationRecord
       l2_employer_name
       post
       department
+      portal_active
       created_at
       updated_at
     ]
@@ -58,6 +59,10 @@ scope :l1_pending_records, -> { where(status: [ "pending", "returned" ]) }
 
   def set_default_status
    self.status ||= "pending"
+  end
+
+  def portal_status_label
+    portal_active? ? "Active" : "Inactive"
   end
 
   def ensure_portal_user!

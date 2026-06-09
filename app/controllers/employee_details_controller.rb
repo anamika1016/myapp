@@ -2,8 +2,8 @@ require "roo"
 require "axlsx"
 
 class EmployeeDetailsController < ApplicationController
-  before_action :set_employee_detail, only: [ :edit, :update, :destroy ]
-  load_and_authorize_resource except: [ :approve, :return, :l2_approve, :l2_return, :edit_l1, :edit_l2 ]
+  before_action :set_employee_detail, only: [ :edit, :update, :destroy, :toggle_portal_status ]
+  load_and_authorize_resource except: [ :approve, :return, :l2_approve, :l2_return, :edit_l1, :edit_l2, :toggle_portal_status, :bulk_update_portal_status ]
 
   def index
     @employee_detail = EmployeeDetail.new
@@ -52,6 +52,31 @@ class EmployeeDetailsController < ApplicationController
         redirect_to employee_details_path, alert: "Failed to delete employee. Please try again."
       end
     end
+  end
+
+  def toggle_portal_status
+    authorize! :manage, EmployeeDetail
+
+    @employee_detail.update!(portal_active: !@employee_detail.portal_active?)
+    redirect_to employee_details_path(anchor: "employee-list"),
+                notice: "#{@employee_detail.employee_name} marked #{@employee_detail.portal_status_label}."
+  end
+
+  def bulk_update_portal_status
+    authorize! :manage, EmployeeDetail
+
+    employee_ids = Array(params[:employee_detail_ids]).reject(&:blank?)
+    if employee_ids.empty?
+      redirect_to employee_details_path(anchor: "employee-list"), alert: "Please select at least one employee."
+      return
+    end
+
+    portal_active = ActiveModel::Type::Boolean.new.cast(params[:portal_active])
+    updated_count = EmployeeDetail.where(id: employee_ids).update_all(portal_active: portal_active, updated_at: Time.current)
+    status_label = portal_active ? "Active" : "Inactive"
+
+    redirect_to employee_details_path(anchor: "employee-list"),
+                notice: "#{updated_count} employee(s) marked #{status_label}."
   end
 
   def export_xlsx
