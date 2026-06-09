@@ -354,7 +354,7 @@
             <div class="employee-final-card">
               <span class="final-card-label">Final Composite Score</span>
               <strong><%= "#{whole_number_score(composite_display_total(annual_percentage: @annual_percentage, pulse_total_score: @dashboard_pulse_scores[:total_score]))}%" %></strong>
-              <div class="employee-final-band"><%= employee_composite[:band] %></div>
+              <div class="employee-final-band"><%= employee_composite&.dig(:band) || "Unsatisfactory" %></div>
             </div>
           </div>
         </div>
@@ -412,14 +412,13 @@
         <%
           pulse_category_markup = lambda do |total_score|
             total_score = total_score.to_f
-            case total_score
-            when 23.0000001..25
+            if total_score > 23
               '<span class="star-rating stars-5">★★★★★</span> <span class="category-label">Exceptional</span>'
-            when 19..23
+            elsif total_score >= 19
               '<span class="star-rating stars-4">★★★★</span> <span class="category-label">Outstanding</span>'
-            when 15...19
+            elsif total_score >= 15
               '<span class="star-rating stars-3">★★★</span> <span class="category-label">Meets Expectations</span>'
-            when 11...15
+            elsif total_score >= 11
               '<span class="star-rating stars-2">★★</span> <span class="category-label">Needs Improvement</span>'
             else
               '<span class="star-rating stars-1">★</span> <span class="category-label">Unsatisfactory</span>'

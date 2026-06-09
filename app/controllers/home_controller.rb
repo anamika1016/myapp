@@ -323,6 +323,8 @@ class HomeController < ApplicationController
   end
 
   def category_details_from_percentage(raw_percentage)
+    raw_percentage = raw_percentage.to_f
+
     if raw_percentage > 92
       { stars: "★★★★★", category: "Exceptional", action: "Accelerated growth track / highest increment", className: "stars-5" }
     elsif raw_percentage >= 76
@@ -511,6 +513,8 @@ class HomeController < ApplicationController
   end
 
   def composite_category_details(ft)
+    ft = ft.to_f
+
     if ft > 92
       { band: "Exceptional", rating: 5, stars: "★★★★★", className: "stars-5", action: "" }
     elsif ft >= 76
