@@ -365,9 +365,9 @@ class HomeController < ApplicationController
   def score_range_rows
     [
       { score_range: "> 23", band: "Exceptional", rating: "5 (★★★★★)", rating_value: 5, stars: "★★★★★", className: "stars-5", action: "Accelerated growth track / highest increment" },
-      { score_range: "19 - 22", band: "Outstanding", rating: "4 (★★★★)", rating_value: 4, stars: "★★★★", className: "stars-4", action: "Merit increment / recognition award" },
-      { score_range: "15 - 18", band: "Meets Expectations", rating: "3 (★★★)", rating_value: 3, stars: "★★★", className: "stars-3", action: "Standard increment as per policy" },
-      { score_range: "11 - 14", band: "Needs Improvement", rating: "2 (★★)", rating_value: 2, stars: "★★", className: "stars-2", action: "PIP / structured coaching plan" },
+      { score_range: "19 - 22.9", band: "Outstanding", rating: "4 (★★★★)", rating_value: 4, stars: "★★★★", className: "stars-4", action: "Merit increment / recognition award" },
+      { score_range: "15 - 18.9", band: "Meets Expectations", rating: "3 (★★★)", rating_value: 3, stars: "★★★", className: "stars-3", action: "Standard increment as per policy" },
+      { score_range: "11 - 14.9", band: "Needs Improvement", rating: "2 (★★)", rating_value: 2, stars: "★★", className: "stars-2", action: "PIP / structured coaching plan" },
       { score_range: "< 11", band: "Unsatisfactory", rating: "1 (★)", rating_value: 1, stars: "★", className: "stars-1", action: "Formal PIP / disciplinary review" }
     ]
   end
@@ -427,8 +427,8 @@ class HomeController < ApplicationController
     pulse_raw = pulse_raw_percentage(@dashboard_pulse_scores[:total_score])
 
     [
-      [ "A - KRA", @annual_percentage.present? ? "#{@annual_percentage}%" : "-", "75%", @dashboard_summary_scores[:annual_score].present? ? "#{@dashboard_summary_scores[:annual_score]}%" : "-" ],
-      [ "B - Pulse Check", pulse_raw.present? ? "#{pulse_raw}%" : "Pending", "25%", @dashboard_summary_scores[:pulse_score].present? ? "#{@dashboard_summary_scores[:pulse_score]}%" : "-" ]
+      [ "A - KRA", @annual_percentage.present? ? "#{compact_number(@annual_percentage)}%" : "-", "75%", @dashboard_summary_scores[:annual_score].present? ? "#{compact_number(@dashboard_summary_scores[:annual_score])}%" : "-" ],
+      [ "B - Pulse Check", pulse_raw.present? ? "#{compact_number(pulse_raw)}%" : "Pending", "25%", @dashboard_summary_scores[:pulse_score].present? ? "#{compact_number(@dashboard_summary_scores[:pulse_score])}%" : "-" ]
     ]
   end
 
@@ -477,32 +477,36 @@ class HomeController < ApplicationController
   end
 
   def weighted_summary_scores(annual_percentage:, pulse_total_score:, remark_score: nil)
-    ap = annual_percentage.to_f
-    ps = pulse_total_score.present? ? pulse_total_score.to_f : 0.0
-    ws_annual = (ap * 0.75).round(2)
-    ws_pulse = pulse_weighted_score(ps)
+    annual_score = annual_percentage.to_f
+    pulse_score = pulse_raw_percentage(pulse_total_score).to_f
+    ws_annual = (annual_score * 0.75).round(2)
+    ws_pulse = (pulse_score * 0.25).round(2)
+
     { annual_score: ws_annual, pulse_score: ws_pulse, remarks_score: 0.0, final_total: (ws_annual + ws_pulse).round(2) }
   end
 
   def composite_formula_text(annual_percentage:, pulse_total_score:)
-    ap = whole_number_score(annual_percentage)
-    pulse_percentage = whole_number_score(pulse_raw_percentage(pulse_total_score))
-    annual_contribution = (ap * 0.75).to_i
-    pulse_contribution = (pulse_percentage * 0.25).to_i
-    final_total = annual_contribution + pulse_contribution
+    ap = annual_percentage.to_f
+    pulse_percentage = pulse_raw_percentage(pulse_total_score).to_f
+    annual_contribution = (ap * 0.75).round(2)
+    pulse_contribution = (pulse_percentage * 0.25).round(2)
+    final_total = (annual_contribution + pulse_contribution).round(2)
 
-    "(#{ap} x 75%) + (#{pulse_percentage} x 25%) = #{annual_contribution} + #{pulse_contribution} = #{final_total}"
+    "(#{compact_number(ap)} x 75%) + (#{compact_number(pulse_percentage)} x 25%) = #{compact_number(annual_contribution)} + #{compact_number(pulse_contribution)} = #{compact_number(final_total)}"
   end
 
   def whole_number_score(value)
-    value.to_f.to_i
+    number = value.to_f
+    base = number.floor
+
+    (number - base) >= 0.5 ? base + 1 : base
   end
 
   def composite_display_total(annual_percentage:, pulse_total_score:)
-    ap = whole_number_score(annual_percentage)
-    pulse_percentage = whole_number_score(pulse_raw_percentage(pulse_total_score))
+    ap = annual_percentage.to_f
+    pulse_percentage = pulse_raw_percentage(pulse_total_score).to_f
 
-    ((ap * 0.75) + (pulse_percentage * 0.25)).to_i
+    ((ap * 0.75) + (pulse_percentage * 0.25)).round(2)
   end
 
   def pulse_scores_from_assessment(a)
@@ -553,7 +557,7 @@ class HomeController < ApplicationController
       ed.user_details
     end
     qs = quarter_summaries_for(ud)
-    ap = (qs.sum { |q| q[:percentage] } / 4.0).round(1)
+    ap = (qs.sum { |q| q[:percentage] } / 4.0).round(2)
     pa = ed.l1_pulse_assessments.max_by(&:updated_at)
     ps = pa ? pulse_scores_from_assessment(pa) : blank_pulse_scores
     manager_feedback = manager_feedback_summary_for(pa)
@@ -684,7 +688,7 @@ class HomeController < ApplicationController
       UserDetail.none
     end
     qs = quarter_summaries_for(@user_details)
-    ap = (qs.sum { |q| q[:percentage] } / 4.0).round(1)
+    ap = (qs.sum { |q| q[:percentage] } / 4.0).round(2)
     pa = @employee_detail&.l1_pulse_assessments&.max_by(&:updated_at)
     ps = pa ? pulse_scores_from_assessment(pa) : blank_pulse_scores
     manager_feedback = manager_feedback_summary_for(pa)

@@ -127,9 +127,9 @@
                     <td><%= row[:employee_code] %></td>
                     <td><%= row[:department] %></td>
                     <% row[:quarter_summaries].each do |quarter| %>
-                      <td><span class="score-chip"><%= "#{whole_number_score(quarter[:percentage])}%" %></span></td>
+                      <td><span class="score-chip"><%= "#{compact_number(quarter[:percentage])}%" %></span></td>
                     <% end %>
-                    <td><span class="score-chip percentage-chip"><%= "#{whole_number_score(row[:annual_percentage])}%" %></span></td>
+                    <td><span class="score-chip percentage-chip"><%= "#{compact_number(row[:annual_percentage])}%" %></span></td>
                   </tr>
                 <% end %>
               </tbody>
@@ -157,7 +157,7 @@
           </div>
           <div class="stat-card final-card">
             <span>Section A Score</span>
-            <strong><%= "#{whole_number_score(@annual_percentage)}%" %></strong>
+            <strong><%= "#{compact_number(@annual_percentage)}%" %></strong>
             <small class="stat-subtext">KRA weightage 75%</small>
           </div>
         </div>
@@ -199,7 +199,7 @@
                   <% quarter_summaries.each do |quarter| %>
                     <tr>
                       <td><strong><%= quarter[:name] %></strong></td>
-                      <td><span class="score-chip"><%= "#{whole_number_score(quarter[:percentage])}%" %></span></td>
+                      <td><span class="score-chip"><%= "#{compact_number(quarter[:percentage])}%" %></span></td>
                     </tr>
                   <% end %>
                 <% else %>
@@ -211,7 +211,7 @@
               <tfoot>
                 <tr>
                   <td><strong>Annual Average</strong></td>
-                  <td><span class="score-chip percentage-chip"><%= "#{whole_number_score(@annual_percentage)}%" %></span></td>
+                  <td><span class="score-chip percentage-chip"><%= "#{compact_number(@annual_percentage)}%" %></span></td>
                 </tr>
               </tfoot>
             </table>
@@ -222,7 +222,7 @@
           <div class="box-header">
             <div>
               <h2>PULSE SCORE RANGE</h2>
-              <p>Final composite score band, rating, and recommended action guide.</p>
+              <p>Pulse score band, rating, and recommended action guide.</p>
             </div>
           </div>
 
@@ -338,14 +338,14 @@
                   <tr>
                     <td>A - KRA</td>
                     <td>75%</td>
-                    <td><%= whole_number_score(@annual_percentage) %></td>
-                    <td><span class="summary-chip annual-summary-chip"><%= (whole_number_score(@annual_percentage) * 0.75).to_i %></span></td>
+                    <td><%= compact_number(@annual_percentage) %></td>
+                    <td><span class="summary-chip annual-summary-chip"><%= compact_number(@annual_percentage.to_f * 0.75) %></span></td>
                   </tr>
                   <tr>
                     <td>B - Pulse Check</td>
                     <td>25%</td>
-                    <td><%= whole_number_score(composite_pulse_percentage) %></td>
-                    <td><span class="summary-chip pulse-summary-chip"><%= (whole_number_score(composite_pulse_percentage) * 0.25).to_i %></span></td>
+                    <td><%= compact_number(composite_pulse_percentage) %></td>
+                    <td><span class="summary-chip pulse-summary-chip"><%= compact_number(composite_pulse_percentage.to_f * 0.25) %></span></td>
                   </tr>
                 </tbody>
               </table>
@@ -353,7 +353,7 @@
 
             <div class="employee-final-card">
               <span class="final-card-label">Final Composite Score</span>
-              <strong><%= "#{whole_number_score(composite_display_total(annual_percentage: @annual_percentage, pulse_total_score: @dashboard_pulse_scores[:total_score]))}%" %></strong>
+              <strong><%= "#{compact_number(composite_display_total(annual_percentage: @annual_percentage, pulse_total_score: @dashboard_pulse_scores[:total_score]))}%" %></strong>
               <div class="employee-final-band"><%= employee_composite&.dig(:band) || "Unsatisfactory" %></div>
             </div>
           </div>
@@ -371,7 +371,7 @@
       <div class="box-header">
         <div>
           <h2>PULSE SCORE RANGE</h2>
-          <p>Final composite score band, rating, and recommended action guide.</p>
+          <p>Pulse score band, rating, and recommended action guide.</p>
         </div>
       </div>
 
@@ -513,8 +513,8 @@
               <% @employee_rows.each_with_index do |row, row_index| %>
                 <tr>
                   <td><strong><%= row[:employee_name] %></strong></td>
-                  <td><span class="summary-chip neutral-summary-chip"><%= whole_number_score(row[:annual_percentage]) %></span></td>
-                  <td><span class="summary-chip neutral-summary-chip"><%= whole_number_score(row[:pulse_raw_percentage]) %></span></td>
+                  <td><span class="summary-chip neutral-summary-chip"><%= compact_number(row[:annual_percentage]) %></span></td>
+                  <td><span class="summary-chip neutral-summary-chip"><%= compact_number(row[:pulse_raw_percentage]) %></span></td>
                   <td class="formula-cell">
                     <button type="button" class="formula-toggle" aria-expanded="false" aria-controls="adminFormula<%= row_index %>" onclick="toggleFormula('adminFormula<%= row_index %>', this)">+</button>
                     <div class="formula-details" id="adminFormula<%= row_index %>">
@@ -522,14 +522,14 @@
                       <span class="formula-note"><strong><%= composite_formula_text(annual_percentage: row[:annual_percentage], pulse_total_score: row.dig(:pulse_scores, :total_score)) %></strong></span>
                     </div>
                   </td>
-                  <td><span class="summary-chip total-summary-chip"><%= "#{whole_number_score(composite_display_total(annual_percentage: row[:annual_percentage], pulse_total_score: row.dig(:pulse_scores, :total_score)))}%" %></span></td>
+                  <td><span class="summary-chip total-summary-chip"><%= "#{compact_number(composite_display_total(annual_percentage: row[:annual_percentage], pulse_total_score: row.dig(:pulse_scores, :total_score)))}%" %></span></td>
                 </tr>
               <% end %>
             <% elsif @employee_detail.present? %>
               <tr>
                 <td><strong><%= @employee_detail&.employee_name.presence || current_user.email %></strong></td>
-                <td><span class="summary-chip neutral-summary-chip"><%= whole_number_score(@annual_percentage) %></span></td>
-                <td><span class="summary-chip neutral-summary-chip"><%= whole_number_score(composite_pulse_percentage) %></span></td>
+                <td><span class="summary-chip neutral-summary-chip"><%= compact_number(@annual_percentage) %></span></td>
+                <td><span class="summary-chip neutral-summary-chip"><%= compact_number(composite_pulse_percentage) %></span></td>
                 <td class="formula-cell">
                   <button type="button" class="formula-toggle" aria-expanded="false" aria-controls="employeeFormula" onclick="toggleFormula('employeeFormula', this)">+</button>
                   <div class="formula-details" id="employeeFormula">
@@ -537,7 +537,7 @@
                     <span class="formula-note"><strong><%= composite_formula_text(annual_percentage: @annual_percentage, pulse_total_score: @dashboard_pulse_scores[:total_score]) %></strong></span>
                   </div>
                 </td>
-                <td><span class="summary-chip total-summary-chip"><%= "#{whole_number_score(composite_display_total(annual_percentage: @annual_percentage, pulse_total_score: @dashboard_pulse_scores[:total_score]))}%" %></span></td>
+                <td><span class="summary-chip total-summary-chip"><%= "#{compact_number(composite_display_total(annual_percentage: @annual_percentage, pulse_total_score: @dashboard_pulse_scores[:total_score]))}%" %></span></td>
               </tr>
             <% end %>
           </tbody>
@@ -545,15 +545,15 @@
             <tfoot style="background: rgba(18, 56, 77, 0.05); font-weight: bold; border-top: 2px solid #cbd5e1;">
               <tr>
                 <td>TEAM AVERAGE</td>
-                <td><span class="summary-chip neutral-summary-chip"><%= whole_number_score(@employee_rows.sum { |r| r[:annual_percentage].to_f } / @employee_rows.size) %></span></td>
-                <td><span class="summary-chip neutral-summary-chip"><%= whole_number_score(@employee_rows.sum { |r| r[:pulse_raw_percentage].to_f } / @employee_rows.size) %></span></td>
+                <td><span class="summary-chip neutral-summary-chip"><%= compact_number(@employee_rows.sum { |r| r[:annual_percentage].to_f } / @employee_rows.size) %></span></td>
+                <td><span class="summary-chip neutral-summary-chip"><%= compact_number(@employee_rows.sum { |r| r[:pulse_raw_percentage].to_f } / @employee_rows.size) %></span></td>
                 <td class="formula-cell">
                   <button type="button" class="formula-toggle" aria-expanded="false" aria-controls="teamAverageFormula" onclick="toggleFormula('teamAverageFormula', this)">+</button>
                   <div class="formula-details" id="teamAverageFormula">
                     <span class="formula-note">Average of all employee composite calculations</span>
                   </div>
                 </td>
-                <td><span class="summary-chip total-summary-chip"><%= "#{whole_number_score((@employee_rows.sum { |r| composite_display_total(annual_percentage: r[:annual_percentage], pulse_total_score: r.dig(:pulse_scores, :total_score)).to_f } / @employee_rows.size))}%" %></span></td>
+                <td><span class="summary-chip total-summary-chip"><%= "#{compact_number(@employee_rows.sum { |r| composite_display_total(annual_percentage: r[:annual_percentage], pulse_total_score: r.dig(:pulse_scores, :total_score)).to_f } / @employee_rows.size)}%" %></span></td>
               </tr>
             </tfoot>
           <% end %>
