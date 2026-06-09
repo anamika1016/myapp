@@ -336,11 +336,11 @@ class HomeController < ApplicationController
     if raw_percentage > 92
       { stars: "★★★★★", category: "Exceptional", action: "Accelerated growth track / highest increment", className: "stars-5" }
     elsif raw_percentage >= 76
-      { stars: "★★★★", category: "Outstanding", action: "Merit increment + recognition award", className: "stars-4" }
+      { stars: "★★★★", category: "Outstanding", action: "Merit increment / recognition award", className: "stars-4" }
     elsif raw_percentage >= 60
       { stars: "★★★", category: "Meets Expectations", action: "Standard increment as per policy", className: "stars-3" }
     elsif raw_percentage >= 44
-      { stars: "★★", category: "Needs Improvement", action: "PIP + structured coaching plan", className: "stars-2" }
+      { stars: "★★", category: "Needs Improvement", action: "PIP / structured coaching plan", className: "stars-2" }
     else { stars: "★", category: "Unsatisfactory", action: "Formal PIP / disciplinary review", className: "stars-1" }
     end
   end
@@ -365,9 +365,9 @@ class HomeController < ApplicationController
   def score_range_rows
     [
       { score_range: "> 23", band: "Exceptional", rating: "5 (★★★★★)", rating_value: 5, stars: "★★★★★", className: "stars-5", action: "Accelerated growth track / highest increment" },
-      { score_range: "19 - 22", band: "Outstanding", rating: "4 (★★★★)", rating_value: 4, stars: "★★★★", className: "stars-4", action: "Merit increment + recognition award" },
+      { score_range: "19 - 22", band: "Outstanding", rating: "4 (★★★★)", rating_value: 4, stars: "★★★★", className: "stars-4", action: "Merit increment / recognition award" },
       { score_range: "15 - 18", band: "Meets Expectations", rating: "3 (★★★)", rating_value: 3, stars: "★★★", className: "stars-3", action: "Standard increment as per policy" },
-      { score_range: "11 - 14", band: "Needs Improvement", rating: "2 (★★)", rating_value: 2, stars: "★★", className: "stars-2", action: "PIP + structured coaching plan" },
+      { score_range: "11 - 14", band: "Needs Improvement", rating: "2 (★★)", rating_value: 2, stars: "★★", className: "stars-2", action: "PIP / structured coaching plan" },
       { score_range: "< 11", band: "Unsatisfactory", rating: "1 (★)", rating_value: 1, stars: "★", className: "stars-1", action: "Formal PIP / disciplinary review" }
     ]
   end
@@ -523,13 +523,13 @@ class HomeController < ApplicationController
   def composite_category_details(ft)
     ft = ft.to_f
 
-    if ft > 92
+    if ft >= 95
       { band: "Exceptional", rating: 5, stars: "★★★★★", className: "stars-5", action: "" }
-    elsif ft >= 76
+    elsif ft >= 90
       { band: "Outstanding", rating: 4, stars: "★★★★", className: "stars-4", action: "" }
-    elsif ft >= 60
+    elsif ft >= 85
       { band: "Meets Expectations", rating: 3, stars: "★★★", className: "stars-3", action: "" }
-    elsif ft >= 44
+    elsif ft >= 45
       { band: "Needs Improvement", rating: 2, stars: "★★", className: "stars-2", action: "PIP" }
     else { band: "Unsatisfactory", rating: 1, stars: "★", className: "stars-1", action: "Formal PIP" }
     end

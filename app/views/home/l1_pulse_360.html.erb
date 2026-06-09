@@ -877,9 +877,9 @@
   (function() {
     function getCategory(total) {
       if (total > 23) return { stars: "★★★★★", category: "Exceptional", action: "Accelerated growth track / highest increment", className: "stars-5" };
-      if (total >= 19) return { stars: "★★★★", category: "Outstanding", action: "Merit increment + recognition award", className: "stars-4" };
+      if (total >= 19) return { stars: "★★★★", category: "Outstanding", action: "Merit increment / recognition award", className: "stars-4" };
       if (total >= 15) return { stars: "★★★", category: "Meets Expectations", action: "Standard increment as per policy", className: "stars-3" };
-      if (total >= 11) return { stars: "★★", category: "Needs Improvement", action: "PIP + structured coaching plan", className: "stars-2" };
+      if (total >= 11) return { stars: "★★", category: "Needs Improvement", action: "PIP / structured coaching plan", className: "stars-2" };
       return { stars: "★", category: "Unsatisfactory", action: "Formal PIP / disciplinary review", className: "stars-1" };
     }
 
