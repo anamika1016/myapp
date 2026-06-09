@@ -25,5 +25,19 @@ class ApplicationController < ActionController::Base
     EmployeeDetail.exists?(l2_employer_name: current_user.email)
   end
 
+  def normalize_financial_year(value)
+    year = value.to_s.strip
+    return nil if year.blank?
+
+    match = year.match(/\A(\d{4})\s*-\s*(\d{2}|\d{4})\z/)
+    return year unless match
+
+    start_year = match[1].to_i
+    end_year = match[2].length == 2 ? ((start_year / 100) * 100) + match[2].to_i : match[2].to_i
+    end_year += 100 if end_year <= start_year
+
+    "#{start_year}-#{end_year}"
+  end
+
   helper_method :has_l1_responsibilities?, :has_l2_responsibilities?
 end

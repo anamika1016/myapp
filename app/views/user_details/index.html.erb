@@ -2,10 +2,21 @@
   <% if @user_details.any? %>
     <div class="bg-white border border-gray-200 rounded-xl shadow-lg mt-4">
       <div class="bg-gray-100 px-6 py-4 border-b border-gray-200 rounded-t-xl">
-        <h2 class="text-3xl font-bold text-gray-800 flex items-center">
-          <i class="fas fa-users me-2 text-indigo-600"></i>
-           HOD TARGET FORM 
-        </h2>
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <h2 class="text-3xl font-bold text-gray-800 flex items-center">
+            <i class="fas fa-users me-2 text-indigo-600"></i>
+             HOD TARGET FORM 
+          </h2>
+
+          <%= form_with url: user_details_path, method: :get, local: true, class: "flex items-center gap-3" do |form| %>
+            <%= form.label :financial_year, "Financial Year", class: "text-sm font-semibold text-gray-700" %>
+            <%= form.select :financial_year,
+                options_for_select(@financial_years, @selected_financial_year),
+                {},
+                class: "bg-white border border-gray-300 rounded-lg px-4 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500",
+                onchange: "this.form.submit();" %>
+          <% end %>
+        </div>
       </div>
 
       <div class="p-6">
@@ -14,6 +25,7 @@
             <thead class="bg-gray-800">
               <tr>
                 <th class="px-5 py-4 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Department</th>
+                <th class="px-5 py-4 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Financial Year</th>
                 <th class="px-5 py-4 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Employee Name</th>
                 <th class="px-5 py-4 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Activity</th>
                 <th class="px-5 py-4 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Theme</th>
@@ -37,6 +49,11 @@
               <% @user_details.each_with_index do |detail, index| %>
                 <tr class="<%= index.even? ? 'bg-gray-50' : 'bg-white' %> hover:bg-gray-100 transition-colors duration-200">
                   <td class="px-5 py-4 text-sm text-gray-800 font-medium border-r border-gray-200"><%= detail.department.department_type %></td>
+                  <td class="px-5 py-4 text-sm text-gray-800 font-medium border-r border-gray-200">
+                    <span class="text-emerald-700 font-semibold bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+                      <%= detail.financial_year.presence || @selected_financial_year %>
+                    </span>
+                  </td>
                   <td class="px-5 py-4 text-sm text-gray-800 font-medium border-r border-gray-200"><%= detail.employee_detail&.employee_name || 'N/A' %></td>
                   <td class="px-5 py-4 text-sm text-gray-800 border-r border-gray-200"><%= detail.activity.activity_name %></td>
                   <td class="px-5 py-4 text-sm text-gray-800 border-r border-gray-200"><%= detail.activity.theme_name.present? ? detail.activity.theme_name : 'No Theme' %></td>
@@ -135,6 +152,26 @@
       </div>
     </div>
   <% else %>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-lg mt-4">
+      <div class="bg-gray-100 px-6 py-4 border-b border-gray-200 rounded-t-xl">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <h2 class="text-3xl font-bold text-gray-800 flex items-center">
+            <i class="fas fa-users me-2 text-indigo-600"></i>
+             HOD TARGET FORM
+          </h2>
+
+          <%= form_with url: user_details_path, method: :get, local: true, class: "flex items-center gap-3" do |form| %>
+            <%= form.label :financial_year, "Financial Year", class: "text-sm font-semibold text-gray-700" %>
+            <%= form.select :financial_year,
+                options_for_select(@financial_years, @selected_financial_year),
+                {},
+                class: "bg-white border border-gray-300 rounded-lg px-4 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500",
+                onchange: "this.form.submit();" %>
+          <% end %>
+        </div>
+      </div>
+    </div>
+
     <div class="flex justify-center mt-10">
       <div class="w-full max-w-4xl bg-gradient-to-br from-pink-50 via-purple-50 to-indigo-50 border border-indigo-100 rounded-3xl shadow-xl p-10 text-center">
 
@@ -156,7 +193,7 @@
 
         <!-- Sub-text -->
         <p class="text-gray-600 text-lg mb-6 leading-relaxed">
-          It seems your HOD hasn’t shared any target records yet.<br>
+          <%= @selected_financial_year %> ke liye target records available nahi hain.<br>
           Don’t worry, check back soon — your goals are on the way!
         </p>    
       </div>

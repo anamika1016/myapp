@@ -276,9 +276,17 @@ class HomeController < ApplicationController
   def financial_year_options
     start_year = Date.current.month >= 4 ? Date.current.year : Date.current.year - 1
     nearby_years = ((start_year - 1)..(start_year + 1)).map { |year| "#{year}-#{year + 1}" }
-    persisted_years = UserDetail.where.not(financial_year: [ nil, "" ]).distinct.pluck(:financial_year)
+    persisted_years = if user_details_financial_year_available?
+      UserDetail.where.not(financial_year: [ nil, "" ]).distinct.pluck(:financial_year)
+    else
+      []
+    end
 
     (persisted_years + nearby_years).filter_map { |year| normalize_financial_year(year) }.uniq
+  end
+
+  def user_details_financial_year_available?
+    UserDetail.column_names.include?("financial_year")
   end
 
   def current_financial_year
@@ -539,7 +547,11 @@ class HomeController < ApplicationController
   end
 
   def build_employee_dashboard_row(ed)
-    ud = ed.user_details.select { |detail| detail.financial_year == @selected_financial_year }
+    ud = if user_details_financial_year_available?
+      ed.user_details.select { |detail| detail.financial_year == @selected_financial_year }
+    else
+      ed.user_details
+    end
     qs = quarter_summaries_for(ud)
     ap = (qs.sum { |q| q[:percentage] } / 4.0).round(1)
     pa = ed.l1_pulse_assessments.max_by(&:updated_at)
@@ -652,18 +664,25 @@ class HomeController < ApplicationController
 
   def load_admin_dashboard
     @dashboard_mode = :admin
-    @employee_rows = EmployeeDetail.joins(:user_details)
-                                   .where(user_details: { financial_year: @selected_financial_year })
-                                   .includes(:l1_pulse_assessments, user_details: [ :department, achievements: :achievement_remark ])
-                                   .distinct
-                                   .order(:employee_name)
-                                   .map { |ed| build_employee_dashboard_row(ed) }
+    scope = EmployeeDetail.joins(:user_details)
+    scope = scope.where(user_details: { financial_year: @selected_financial_year }) if user_details_financial_year_available?
+
+    @employee_rows = scope.includes(:l1_pulse_assessments, user_details: [ :department, achievements: :achievement_remark ])
+                          .distinct
+                          .order(:employee_name)
+                          .map { |ed| build_employee_dashboard_row(ed) }
   end
 
   def load_employee_dashboard
     @dashboard_mode = :employee
     @employee_detail = current_user.employee_detail || EmployeeDetail.find_by(employee_email: current_user.email)
-    @user_details = @employee_detail ? UserDetail.includes(:department, achievements: :achievement_remark).where(employee_detail_id: @employee_detail.id, financial_year: @selected_financial_year) : UserDetail.none
+    @user_details = if @employee_detail
+      scope = UserDetail.includes(:department, achievements: :achievement_remark).where(employee_detail_id: @employee_detail.id)
+      scope = scope.where(financial_year: @selected_financial_year) if user_details_financial_year_available?
+      scope
+    else
+      UserDetail.none
+    end
     qs = quarter_summaries_for(@user_details)
     ap = (qs.sum { |q| q[:percentage] } / 4.0).round(1)
     pa = @employee_detail&.l1_pulse_assessments&.max_by(&:updated_at)

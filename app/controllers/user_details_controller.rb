@@ -1,10 +1,16 @@
 class UserDetailsController < ApplicationController
   require "ostruct"
   require "set"
+  MONTH_ATTRIBUTES = %i[
+    april may june july august september october november december january february march
+  ].freeze
+
   before_action :set_user_detail, only: [ :show, :edit, :update, :destroy ]
   load_and_authorize_resource except: [ :index, :new, :create, :get_user_detail, :get_activities, :bulk_create, :submit_achievements, :export, :import, :quarterly_edit_all, :update_quarterly_achievements, :test_sms, :view_sms_logs, :submitted_achievements ]
 
   def index
+    set_financial_year_context
+
     if current_user.role == "employee" || current_user.role == "l1_employer" || current_user.role == "l2_employer"
       employee_detail = EmployeeDetail.find_by(employee_email: current_user.email)
 
@@ -12,6 +18,7 @@ class UserDetailsController < ApplicationController
         # Get all user_details for this employee and deduplicate by activity
         all_details = UserDetail.includes(:department, :activity, :employee_detail)
                                .where(employee_detail_id: employee_detail.id)
+                               .where(financial_year: @selected_financial_year)
 
         # Deduplicate by keeping the most recent record for each activity
         deduplicated_details = all_details.group_by(&:activity_id).map do |activity_id, records|
@@ -27,6 +34,7 @@ class UserDetailsController < ApplicationController
     elsif current_user.role == "hod"
       # Get all user_details and deduplicate by activity and employee
       all_details = UserDetail.includes(:department, :activity, :employee_detail)
+                              .where(financial_year: @selected_financial_year)
 
       # Deduplicate by keeping the most recent record for each activity-employee combination
       deduplicated_details = all_details.group_by { |detail| [ detail.activity_id, detail.employee_detail_id ] }.map do |key, records|
@@ -38,11 +46,13 @@ class UserDetailsController < ApplicationController
     end
   end
 
-    def new
+  def new
     @user_detail = UserDetail.new
+    set_financial_year_context
 
     # Load unique departments
-    @departments = Department.select("DISTINCT ON (department_type) id, department_type")
+    @departments = Department.where(financial_year: @selected_financial_year)
+                             .select("DISTINCT ON (department_type) id, department_type")
 
     # Filter employees based on selected department
     if params[:department_id].present?
@@ -74,26 +84,21 @@ class UserDetailsController < ApplicationController
     # Load employee-specific activities when both department and employee are selected
     if params[:department_id].present? && params[:employee_detail_id].present?
       begin
-        # Get the department
-        selected_department = Department.find(params[:department_id])
-
         # Get activities that have existing user_details for this specific employee
         # This ensures only activities relevant to the selected employee are shown
         @employee_activities = UserDetail.includes(:activity)
                                        .where(employee_detail_id: params[:employee_detail_id])
+                                       .where(department_id: params[:department_id])
+                                       .where(financial_year: @selected_financial_year)
                                        .where.not(activity_id: nil)
                                        .map(&:activity)
                                        .uniq
-
-        # If no existing activities found, show all department activities (for new entries)
-        if @employee_activities.empty?
-          @employee_activities = selected_department.activities
-        end
 
         # FIXED: Only load user_details when BOTH department and employee are selected
         # This prevents showing all data when only one filter is applied
         @user_details = UserDetail.includes(:department, :activity, :employee_detail)
                                   .where(filter_conditions)
+                                  .where(financial_year: @selected_financial_year)
                                   .limit(100)
       rescue ActiveRecord::RecordNotFound => e
         flash[:alert] = "Error loading data: #{e.message}"
@@ -173,6 +178,8 @@ class UserDetailsController < ApplicationController
 
 
   def update_quarterly_achievements
+    set_financial_year_context
+
     # Get the correct parameters
     selected_quarter = params[:selected_quarter]
     achievement_data = params[:achievements] || {}
@@ -182,7 +189,7 @@ class UserDetailsController < ApplicationController
 
     if achievement_data.empty?
       flash[:alert] = "No achievement data received. Please try again."
-      redirect_to quarterly_edit_all_user_details_path
+      redirect_to quarterly_edit_all_user_details_path(financial_year: @selected_financial_year)
       return
     end
 
@@ -261,7 +268,7 @@ class UserDetailsController < ApplicationController
 
         # Get all achievements for this specific employee in the selected quarter
         employee_achievements = Achievement.joins(:user_detail)
-                                        .where(user_details: { employee_detail_id: employee_detail_id })
+                                        .where(user_details: { employee_detail_id: employee_detail_id, financial_year: @selected_financial_year })
                                         .where(month: quarter_months)
 
         # Set status to pending for this employee's achievements only
@@ -295,27 +302,31 @@ class UserDetailsController < ApplicationController
       flash[:alert] += " and #{errors.count - 2} more errors..." if errors.count > 2
     end
 
-    redirect_to quarterly_edit_all_user_details_path
+    redirect_to quarterly_edit_all_user_details_path(financial_year: @selected_financial_year)
 
     rescue => e
       Rails.logger.error "Quarterly update error: #{e.message}\n#{e.backtrace.join("\n")}"
       flash[:alert] = "❌ An error occurred while updating achievements: #{e.message}"
-      redirect_to quarterly_edit_all_user_details_path
+      redirect_to quarterly_edit_all_user_details_path(financial_year: @selected_financial_year)
   end
 
   # FIXED: Quarterly edit all method
   def quarterly_edit_all
+    set_financial_year_context
+
     if current_user.role == "employee" || current_user.role == "l1_employer" || current_user.role == "l2_employer"
       employee_detail = EmployeeDetail.find_by(employee_email: current_user.email)
       @user_details = if employee_detail
         UserDetail.includes(:department, :activity, :employee_detail, achievements: :achievement_remark)
                 .where(employee_detail_id: employee_detail.id)
+                .where(financial_year: @selected_financial_year)
                 .order("departments.department_type, activities.activity_name")
       else
         UserDetail.none
       end
     elsif current_user.role == "hod"
       @user_details = UserDetail.includes(:department, :activity, :employee_detail, achievements: :achievement_remark)
+                              .where(financial_year: @selected_financial_year)
                               .order("departments.department_type, employee_details.employee_name, activities.activity_name")
     else
       @user_details = UserDetail.none
@@ -445,6 +456,8 @@ class UserDetailsController < ApplicationController
   end
 
   def get_user_detail
+    set_financial_year_context
+
     if [ "employee", "l1_employer", "l2_employer" ].include?(current_user.role)
       @employee_detail = EmployeeDetail.find_by(employee_email: current_user.email)
 
@@ -452,6 +465,7 @@ class UserDetailsController < ApplicationController
         # Get all user_details for this employee and deduplicate by activity
         all_details = UserDetail.includes(:department, :activity, :employee_detail, achievements: :achievement_remark)
                                .where(employee_detail_id: @employee_detail.id)
+                               .where(financial_year: @selected_financial_year)
 
         # Deduplicate by keeping the most recent record for each activity
         deduplicated_details = all_details.group_by(&:activity_id).map do |activity_id, records|
@@ -467,6 +481,7 @@ class UserDetailsController < ApplicationController
     elsif current_user.role == "hod"
       # Get all user_details and deduplicate by activity and employee
       all_details = UserDetail.includes(:department, :activity, :employee_detail, achievements: :achievement_remark)
+                              .where(financial_year: @selected_financial_year)
 
       # Deduplicate by keeping the most recent record for each activity-employee combination
       deduplicated_details = all_details.group_by { |detail| [ detail.activity_id, detail.employee_detail_id ] }.map do |key, records|
@@ -480,37 +495,53 @@ class UserDetailsController < ApplicationController
   end
 
   def submitted_achievements
+    set_financial_year_context
+
     if [ "employee", "l1_employer", "l2_employer" ].include?(current_user.role)
       @employee_detail = EmployeeDetail.find_by(employee_email: current_user.email)
 
       @user_details = if @employee_detail
-        # Get all user_details for this employee and deduplicate by activity
+        # Show rows that have submitted achievements. Picking the newest target row
+        # first can hide achievements saved against an older user_detail record.
         all_details = UserDetail.includes(:department, :activity, :employee_detail, achievements: :achievement_remark)
+                               .joins(:achievements)
                                .where(employee_detail_id: @employee_detail.id)
+                               .where(financial_year: @selected_financial_year)
+                               .where.not(achievements: { achievement: [ nil, "" ] })
+                               .distinct
 
-        # Deduplicate by keeping the most recent record for each activity
+        # Deduplicate by keeping the activity row with the latest submitted achievement.
         deduplicated_details = all_details.group_by(&:activity_id).map do |activity_id, records|
-          records.max_by(&:updated_at)
+          records.max_by { |record| latest_achievement_updated_at(record) }
         end
 
-        # Convert to ActiveRecord relation and limit
-        UserDetail.where(id: deduplicated_details.map(&:id)).limit(100)
+        UserDetail.includes(:department, :activity, :employee_detail, achievements: :achievement_remark)
+                  .where(id: deduplicated_details.map(&:id))
+                  .limit(100)
       else
         UserDetail.none
       end
 
     elsif current_user.role == "hod"
-      # Get all user_details and deduplicate by activity and employee
+      # Show only rows that have submitted achievements, then deduplicate by
+      # activity and employee.
       all_details = UserDetail.includes(:department, :activity, :employee_detail, achievements: :achievement_remark)
+                              .joins(:achievements)
+                              .where(financial_year: @selected_financial_year)
+                              .where.not(achievements: { achievement: [ nil, "" ] })
+                              .distinct
 
-      # Deduplicate by keeping the most recent record for each activity-employee combination
       deduplicated_details = all_details.group_by { |detail| [ detail.activity_id, detail.employee_detail_id ] }.map do |key, records|
-        records.max_by(&:updated_at)
+        records.max_by { |record| latest_achievement_updated_at(record) }
       end
 
-      # Convert to ActiveRecord relation and limit
-      @user_details = UserDetail.where(id: deduplicated_details.map(&:id)).limit(100)
+      @user_details = UserDetail.includes(:department, :activity, :employee_detail, achievements: :achievement_remark)
+                                .where(id: deduplicated_details.map(&:id))
+                                .limit(100)
       @employee_detail = nil
+    else
+      @employee_detail = nil
+      @user_details = UserDetail.none
     end
   end
 
@@ -645,6 +676,7 @@ class UserDetailsController < ApplicationController
   def bulk_create
     department_id = params[:department_id]
     employee_detail_id = params[:employee_detail_id]
+    financial_year = normalize_financial_year(params[:financial_year]) || current_financial_year
     user_details_params = params[:user_details]
 
     # Enhanced validation
@@ -683,7 +715,8 @@ class UserDetailsController < ApplicationController
     existing_records = UserDetail.where(
       department_id: department_id,
       activity_id: activity_ids,
-      employee_detail_id: employee_detail_id
+      employee_detail_id: employee_detail_id,
+      financial_year: financial_year
     ).index_by(&:activity_id)
 
     ActiveRecord::Base.transaction do
@@ -724,7 +757,8 @@ class UserDetailsController < ApplicationController
           user_detail_record = UserDetail.find_or_initialize_by(
             department_id: department_id,
             activity_id: activity_id,
-            employee_detail_id: employee_detail_id
+            employee_detail_id: employee_detail_id,
+            financial_year: financial_year
           )
 
           # Update Activity metadata (always update to handle clearing values)
@@ -789,7 +823,10 @@ class UserDetailsController < ApplicationController
   end
 
   def export
+    set_financial_year_context
+
     @user_details = UserDetail.includes(:employee_detail, :department, :activity)
+                              .where(financial_year: @selected_financial_year)
                               .limit(5000)
 
     respond_to do |format|
@@ -880,7 +917,8 @@ class UserDetailsController < ApplicationController
               next
             end
 
-            department = Department.find_or_create_by!(department_type: department_type)
+            financial_year = normalize_financial_year(row["financial_year"]) || normalize_financial_year(params[:financial_year]) || current_financial_year
+            department = Department.find_or_create_by!(department_type: department_type, financial_year: financial_year)
 
             employee_attributes = {
               employee_name: employee_name.to_s.strip,
@@ -914,12 +952,14 @@ class UserDetailsController < ApplicationController
             end
 
             begin
-              UserDetail.create!(
+              user_detail = UserDetail.find_or_initialize_by(
                 employee_detail_id: employee.id,
                 department_id: department.id,
                 activity_id: activity.id,
-                **months
+                financial_year: financial_year
               )
+              user_detail.assign_attributes(months)
+              user_detail.save!
               success_count += 1
             rescue ActiveRecord::RecordInvalid => e
               errors << "Row #{i}: #{e.message}"
@@ -947,6 +987,14 @@ class UserDetailsController < ApplicationController
 
 
   private
+
+  def latest_achievement_updated_at(user_detail)
+    user_detail.achievements
+               .select { |achievement| achievement.achievement.present? }
+               .map(&:updated_at)
+               .compact
+               .max || user_detail.updated_at
+  end
 
   def extract_employee_mobile_number(row)
     prioritized_keys = %w[
@@ -1009,11 +1057,37 @@ class UserDetailsController < ApplicationController
   def user_detail_params
     params.require(:user_detail).permit(:department_id, :activity_id, :april, :may, :june,
                                         :july, :august, :september, :october, :november,
-                                        :december, :january, :february, :march, :employee_detail_id, :employee_detail_email)
+                                        :december, :january, :february, :march, :employee_detail_id, :employee_detail_email,
+                                        :financial_year)
   end
 
   def bulk_create_params
-    params.permit(:department_id, :employee_detail_id, user_details: {})
+    params.permit(:department_id, :employee_detail_id, :financial_year, user_details: {})
+  end
+
+  def set_financial_year_context
+    @financial_years = financial_year_options
+    @selected_financial_year = normalize_financial_year(params[:financial_year]) || current_financial_year
+    @financial_years |= [ @selected_financial_year ]
+    @financial_years.sort!.reverse!
+  end
+
+  def financial_year_options
+    start_year = Date.current.month >= 4 ? Date.current.year : Date.current.year - 1
+    nearby_years = ((start_year - 1)..(start_year + 1)).map { |year| "#{year}-#{year + 1}" }
+
+    persisted_years = if UserDetail.column_names.include?("financial_year")
+      UserDetail.where.not(financial_year: [ nil, "" ]).distinct.pluck(:financial_year)
+    else
+      []
+    end
+
+    (persisted_years + nearby_years).filter_map { |year| normalize_financial_year(year) }.uniq
+  end
+
+  def current_financial_year
+    start_year = Date.current.month >= 4 ? Date.current.year : Date.current.year - 1
+    "#{start_year}-#{start_year + 1}"
   end
 
   def extract_month_value(details, month)

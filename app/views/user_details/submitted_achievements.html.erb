@@ -1,18 +1,27 @@
 <!-- Main Content Area -->
 <div class="main-content bg-gray-50 min-h-screen">
   <div class="bg-gray-50 min-h-screen">
-    <% if @user_details.any? && @user_details.any? { |detail| detail.achievements.any?(&:achievement?) } %>
+    <% if @user_details.any? && @user_details.any? { |detail| detail.achievements.any? { |achievement| achievement.achievement.present? } } %>
    <!-- Update this section in your existing index.html.erb file -->
 <div class="bg-gray-100 px-6 py-4 border-b border-gray-200 rounded-t-xl">
   <div class="flex justify-between items-center">
     <h2 class="text-4xl font-bold text-gray-800 flex items-center">
       <i class="fas fa-check-circle me-3 text-green-600 text-2xl"></i>
-      Submitted  Viwe Achievements
+      Submitted View Achievements
     </h2>
     
     <!-- Add this Quarterly Edit Button -->
    <div class="flex items-center gap-3">
-  <%= link_to quarterly_edit_all_user_details_path, 
+  <%= form_with url: submitted_achievements_user_details_path, method: :get, local: true, class: "flex items-center gap-2" do |form| %>
+    <%= form.label :financial_year, "Financial Year", class: "text-sm font-semibold text-gray-700" %>
+    <%= form.select :financial_year,
+        options_for_select(@financial_years, @selected_financial_year),
+        {},
+        class: "bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700",
+        onchange: "this.form.submit();" %>
+  <% end %>
+
+  <%= link_to quarterly_edit_all_user_details_path(financial_year: @selected_financial_year), 
               class: "bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center shadow-md hover:shadow-lg transform hover:scale-105" do %>
     <i class="fas fa-edit me-2"></i>
     <span class="font-semibold">Quarterly Edit</span>
@@ -832,6 +841,14 @@
             <i class="fas fa-check-circle me-3 text-green-600 text-2xl"></i>
             Submitted View Achievements
           </h2>
+          <%= form_with url: submitted_achievements_user_details_path, method: :get, local: true, class: "flex items-center gap-2" do |form| %>
+            <%= form.label :financial_year, "Financial Year", class: "text-sm font-semibold text-gray-700" %>
+            <%= form.select :financial_year,
+                options_for_select(@financial_years, @selected_financial_year),
+                {},
+                class: "bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700",
+                onchange: "this.form.submit();" %>
+          <% end %>
         </div>
       </div>
       
@@ -847,12 +864,12 @@
           <!-- No Data Message -->
           <h3 class="text-2xl font-bold text-gray-800 mb-4 no-data-title">No Submitted Data Available</h3>
           <p class="text-gray-600 text-lg mb-8 max-w-md mx-auto no-data-description">
-            You haven't submitted any quarterly achievements yet. Please submit your achievements first to view them here.
+            You haven't submitted any quarterly achievements for <%= @selected_financial_year %> yet. Please submit your achievements first to view them here.
           </p>
           
           <!-- Submit Button -->
           <div class="flex justify-center">
-            <%= link_to get_user_detail_user_details_path, 
+            <%= link_to get_user_detail_user_details_path(financial_year: @selected_financial_year), 
                         class: "bg-gray-600 hover:bg-gray-700 text-white px-8 py-3 rounded-lg transition-all duration-300 flex items-center shadow-md hover:shadow-lg transform hover:scale-105 no-data-button" do %>
               <i class="fas fa-plus mr-2"></i>
               <span class="font-semibold">Submit Your Achievements</span>

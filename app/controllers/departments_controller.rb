@@ -4,11 +4,13 @@ class DepartmentsController < ApplicationController
   before_action :set_department, only: [ :show, :edit, :update, :destroy, :delete_user_activities, :delete_user_from_department ]
 
   def index
+    set_financial_year_context
+
     if params[:employee_id].present?
       @selected_employee = EmployeeDetail.find_by(employee_id: params[:employee_id])
       if @selected_employee
         # Get activities for the selected employee using UserDetail
-        @employee_activities = get_employee_activities(@selected_employee)
+        @employee_activities = get_employee_activities(@selected_employee, @selected_financial_year)
       else
         @employee_activities = {}
       end
@@ -16,19 +18,19 @@ class DepartmentsController < ApplicationController
       @selected_employee = EmployeeDetail.find_by(employee_code: params[:employee_code])
       if @selected_employee
         # Get activities for the selected employee using UserDetail
-        @employee_activities = get_employee_activities(@selected_employee)
+        @employee_activities = get_employee_activities(@selected_employee, @selected_financial_year)
       else
         @employee_activities = {}
       end
     else
       # Show all employees with their activities grouped by employee
-      @employee_activities = get_all_employee_activities
+      @employee_activities = get_all_employee_activities(@selected_financial_year)
     end
 
     # Debug logging - simplified to avoid database errors
     Rails.logger.info "Employee activities loaded successfully"
 
-    @department = Department.new
+    @department = Department.new(financial_year: @selected_financial_year)
     # Only build one activity by default to prevent duplicates
     @department.activities.build
 
@@ -48,7 +50,9 @@ class DepartmentsController < ApplicationController
   end
 
   def new
-    @department = Department.new
+    set_financial_year_context
+
+    @department = Department.new(financial_year: @selected_financial_year)
     @employee_departments = EmployeeDetail.distinct.pluck(:department).compact.reject(&:blank?)
     @employees = EmployeeDetail.where("employee_name IS NOT NULL AND employee_id IS NOT NULL AND department IS NOT NULL")
                               .order(:employee_name)
@@ -57,24 +61,27 @@ class DepartmentsController < ApplicationController
   end
 
   def create
+    set_financial_year_context
+
     @department = Department.new(department_params)
+    @department.financial_year = @selected_financial_year if @department.financial_year.blank?
 
     if @department.save
       respond_to do |format|
-        format.html { redirect_to departments_path, notice: "Department was successfully created." }
+        format.html { redirect_to departments_path(financial_year: @department.financial_year), notice: "Department was successfully created." }
         format.json { render json: { success: true, message: "Department created successfully!" } }
       end
     else
       respond_to do |format|
         format.html {
-          @department = Department.new
+          @department = Department.new(financial_year: @selected_financial_year)
           @department.activities.build
           @departments = Department.includes(:activities).all
           @employee_departments = EmployeeDetail.distinct.pluck(:department).compact.reject(&:blank?)
           @employees = EmployeeDetail.where("employee_name IS NOT NULL AND employee_id IS NOT NULL AND department IS NOT NULL")
                                    .order(:employee_name)
           # Set employee_activities to avoid nil error in view
-          @employee_activities = get_all_employee_activities
+          @employee_activities = get_all_employee_activities(@selected_financial_year)
           flash.now[:alert] = "Failed to create department: #{@department.errors.full_messages.join(', ')}"
           render :index, status: :unprocessable_entity
         }
@@ -90,6 +97,8 @@ class DepartmentsController < ApplicationController
   end
 
   def edit_data
+    set_financial_year_context
+
     # Disable caching to ensure fresh data is always returned
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Pragma"] = "no-cache"
@@ -113,6 +122,7 @@ class DepartmentsController < ApplicationController
         # Get activities from UserDetail records for this specific employee
         user_details = UserDetail.includes(:activity, :department)
                                 .where(employee_detail_id: employee.id)
+                                .where(financial_year: @selected_financial_year)
                                 .where("activity_id IS NOT NULL")
 
         # Map activities from user_details (employee-specific activities)
@@ -138,6 +148,7 @@ class DepartmentsController < ApplicationController
           employee_name: employee_name,
           employee_code: employee_code,
           employee_display_name: employee ? "#{employee_name} (#{employee_code})" : "N/A",
+          financial_year: department.financial_year.presence || @selected_financial_year,
           activities: activities,
           timestamp: Time.current.to_i
         }
@@ -154,6 +165,7 @@ class DepartmentsController < ApplicationController
         # Get activities for this employee using UserDetail
         user_details = UserDetail.includes(:activity, :department)
                                 .where(employee_detail_id: employee.id)
+                                .where(financial_year: @selected_financial_year)
                                 .where("activity_id IS NOT NULL")
 
         activities = user_details.map do |user_detail|
@@ -178,6 +190,7 @@ class DepartmentsController < ApplicationController
           employee_name: employee.employee_name,
           employee_code: employee.employee_code,
           employee_display_name: "#{employee.employee_name} (#{employee.employee_code || employee.employee_id})",
+          financial_year: @selected_financial_year,
           activities: activities,
           timestamp: Time.current.to_i
         }
@@ -191,6 +204,7 @@ class DepartmentsController < ApplicationController
   # Handle employee-specific activity updates
   def handle_employee_activity_update(employee)
     Rails.logger.info "=== handle_employee_activity_update called for employee #{employee.employee_id} ==="
+    year = normalize_financial_year(params.dig(:department, :financial_year)) || current_financial_year
 
     if params[:department] && params[:department][:activities_attributes].present?
       Rails.logger.info "Processing employee activity updates for #{employee.employee_name}"
@@ -198,7 +212,7 @@ class DepartmentsController < ApplicationController
       begin
         ActiveRecord::Base.transaction do
           # Get existing UserDetail records for this employee
-          existing_user_details = UserDetail.where(employee_detail_id: employee.id)
+          existing_user_details = UserDetail.where(employee_detail_id: employee.id, financial_year: year)
           Rails.logger.info "Found #{existing_user_details.count} existing user_details for employee"
 
           # Process activities marked for destruction (remove from employee)
@@ -252,7 +266,8 @@ class DepartmentsController < ApplicationController
                 UserDetail.create!(
                   employee_detail_id: employee.id,
                   activity_id: activity_id,
-                  department_id: department.id
+                  department_id: department.id,
+                  financial_year: year
                 )
               end
             end
@@ -273,6 +288,8 @@ class DepartmentsController < ApplicationController
   end
 
   def update
+    set_financial_year_context
+
     # Handle nested attributes with proper foreign key constraint handling
     begin
       ActiveRecord::Base.transaction do
@@ -299,7 +316,7 @@ class DepartmentsController < ApplicationController
     # Now update the department with the remaining activities
     if @department.update(department_params)
       respond_to do |format|
-        format.html { redirect_to departments_path, notice: "Department was successfully updated." }
+        format.html { redirect_to departments_path(financial_year: @selected_financial_year), notice: "Department was successfully updated." }
         format.json { render json: { success: true, message: "Department updated successfully!" } }
       end
     else
@@ -443,6 +460,8 @@ class DepartmentsController < ApplicationController
 
   # New action to handle updating employee activity data from the edit form
   def update_employee_activity_data
+    set_financial_year_context
+
     # The ID could be either a department ID or employee ID
     id = params[:id]
 
@@ -542,14 +561,16 @@ class DepartmentsController < ApplicationController
                       existing_user_detail = UserDetail.find_by(
                         department_id: department.id,
                         activity_id: existing_activity.id,
-                        employee_detail_id: employee.id
+                        employee_detail_id: employee.id,
+                        financial_year: @selected_financial_year
                       )
 
                       unless existing_user_detail
                         UserDetail.create!(
                           department_id: department.id,
                           activity_id: existing_activity.id,
-                          employee_detail_id: employee.id
+                          employee_detail_id: employee.id,
+                          financial_year: @selected_financial_year
                         )
                       end
                     end
@@ -575,7 +596,8 @@ class DepartmentsController < ApplicationController
                     UserDetail.create!(
                       department_id: department.id,
                       activity_id: new_activity.id,
-                      employee_detail_id: employee.id
+                      employee_detail_id: employee.id,
+                      financial_year: @selected_financial_year
                     )
                     Rails.logger.info "Created UserDetail linking activity #{new_activity.id} to employee #{employee.employee_id}"
                   end
@@ -647,6 +669,8 @@ class DepartmentsController < ApplicationController
   end
 
   def import
+    set_financial_year_context
+
     file = params[:file]
 
     if file.nil?
@@ -658,6 +682,7 @@ class DepartmentsController < ApplicationController
     header = spreadsheet.row(1)
 
     header_map = {
+      "Financial Year" => "financial_year",
       "Department" => "department_type",
       "Employee Name" => "employee_name",
       "Theme Name" => "theme_name",
@@ -674,6 +699,7 @@ class DepartmentsController < ApplicationController
       row_data = spreadsheet.row(i)
       row = Hash[[ header, row_data ].transpose]
       mapped = row.transform_keys { |key| header_map[key] }.compact
+      financial_year = normalize_financial_year(mapped["financial_year"]) || @selected_financial_year
 
       # Skip empty rows
       next if mapped["department_type"].blank? && mapped["employee_name"].blank? && mapped["theme_name"].blank?
@@ -702,10 +728,12 @@ class DepartmentsController < ApplicationController
       end
 
       # Create unique key for each department-employee-theme combination
-      key = "#{mapped["department_type"]}-#{employee.employee_id}-#{mapped["theme_name"]}"
+      key = "#{financial_year}-#{mapped["department_type"]}-#{employee.employee_id}-#{mapped["theme_name"]}"
       departments_hash[key] ||= {
+        financial_year: financial_year,
         department_type: mapped["department_type"],
         employee_reference: employee.employee_id,
+        employee_detail_id: employee.id,
         theme_name: mapped["theme_name"],
         activities: []
       }
@@ -729,27 +757,40 @@ class DepartmentsController < ApplicationController
     # Create departments and activities
     ActiveRecord::Base.transaction do
       departments_hash.each_value do |dept_data|
-        department = Department.create!(
+        department = Department.find_or_initialize_by(
           department_type: dept_data[:department_type],
           employee_reference: dept_data[:employee_reference],
-          theme_name: dept_data[:theme_name]
+          theme_name: dept_data[:theme_name],
+          financial_year: dept_data[:financial_year]
         )
+        department.save!
 
         dept_data[:activities].each do |act|
-          department.activities.create!(act)
+          activity = department.activities.find_or_initialize_by(activity_name: act[:activity_name])
+          activity.assign_attributes(act)
+          activity.save!
+
+          UserDetail.find_or_create_by!(
+            department_id: department.id,
+            activity_id: activity.id,
+            employee_detail_id: dept_data[:employee_detail_id],
+            financial_year: dept_data[:financial_year]
+          )
         end
 
         success_count += 1
       end
     end
 
-    redirect_to departments_path, notice: "✅ Successfully imported #{success_count} department(s) with activities!"
+    redirect_to departments_path(financial_year: @selected_financial_year), notice: "✅ Successfully imported #{success_count} department(s) with activities!"
   rescue => e
-    redirect_to departments_path, alert: "❌ Import failed: #{e.message}"
+    redirect_to departments_path(financial_year: params[:financial_year].presence), alert: "❌ Import failed: #{e.message}"
   end
 
   def export
-    @departments = Department.includes(:activities).all
+    set_financial_year_context
+
+    @employee_activities = get_all_employee_activities(@selected_financial_year)
 
     respond_to do |format|
       format.xlsx {
@@ -1037,17 +1078,43 @@ class DepartmentsController < ApplicationController
   end
 
   def department_params
-    params.require(:department).permit(:department_type, :employee_reference, :theme_name,
+    params.require(:department).permit(:department_type, :employee_reference, :theme_name, :financial_year,
     activities_attributes: [ :id, :theme_name, :activity_name, :unit, :weight, :_destroy ])
   end
 
+  def set_financial_year_context
+    @financial_years = financial_year_options
+    @selected_financial_year = normalize_financial_year(params[:financial_year]) ||
+                               normalize_financial_year(params.dig(:department, :financial_year)) ||
+                               current_financial_year
+    @financial_years |= [ @selected_financial_year ]
+    @financial_years.sort!.reverse!
+  end
+
+  def financial_year_options
+    start_year = Date.current.month >= 4 ? Date.current.year : Date.current.year - 1
+    nearby_years = ((start_year - 1)..(start_year + 1)).map { |year| "#{year}-#{year + 1}" }
+
+    persisted_years = []
+    persisted_years += Department.where.not(financial_year: [ nil, "" ]).distinct.pluck(:financial_year) if Department.column_names.include?("financial_year")
+    persisted_years += UserDetail.where.not(financial_year: [ nil, "" ]).distinct.pluck(:financial_year) if UserDetail.column_names.include?("financial_year")
+
+    (persisted_years + nearby_years).filter_map { |year| normalize_financial_year(year) }.uniq
+  end
+
+  def current_financial_year
+    start_year = Date.current.month >= 4 ? Date.current.year : Date.current.year - 1
+    "#{start_year}-#{start_year + 1}"
+  end
+
   # Get activities for a specific employee using UserDetail
-  def get_employee_activities(employee)
+  def get_employee_activities(employee, financial_year = current_financial_year)
     activities_hash = {}
 
     # Get all user_details for this employee and deduplicate
     user_details = UserDetail.includes(:activity, :department)
                             .where(employee_detail_id: employee.id)
+                            .where(financial_year: financial_year)
                             .where("activity_id IS NOT NULL")
 
     # Deduplicate by keeping the most recent record for each activity
@@ -1069,6 +1136,7 @@ class DepartmentsController < ApplicationController
         employee_code: employee.employee_code,
         department: employee.department, # Employee's department
         department_type: department.department_type, # Activity's department
+        financial_year: user_detail.financial_year,
         total_activities: 0,
         activities: []
       }
@@ -1088,11 +1156,12 @@ class DepartmentsController < ApplicationController
   end
 
   # Get all employees with their activities grouped by employee
-  def get_all_employee_activities
+  def get_all_employee_activities(financial_year = current_financial_year)
     activities_hash = {}
 
     # Get all employees who have user_details
     employees_with_activities = EmployeeDetail.joins(:user_details)
+                                             .where(user_details: { financial_year: financial_year })
                                              .distinct
                                              .includes(:user_details)
 
@@ -1100,6 +1169,7 @@ class DepartmentsController < ApplicationController
       # Get activities for this employee and deduplicate
       user_details = UserDetail.includes(:activity, :department)
                               .where(employee_detail_id: employee.id)
+                              .where(financial_year: financial_year)
                               .where("activity_id IS NOT NULL")
 
       # Deduplicate by keeping the most recent record for each activity
@@ -1121,6 +1191,7 @@ class DepartmentsController < ApplicationController
           employee_code: employee.employee_code,
           department: employee.department, # Employee's department
           department_type: department.department_type, # Activity's department
+          financial_year: user_detail.financial_year,
           total_activities: 0,
           activities: []
         }

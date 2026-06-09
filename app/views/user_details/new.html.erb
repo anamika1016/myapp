@@ -9,6 +9,7 @@
           <!-- Left side - Upload Section -->
           <div class="upload-section">
             <%= form_with url: import_user_details_path, method: :post, multipart: true, local: true, class: "upload-form" do |form| %>
+              <%= form.hidden_field :financial_year, value: @selected_financial_year %>
               <%= form.file_field :file, accept: ".xlsx,.xls", style: "display: none;", id: "excel-file-input" %>
               
               <button type="button" class="choose-file-btn" onclick="document.getElementById('excel-file-input').click()">
@@ -23,7 +24,7 @@
           
           <!-- Right side - Export Section -->
           <div class="export-section" style="display: flex; align-items: center;">
-            <%= link_to export_department_activity_data_user_details_path(format: :xlsx, department_id: params[:department_id], employee_detail_id: params[:employee_detail_id]), 
+            <%= link_to export_department_activity_data_user_details_path(format: :xlsx, department_id: params[:department_id], employee_detail_id: params[:employee_detail_id], financial_year: @selected_financial_year), 
                 class: "btn btn-success export-btn", 
                 id: "export-btn",
                 style: "display: inline-block; visibility: visible; opacity: 1;" do %>
@@ -44,6 +45,7 @@
             <table class="table table-bordered table-hover w-full text-sm text-gray-700 border border-gray-300">
               <thead class="bg-gray-light">
                 <tr>
+                  <th class="px-4 py-3 text-start">Financial Year</th>
                   <th class="px-4 py-3 text-start">Department</th>
                   <th class="px-4 py-3 text-start">Employee Name</th>
                   <th class="px-4 py-3 text-start">L1 Employer</th>
@@ -52,6 +54,14 @@
               </thead>
               <tbody>
                 <tr>
+                  <td class="px-4 py-3">
+                    <%= form.select :financial_year,
+                        options_for_select(@financial_years, @selected_financial_year),
+                        {},
+                        class: "form-select form-select-sm w-full border-gray-300 rounded",
+                        onchange: "this.form.submit();" %>
+                  </td>
+
                   <!-- Department Dropdown -->
                   <td class="px-4 py-3">
                     <%= form.select :department_id,
@@ -111,14 +121,12 @@
                   existing_data = UserDetail.find_by(
                     department_id: params[:department_id],
                     activity_id: activity.id,
-                    employee_detail_id: params[:employee_detail_id]
+                    employee_detail_id: params[:employee_detail_id],
+                    financial_year: @selected_financial_year
                   )
                   
-                  # Only include activities that have no existing data OR have all blank target values
-                  if existing_data.nil?
-                    # No existing data - include this activity
-                    activities << activity
-                  else
+                  # Only include year-scoped activities that already have user_detail rows
+                  if existing_data.present?
                     # Check if all target values are blank
                     months = [:april, :may, :june, :july, :august, :september, :october, :november, :december, :january, :february, :march]
                     all_blank = months.all? do |month|
@@ -139,6 +147,7 @@
               <%= form_with url: bulk_create_user_details_path, method: :post, local: true, id: 'bulk-form' do |form| %>
                 <%= form.hidden_field :department_id, value: params[:department_id] %>
                 <%= form.hidden_field :employee_detail_id, value: params[:employee_detail_id] %>
+                <%= form.hidden_field :financial_year, value: @selected_financial_year %>
                 
                 <div class="table-responsive">
                   <table class="table table-bordered table-striped mb-0">
@@ -171,7 +180,8 @@
                           existing_data = UserDetail.find_by(
                             department_id: params[:department_id],
                             activity_id: activity.id,
-                            employee_detail_id: params[:employee_detail_id]
+                            employee_detail_id: params[:employee_detail_id],
+                            financial_year: @selected_financial_year
                           )
                         %>
                         <tr>
@@ -223,6 +233,8 @@
                 <i class="fas fa-info-circle me-2"></i>
                 <% if params[:department_id].blank? || params[:employee_detail_id].blank? %>
                   Please select both department and employee.
+                <% else %>
+                  No activities are assigned for <%= @selected_financial_year %>. Please upload or create year-wise department activities first.
                 <% end %>
               </div>
             <% end %>
@@ -236,7 +248,7 @@
           <div class="card-header bg-gray text-white d-flex justify-content-between align-items-center">
             <h5 class="mb-0">
               <i class="fas fa-database me-2"></i>
-              Existing Data for <%= @selected_employee&.employee_name || 'Selected Employee' %> (Limited to 100 records)
+              Existing Data for <%= @selected_employee&.employee_name || 'Selected Employee' %> - <%= @selected_financial_year %> (Limited to 100 records)
             </h5>
             <button class="btn btn-sm btn-outline-light" onclick="toggleExistingData()">
               <i class="fas fa-eye" id="toggle-icon"></i> Toggle View
@@ -270,7 +282,7 @@
                 </thead>
                 <tbody>
                   <% 
-                    toggle_activities = (@employee_activities.present? ? @employee_activities : (Department.find_by(id: params[:department_id])&.activities || []))
+                    toggle_activities = @employee_activities || []
                     details_by_activity = @user_details.index_by(&:activity_id)
                   %>
                   <% toggle_activities.each do |activity| %>

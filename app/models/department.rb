@@ -31,20 +31,24 @@
     employee = EmployeeDetail.find_by(employee_id: employee_reference)
     return unless employee
 
+    year = financial_year.presence || current_financial_year
+
     # Create UserDetail records for each activity
     activities.each do |activity|
       # Check if UserDetail already exists to avoid duplicates
       existing_user_detail = UserDetail.find_by(
         department_id: id,
         activity_id: activity.id,
-        employee_detail_id: employee.id
+        employee_detail_id: employee.id,
+        financial_year: year
       )
 
       unless existing_user_detail
         UserDetail.create!(
           department_id: id,
           activity_id: activity.id,
-          employee_detail_id: employee.id
+          employee_detail_id: employee.id,
+          financial_year: year
         )
       end
     end
@@ -57,13 +61,16 @@
     employee = EmployeeDetail.find_by(employee_id: employee_reference)
     return unless employee
 
+    year = financial_year.presence || current_financial_year
+
     # Get current activity IDs
     current_activity_ids = activities.pluck(:id)
 
     # Remove UserDetail records for activities that no longer exist
     UserDetail.where(
       department_id: id,
-      employee_detail_id: employee.id
+      employee_detail_id: employee.id,
+      financial_year: year
     ).where.not(activity_id: current_activity_ids).destroy_all
 
     # Create UserDetail records for new activities
@@ -71,17 +78,24 @@
       existing_user_detail = UserDetail.find_by(
         department_id: id,
         activity_id: activity_id,
-        employee_detail_id: employee.id
+        employee_detail_id: employee.id,
+        financial_year: year
       )
 
       unless existing_user_detail
         UserDetail.create!(
           department_id: id,
           activity_id: activity_id,
-          employee_detail_id: employee.id
+          employee_detail_id: employee.id,
+          financial_year: year
         )
       end
     end
+  end
+
+  def current_financial_year
+    start_year = Date.current.month >= 4 ? Date.current.year : Date.current.year - 1
+    "#{start_year}-#{start_year + 1}"
   end
 
   # Get employee name from employee_reference (which stores employee_id)

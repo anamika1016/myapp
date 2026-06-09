@@ -31,15 +31,23 @@
                 <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
                   
                   <form action="/departments/import" method="post" enctype="multipart/form-data" class="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
+                    <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
+                    <select name="financial_year" class="border border-gray-300 p-2 rounded-md w-full sm:w-auto">
+                      <% @financial_years.each do |year| %>
+                        <option value="<%= year %>" <%= 'selected' if year == @selected_financial_year %>><%= year %></option>
+                      <% end %>
+                    </select>
                     <input type="file" name="file" accept=".xlsx,.xls,.csv" required class="border border-gray-300 p-2 rounded-md w-full sm:w-auto">
                     <input type="submit" value="Upload" class="bg-gray-700 hover:bg-gray-800 text-white font-semibold py-2 px-6 rounded shadow cursor-pointer">
                   </form>
 
-                  <a href="/departments/export.xlsx" class="inline-flex items-center bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-3 rounded-lg shadow-md transition duration-200">Export Departments</a>
+                  <%= link_to "Export Departments",
+                      export_departments_path(format: :xlsx, financial_year: @selected_financial_year),
+                      class: "inline-flex items-center bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-3 rounded-lg shadow-md transition duration-200" %>
                 </div>
 
                 <p class="text-sm text-gray-500 mt-4 italic">
-                  * Excel must have columns: <strong>Department</strong>, <strong>Employee Name</strong>, <strong>Theme Name</strong>, <strong>Activity Name</strong>, <strong>Unit</strong>, <strong>Weight</strong>
+                  * Excel must have columns: <strong>Financial Year</strong>, <strong>Department</strong>, <strong>Employee Name</strong>, <strong>Theme Name</strong>, <strong>Activity Name</strong>, <strong>Unit</strong>, <strong>Weight</strong>
                 </p>
               </div>
             </div>
@@ -50,7 +58,20 @@
               <input type="hidden" name="_method" value="POST" id="form-method">
               <input type="hidden" name="department[theme_name]" value="" id="department-theme-name">
               
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div>
+                  <label for="department_financial_year" class="block text-sm font-medium text-gray-700">
+                    Financial Year
+                  </label>
+                  <select id="department_financial_year" name="department[financial_year]"
+                    class="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm
+                          focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                    <% @financial_years.each do |year| %>
+                      <option value="<%= year %>" <%= 'selected' if year == @selected_financial_year %>><%= year %></option>
+                    <% end %>
+                  </select>
+                </div>
+
                 <!-- Department Dropdown -->
                 <div>
                   <label for="department_department_type" class="block text-sm font-medium text-gray-700">
@@ -155,7 +176,7 @@
                   </div>
                   <div>
                     <h2 class="text-2xl font-bold text-gray-800">Department List</h2>
-                    <p class="text-sm text-gray-600 mt-1">Manage employee departments and activities</p>
+                    <p class="text-sm text-gray-600 mt-1">Manage employee departments and activities for <%= @selected_financial_year %></p>
                   </div>
                   <% if @selected_employee %>
                     <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 border border-blue-200">
@@ -167,6 +188,17 @@
                   <% end %>
                 </div>
                 <div class="flex items-center gap-4">
+                  <%= form_with url: departments_path, method: :get, local: true, class: "flex items-center gap-3" do |form| %>
+                    <%= hidden_field_tag :employee_id, params[:employee_id] if params[:employee_id].present? %>
+                    <%= hidden_field_tag :employee_code, params[:employee_code] if params[:employee_code].present? %>
+                    <%= form.label :financial_year, "Financial Year:", class: "text-sm font-semibold text-gray-700" %>
+                    <%= form.select :financial_year,
+                        options_for_select(@financial_years, @selected_financial_year),
+                        {},
+                        class: "bg-white border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent shadow-sm",
+                        onchange: "this.form.submit();" %>
+                  <% end %>
+
                   <!-- Employee Filter -->
                   <div class="flex items-center gap-3">
                     <label for="employee-filter" class="text-sm font-semibold text-gray-700">Filter by Employee:</label>
@@ -203,6 +235,7 @@
                   <tr>
                     <th class="px-8 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Employee Name</th>
                     <th class="px-8 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Employee Code</th>
+                    <th class="px-8 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Financial Year</th>
                     <th class="px-8 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Department</th>
                     <th class="px-8 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-300">Activities</th>
                     <th class="px-8 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
@@ -225,6 +258,11 @@
                         <td class="px-8 py-5 text-sm font-medium text-gray-700 border-r border-gray-200">
                           <span class="inline-flex items-center px-3 py-1 rounded-lg text-sm font-medium bg-slate-100 text-slate-700 border border-slate-200">
                             <%= data[:employee_code].presence || 'N/A' %>
+                          </span>
+                        </td>
+                        <td class="px-8 py-5 text-sm font-medium text-gray-700 border-r border-gray-200">
+                          <span class="inline-flex items-center px-3 py-1 rounded-lg text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <%= data[:financial_year].presence || @selected_financial_year %>
                           </span>
                         </td>
                         <td class="px-8 py-5 text-sm font-medium text-gray-700 border-r border-gray-200">
@@ -271,7 +309,7 @@
                     <% end %>
                   <% else %>
                     <tr>
-                      <td colspan="5" class="px-8 py-12 text-center">
+                      <td colspan="6" class="px-8 py-12 text-center">
                         <div class="flex flex-col items-center justify-center">
                           <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                             <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -973,7 +1011,8 @@ class DepartmentManager {
       
       // Add cache-busting parameter to ensure fresh data
       const timestamp = Date.now();
-      const response = await fetch(`/departments/${employeeId}/edit_data?t=${timestamp}`, {
+      const selectedFinancialYear = document.getElementById('department_financial_year')?.value || new URL(window.location).searchParams.get('financial_year') || '';
+      const response = await fetch(`/departments/${employeeId}/edit_data?t=${timestamp}&financial_year=${encodeURIComponent(selectedFinancialYear)}`, {
         headers: {
           'X-CSRF-Token': csrfToken,
           'Accept': 'application/json', // Request JSON response
@@ -1012,6 +1051,10 @@ class DepartmentManager {
     
     document.getElementById('department_department_type').value = department.department_type || '';
     document.getElementById('department-theme-name').value = department.theme_name || '';
+    const financialYearSelect = document.getElementById('department_financial_year');
+    if (financialYearSelect && department.financial_year) {
+      financialYearSelect.value = department.financial_year;
+    }
     
     // First filter employees by department, then set the employee
     if (department.department_type) {
@@ -1312,7 +1355,10 @@ class DepartmentManager {
       // Reload the page to show updated data
       setTimeout(() => {
         console.log('Reloading page to show updated data...');
-        window.location.reload();
+        const selectedFinancialYear = document.getElementById('department_financial_year')?.value || new URL(window.location).searchParams.get('financial_year') || '';
+        const nextUrl = new URL(window.location);
+        if (selectedFinancialYear) nextUrl.searchParams.set('financial_year', selectedFinancialYear);
+        window.location.href = nextUrl.toString();
       }, 1500);
     } else {
       const errors = result.errors || [result.message] || ['Error saving department. Please check your input.'];
