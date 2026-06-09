@@ -18,8 +18,16 @@
             <%= link_to "Pulse Check", "#pulse-score-section", class: "hero-tag hero-menu-tag" %>
           <% end %>
           <%= link_to "COMPOSITE PERFORMANCE SCORE", "#summary-box-section", class: "hero-tag hero-menu-tag" %>
-          <%= link_to "Export Excel", export_dashboard_xlsx_path(format: :xlsx), class: "hero-tag export-tag" %>
+          <%= link_to "Export Excel", export_dashboard_xlsx_path(format: :xlsx, financial_year: @selected_financial_year), class: "hero-tag export-tag" %>
         </div>
+
+        <%= form_with url: dashboard_path, method: :get, local: true, class: "financial-year-filter" do |form| %>
+          <%= form.label :financial_year, "Financial Year" %>
+          <%= form.select :financial_year,
+              options_for_select(@financial_years, @selected_financial_year),
+              {},
+              onchange: "this.form.submit();" %>
+        <% end %>
       </div>
 
       <div class="time-panel">
@@ -95,7 +103,7 @@
               <h2>SECTION A: Annually / Weightage : 75%</h2>
               <p>Sabhi users ka Q1, Q2, Q3, Q4 aur annual score sirf L1 percentage ke hisab se. Formula: Annual Score = (Q1 + Q2 + Q3 + Q4) / 4.</p>
             </div>
-            <%= link_to "Export", export_dashboard_section_xlsx_path("annual", format: :xlsx), class: "section-export-btn" %>
+            <%= link_to "Export", export_dashboard_section_xlsx_path("annual", format: :xlsx, financial_year: @selected_financial_year), class: "section-export-btn" %>
           </div>
 
           <div class="table-wrap">
@@ -131,7 +139,7 @@
       <% else %>
         <div class="empty-dashboard">
           <h2>No user data found</h2>
-          <p>Abhi kisi bhi employee ka annual data available nahi hai.</p>
+          <p><%= @selected_financial_year %> ke liye abhi kisi bhi employee ka annual data available nahi hai.</p>
         </div>
       <% end %>
     <% else %>
@@ -160,7 +168,7 @@
               <h2>SECTION A: Annually / Weightage : 75%</h2>
               <p>Quarter-wise annual score for your dashboard. Formula: Annual Score = (Q1 + Q2 + Q3 + Q4) / 4.</p>
             </div>
-            <%= link_to "Export", export_dashboard_section_xlsx_path("annual", format: :xlsx), class: "section-export-btn" %>
+            <%= link_to "Export", export_dashboard_section_xlsx_path("annual", format: :xlsx, financial_year: @selected_financial_year), class: "section-export-btn" %>
           </div>
 
           <div class="employee-meta-grid">
@@ -249,7 +257,7 @@
                 <h2>SECTION B - PULSE CHECK / Weightage : 25%</h2>
                 <p>Pulse survey scores with raw percentage and overall category.</p>
               </div>
-              <%= link_to "Export", export_dashboard_section_xlsx_path("pulse", format: :xlsx), class: "section-export-btn pulse-export-btn" %>
+              <%= link_to "Export", export_dashboard_section_xlsx_path("pulse", format: :xlsx, financial_year: @selected_financial_year), class: "section-export-btn pulse-export-btn" %>
             </div>
 
             <div class="table-wrap">
@@ -312,7 +320,7 @@
               <h2>COMPOSITE PERFORMANCE SCORE</h2>
               <p>KRA 75% + Pulse 25% combined into one final score.</p>
             </div>
-            <%= link_to "Export", export_dashboard_section_xlsx_path("summary", format: :xlsx), class: "section-export-btn" %>
+            <%= link_to "Export", export_dashboard_section_xlsx_path("summary", format: :xlsx, financial_year: @selected_financial_year), class: "section-export-btn" %>
           </div>
 
           <div class="employee-summary-layout">
@@ -347,8 +355,6 @@
               <span class="final-card-label">Final Composite Score</span>
               <strong><%= "#{whole_number_score(composite_display_total(annual_percentage: @annual_percentage, pulse_total_score: @dashboard_pulse_scores[:total_score]))}%" %></strong>
               <div class="employee-final-band"><%= employee_composite[:band] %></div>
-              <div class="employee-final-rating">Rating <%= employee_composite[:rating] %> / 5</div>
-              <p><%= employee_composite[:action] %></p>
             </div>
           </div>
         </div>
@@ -399,20 +405,21 @@
           <h2>SECTION B: PULSE-360 ASSESSMENT SCORE / Weightage : 25%</h2>
           <p>All user pulse survey scores, total score, and category in one place.</p>
         </div>
-        <%= link_to "Export", export_dashboard_section_xlsx_path("pulse", format: :xlsx), class: "section-export-btn pulse-export-btn" %>
+        <%= link_to "Export", export_dashboard_section_xlsx_path("pulse", format: :xlsx, financial_year: @selected_financial_year), class: "section-export-btn pulse-export-btn" %>
       </div>
 
       <div class="table-wrap pulse-score-table-wrap">
         <%
           pulse_category_markup = lambda do |total_score|
-            case ((total_score.to_f / 25.0) * 100.0)
-            when 90..100
-              '<span class="star-rating stars-5">★★★★★</span> <span class="category-label">Outstanding</span>'
-            when 75...90
-              '<span class="star-rating stars-4">★★★★</span> <span class="category-label">Exceeds Expectations</span>'
-            when 60...75
+            total_score = total_score.to_f
+            case total_score
+            when 23.0000001..25
+              '<span class="star-rating stars-5">★★★★★</span> <span class="category-label">Exceptional</span>'
+            when 19..23
+              '<span class="star-rating stars-4">★★★★</span> <span class="category-label">Outstanding</span>'
+            when 15...19
               '<span class="star-rating stars-3">★★★</span> <span class="category-label">Meets Expectations</span>'
-            when 45...60
+            when 11...15
               '<span class="star-rating stars-2">★★</span> <span class="category-label">Needs Improvement</span>'
             else
               '<span class="star-rating stars-1">★</span> <span class="category-label">Unsatisfactory</span>'
@@ -488,7 +495,7 @@
           <h2><i class="fas fa-chart-line"></i> COMPOSITE PERFORMANCE SCORE — KRA 75% + Pulse 25%</h2>
           <p>User wise weighted total based on Annually / Weightage : 75% and PULSE-360 ASSESSMENT SCORE / Weightage : 25%.</p>
         </div>
-        <%= link_to "Export", export_dashboard_section_xlsx_path("summary", format: :xlsx), class: "section-export-btn" %>
+        <%= link_to "Export", export_dashboard_section_xlsx_path("summary", format: :xlsx, financial_year: @selected_financial_year), class: "section-export-btn" %>
       </div>
 
       <div class="table-wrap summary-wrap">
@@ -645,6 +652,29 @@
     font-size: 0.9rem;
     font-weight: 600;
     text-decoration: none;
+  }
+
+  .financial-year-filter {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+
+  .financial-year-filter label {
+    color: #13475a;
+    font-size: 0.86rem;
+    font-weight: 700;
+  }
+
+  .financial-year-filter select {
+    min-width: 150px;
+    border: 1px solid #cfe3f0;
+    border-radius: 10px;
+    background: #ffffff;
+    color: #123044;
+    font-weight: 600;
+    padding: 0.58rem 0.8rem;
   }
 
   .export-tag {

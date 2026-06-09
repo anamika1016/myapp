@@ -9,6 +9,8 @@ class HomeController < ApplicationController
   end
 
   def dashboard
+    set_financial_year_context
+
     if admin_dashboard_user?
       load_admin_dashboard
     else
@@ -22,6 +24,8 @@ class HomeController < ApplicationController
   end
 
   def export_dashboard_xlsx
+    set_financial_year_context
+
     if admin_dashboard_user?
       load_admin_dashboard
     else
@@ -126,7 +130,7 @@ class HomeController < ApplicationController
         end
         composite = composite_category_details(@dashboard_summary_scores[:final_total])
         sheet.add_row []
-        sheet.add_row [ "Final Composite Score", "#{@dashboard_summary_scores[:final_total]}%", composite[:band], "Rating #{composite[:rating]} / 5" ]
+        sheet.add_row [ "Final Composite Score", "#{@dashboard_summary_scores[:final_total]}%", composite[:band] ]
       end
     end
 
@@ -136,6 +140,8 @@ class HomeController < ApplicationController
   end
 
   def export_dashboard_section_xlsx
+    set_financial_year_context
+
     if admin_dashboard_user?
       load_admin_dashboard
     else
@@ -198,7 +204,7 @@ class HomeController < ApplicationController
           end
           composite = composite_category_details(@dashboard_summary_scores[:final_total])
           sheet.add_row []
-          sheet.add_row [ "Final Composite Score", "#{@dashboard_summary_scores[:final_total]}%", composite[:band], "Rating #{composite[:rating]} / 5" ]
+          sheet.add_row [ "Final Composite Score", "#{@dashboard_summary_scores[:final_total]}%", composite[:band] ]
         end
       end
     end
@@ -260,6 +266,26 @@ class HomeController < ApplicationController
     current_user.hod? || current_user.admin?
   end
 
+  def set_financial_year_context
+    @financial_years = financial_year_options
+    @selected_financial_year = normalize_financial_year(params[:financial_year]) || current_financial_year
+    @financial_years |= [ @selected_financial_year ]
+    @financial_years.sort!.reverse!
+  end
+
+  def financial_year_options
+    start_year = Date.current.month >= 4 ? Date.current.year : Date.current.year - 1
+    nearby_years = ((start_year - 1)..(start_year + 1)).map { |year| "#{year}-#{year + 1}" }
+    persisted_years = UserDetail.where.not(financial_year: [ nil, "" ]).distinct.pluck(:financial_year)
+
+    (persisted_years + nearby_years).filter_map { |year| normalize_financial_year(year) }.uniq
+  end
+
+  def current_financial_year
+    start_year = Date.current.month >= 4 ? Date.current.year : Date.current.year - 1
+    "#{start_year}-#{start_year + 1}"
+  end
+
   def quarter_map
     { "Q1" => %w[april may june], "Q2" => %w[july august september], "Q3" => %w[october november december], "Q4" => %w[january february march] }
   end
@@ -297,11 +323,14 @@ class HomeController < ApplicationController
   end
 
   def category_details_from_percentage(raw_percentage)
-    case raw_percentage
-    when 90..100 then { stars: "★★★★★", category: "Outstanding", action: "Accelerated growth track / highest increment", className: "stars-5" }
-    when 75...90 then { stars: "★★★★", category: "Exceeds Expectations", action: "Merit increment + recognition award", className: "stars-4" }
-    when 60...75 then { stars: "★★★", category: "Meets Expectations", action: "Standard increment as per policy", className: "stars-3" }
-    when 45...60 then { stars: "★★", category: "Needs Improvement", action: "PIP + structured coaching plan", className: "stars-2" }
+    if raw_percentage > 92
+      { stars: "★★★★★", category: "Exceptional", action: "Accelerated growth track / highest increment", className: "stars-5" }
+    elsif raw_percentage >= 76
+      { stars: "★★★★", category: "Outstanding", action: "Merit increment + recognition award", className: "stars-4" }
+    elsif raw_percentage >= 60
+      { stars: "★★★", category: "Meets Expectations", action: "Standard increment as per policy", className: "stars-3" }
+    elsif raw_percentage >= 44
+      { stars: "★★", category: "Needs Improvement", action: "PIP + structured coaching plan", className: "stars-2" }
     else { stars: "★", category: "Unsatisfactory", action: "Formal PIP / disciplinary review", className: "stars-1" }
     end
   end
@@ -310,8 +339,8 @@ class HomeController < ApplicationController
     return nil if score.blank?
 
     case score.to_i
-    when 5 then { rating: 5, stars: "★★★★★", className: "stars-5", band: "Outstanding" }
-    when 4 then { rating: 4, stars: "★★★★", className: "stars-4", band: "Exceeds Expectations" }
+    when 5 then { rating: 5, stars: "★★★★★", className: "stars-5", band: "Exceptional" }
+    when 4 then { rating: 4, stars: "★★★★", className: "stars-4", band: "Outstanding" }
     when 3 then { rating: 3, stars: "★★★", className: "stars-3", band: "Meets Expectations" }
     when 2 then { rating: 2, stars: "★★", className: "stars-2", band: "Needs Improvement" }
     else { rating: 1, stars: "★", className: "stars-1", band: "Unsatisfactory" }
@@ -325,8 +354,8 @@ class HomeController < ApplicationController
 
   def score_range_rows
     [
-      { score_range: "> 23", band: "Outstanding", rating: "5 (★★★★★)", rating_value: 5, stars: "★★★★★", className: "stars-5", action: "Accelerated growth track / highest increment" },
-      { score_range: "19 - 22", band: "Exceeds Expectations", rating: "4 (★★★★)", rating_value: 4, stars: "★★★★", className: "stars-4", action: "Merit increment + recognition award" },
+      { score_range: "> 23", band: "Exceptional", rating: "5 (★★★★★)", rating_value: 5, stars: "★★★★★", className: "stars-5", action: "Accelerated growth track / highest increment" },
+      { score_range: "19 - 22", band: "Outstanding", rating: "4 (★★★★)", rating_value: 4, stars: "★★★★", className: "stars-4", action: "Merit increment + recognition award" },
       { score_range: "15 - 18", band: "Meets Expectations", rating: "3 (★★★)", rating_value: 3, stars: "★★★", className: "stars-3", action: "Standard increment as per policy" },
       { score_range: "11 - 14", band: "Needs Improvement", rating: "2 (★★)", rating_value: 2, stars: "★★", className: "stars-2", action: "PIP + structured coaching plan" },
       { score_range: "< 11", band: "Unsatisfactory", rating: "1 (★)", rating_value: 1, stars: "★", className: "stars-1", action: "Formal PIP / disciplinary review" }
@@ -482,11 +511,14 @@ class HomeController < ApplicationController
   end
 
   def composite_category_details(ft)
-    case ft
-    when 90..100 then { band: "Outstanding", rating: 5, stars: "★★★★★", className: "stars-5", action: "Accelerated growth track" }
-    when 75..89 then { band: "Exceeds Expectations", rating: 4, stars: "★★★★", className: "stars-4", action: "Merit increment" }
-    when 60..74 then { band: "Meets Expectations", rating: 3, stars: "★★★", className: "stars-3", action: "Standard increment" }
-    when 45..59 then { band: "Needs Improvement", rating: 2, stars: "★★", className: "stars-2", action: "PIP" }
+    if ft > 92
+      { band: "Exceptional", rating: 5, stars: "★★★★★", className: "stars-5", action: "" }
+    elsif ft >= 76
+      { band: "Outstanding", rating: 4, stars: "★★★★", className: "stars-4", action: "" }
+    elsif ft >= 60
+      { band: "Meets Expectations", rating: 3, stars: "★★★", className: "stars-3", action: "" }
+    elsif ft >= 44
+      { band: "Needs Improvement", rating: 2, stars: "★★", className: "stars-2", action: "PIP" }
     else { band: "Unsatisfactory", rating: 1, stars: "★", className: "stars-1", action: "Formal PIP" }
     end
   end
@@ -503,7 +535,7 @@ class HomeController < ApplicationController
   end
 
   def build_employee_dashboard_row(ed)
-    ud = ed.user_details
+    ud = ed.user_details.select { |detail| detail.financial_year == @selected_financial_year }
     qs = quarter_summaries_for(ud)
     ap = (qs.sum { |q| q[:percentage] } / 4.0).round(1)
     pa = ed.l1_pulse_assessments.max_by(&:updated_at)
@@ -616,13 +648,18 @@ class HomeController < ApplicationController
 
   def load_admin_dashboard
     @dashboard_mode = :admin
-    @employee_rows = EmployeeDetail.includes(:l1_pulse_assessments, user_details: [ :department, achievements: :achievement_remark ]).order(:employee_name).map { |ed| build_employee_dashboard_row(ed) }
+    @employee_rows = EmployeeDetail.joins(:user_details)
+                                   .where(user_details: { financial_year: @selected_financial_year })
+                                   .includes(:l1_pulse_assessments, user_details: [ :department, achievements: :achievement_remark ])
+                                   .distinct
+                                   .order(:employee_name)
+                                   .map { |ed| build_employee_dashboard_row(ed) }
   end
 
   def load_employee_dashboard
     @dashboard_mode = :employee
     @employee_detail = current_user.employee_detail || EmployeeDetail.find_by(employee_email: current_user.email)
-    @user_details = @employee_detail ? UserDetail.includes(:department, achievements: :achievement_remark).where(employee_detail_id: @employee_detail.id) : UserDetail.none
+    @user_details = @employee_detail ? UserDetail.includes(:department, achievements: :achievement_remark).where(employee_detail_id: @employee_detail.id, financial_year: @selected_financial_year) : UserDetail.none
     qs = quarter_summaries_for(@user_details)
     ap = (qs.sum { |q| q[:percentage] } / 4.0).round(1)
     pa = @employee_detail&.l1_pulse_assessments&.max_by(&:updated_at)
