@@ -39,5 +39,37 @@ class ApplicationController < ActionController::Base
     "#{start_year}-#{end_year}"
   end
 
-  helper_method :has_l1_responsibilities?, :has_l2_responsibilities?
+  def helpdesk_reviewer?
+    return false if current_user.blank?
+    return true if current_user.hod?
+
+    HelpdeskEscalationLevel.exists?(user_id: current_user.id) ||
+      HelpdeskEscalationMatrix.where(
+        "l1_user_id = :user_id OR l2_user_id = :user_id OR l3_user_id = :user_id",
+        user_id: current_user.id
+      ).exists?
+  end
+
+  def help_desk_user_action_count
+    return 0 if current_user.blank?
+
+    HelpDeskTicket.pending_user_action_for(current_user).count
+  end
+
+  def help_desk_assigned_count
+    return 0 if current_user.blank? || !helpdesk_reviewer?
+
+    HelpDeskTicket.open_for_review.assigned_to(current_user).count
+  end
+
+  def help_desk_notification_label(count)
+    count.to_i > 99 ? "99+" : count.to_i.to_s
+  end
+
+  helper_method :has_l1_responsibilities?,
+                :has_l2_responsibilities?,
+                :helpdesk_reviewer?,
+                :help_desk_user_action_count,
+                :help_desk_assigned_count,
+                :help_desk_notification_label
 end

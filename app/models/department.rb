@@ -10,11 +10,28 @@
   class Department < ApplicationRecord
   has_many :activities
   has_many :user_details
+  has_many :help_desk_tickets
+  has_many :help_desk_question_masters, dependent: :destroy
+  has_one :helpdesk_escalation_matrix, dependent: :destroy
 
   accepts_nested_attributes_for :activities, allow_destroy: true, reject_if: :all_blank
 
   validates :department_type, presence: true
   # validates :employee_reference, presence: true
+
+  scope :selectable_verticals, -> { where.not(department_type: [ nil, "" ]).order(:department_type) }
+
+  def self.ensure_department_type!(department_name)
+    normalized_name = department_name.to_s.strip
+    return if normalized_name.blank?
+
+    where("LOWER(department_type) = ?", normalized_name.downcase).first ||
+      create!(department_type: normalized_name)
+  end
+
+  def self.ensure_from_employee_details!
+    EmployeeDetail.distinct.pluck(:department).each { |department_name| ensure_department_type!(department_name) }
+  end
 
   # Callback to create UserDetail records when activities are created
   after_save :create_user_details_for_activities

@@ -69,9 +69,13 @@
     }
     
     /* Force text to show inline */
-    #hs-application-sidebar span {
+    #hs-application-sidebar span:not([class*="inline-flex"]) {
       display: inline !important;
       white-space: nowrap !important;
+    }
+
+    #hs-application-sidebar summary::-webkit-details-marker {
+      display: none;
     }
     
     /* Force navigation to be visible */
@@ -265,18 +269,125 @@
               <% end %>
             </li>
           <% end %>
-           <li>
-            <%= link_to trainings_path,
-                class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if current_page?(trainings_path)} text-base text-gray-800 rounded-lg" do %>
 
-              <svg class="shrink-0 size-6 sidebar-nav-icon" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24">
-                <path d="M5.5 7.5 12 4l6.5 3.5L12 11Z" />
-                <path d="M5.5 7.5V15L12 20l6.5-5V7.5" />
-                <path d="M12 11v9" />
-              </svg>
+          <li>
+            <%
+              help_desk_user_badge_count = help_desk_user_action_count
+              help_desk_assigned_badge_count = helpdesk_reviewer? ? help_desk_assigned_count : 0
+              help_desk_menu_badge_count = help_desk_user_badge_count + help_desk_assigned_badge_count
+              help_desk_menu_open = %w[help_desk_tickets help_desk_reports help_desk_question_masters helpdesk_escalation_matrices].include?(controller_name)
+            %>
+            <details class="group" <%= "open" if help_desk_menu_open %>>
+              <summary class="flex items-center gap-x-3.5 py-2 px-2.5 <%= 'bg-gray-100' if help_desk_menu_open %> text-base text-gray-800 rounded-lg cursor-pointer list-none">
+                <svg class="shrink-0 size-6 sidebar-nav-icon" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24">
+                  <path d="M4 5h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-5l-3 3-3-3H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" />
+                  <path d="M8 10h8" />
+                  <path d="M8 14h5" />
+                </svg>
+                <span class="font-semibold text-base">Help Desk</span>
+                <% if help_desk_menu_badge_count.positive? %>
+                  <span class="ml-auto inline-flex min-w-6 items-center justify-center rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white">
+                    <%= help_desk_notification_label(help_desk_menu_badge_count) %>
+                  </span>
+                <% end %>
+                <svg class="<%= help_desk_menu_badge_count.positive? ? '' : 'ms-auto' %> size-4 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </summary>
 
-              <span class="font-semibold">Trainings</span>
-            <% end %>
+              <ul class="pt-1 ps-8 space-y-1">
+                <li>
+                  <%= link_to help_desk_tickets_path, class: "flex items-center gap-x-2 py-1.5 px-2.5 #{'bg-gray-100' if controller_name == 'help_desk_tickets' && action_name != 'assigned_queue'} text-sm text-gray-800 rounded-lg" do %>
+                    <span class="font-semibold">Help Desk Ticket</span>
+                    <% if help_desk_user_badge_count.positive? %>
+                      <span class="ml-auto inline-flex min-w-6 items-center justify-center rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white" data-helpdesk-menu-badge="<%= help_desk_user_badge_count %>">
+                        <%= help_desk_notification_label(help_desk_user_badge_count) %>
+                      </span>
+                    <% end %>
+                  <% end %>
+                </li>
+
+                <% if helpdesk_reviewer? %>
+                  <li>
+                    <%= link_to assigned_queue_help_desk_tickets_path, class: "flex items-center gap-x-2 py-1.5 px-2.5 #{'bg-gray-100' if controller_name == 'help_desk_tickets' && action_name == 'assigned_queue'} text-sm text-gray-800 rounded-lg" do %>
+                      <span class="font-semibold">Assigned Queue</span>
+                      <% if help_desk_assigned_badge_count.positive? %>
+                        <span class="ml-auto inline-flex min-w-6 items-center justify-center rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white">
+                          <%= help_desk_notification_label(help_desk_assigned_badge_count) %>
+                        </span>
+                      <% end %>
+                    <% end %>
+                  </li>
+                <% end %>
+
+                <li>
+                  <%= link_to help_desk_reports_path, class: "flex items-center gap-x-2 py-1.5 px-2.5 #{'bg-gray-100' if controller_name == 'help_desk_reports'} text-sm text-gray-800 rounded-lg" do %>
+                    <span class="font-semibold">Help Desk Report</span>
+                  <% end %>
+                </li>
+
+                <% if current_user.hod? %>
+                  <li>
+                    <%= link_to help_desk_question_masters_path, class: "flex items-center gap-x-2 py-1.5 px-2.5 #{'bg-gray-100' if controller_name == 'help_desk_question_masters'} text-sm text-gray-800 rounded-lg" do %>
+                      <span class="font-semibold">Question Master</span>
+                    <% end %>
+                  </li>
+
+                  <li>
+                    <%= link_to helpdesk_escalation_matrices_path, class: "flex items-center gap-x-2 py-1.5 px-2.5 #{'bg-gray-100' if controller_name == 'helpdesk_escalation_matrices'} text-sm text-gray-800 rounded-lg" do %>
+                      <span class="font-semibold">Escalation Matrix</span>
+                    <% end %>
+                  </li>
+                <% end %>
+              </ul>
+            </details>
+          </li>
+
+          <% training_menu_active = %w[trainings employee_trainings employee_training_thematics employee_training_topics].include?(controller_name) %>
+          <li>
+            <details class="group" <%= "open" if training_menu_active %>>
+              <summary class="flex items-center gap-x-3.5 py-2 px-2.5 <%= 'bg-gray-100' if training_menu_active %> text-base text-gray-800 rounded-lg cursor-pointer list-none">
+                <svg class="shrink-0 size-6 sidebar-nav-icon" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24">
+                  <path d="M5.5 7.5 12 4l6.5 3.5L12 11Z" />
+                  <path d="M5.5 7.5V15L12 20l6.5-5V7.5" />
+                  <path d="M12 11v9" />
+                </svg>
+                <span class="font-semibold text-base">Training</span>
+                <svg class="ms-auto size-4 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </summary>
+
+              <ul class="pt-1 ps-8 space-y-1">
+                <li>
+                  <%= link_to employee_trainings_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if controller_name == 'employee_trainings' && action_name != 'new'} text-sm text-gray-800 rounded-lg" do %>
+                    <span class="font-semibold">Training Record</span>
+                  <% end %>
+                </li>
+                <li>
+                  <%= link_to new_employee_training_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if current_page?(new_employee_training_path)} text-sm text-gray-800 rounded-lg" do %>
+                    <span class="font-semibold">TOT Training</span>
+                  <% end %>
+                </li>
+                <li>
+                  <%= link_to trainings_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if controller_name == 'trainings'} text-sm text-gray-800 rounded-lg" do %>
+                    <span class="font-semibold">Online Training</span>
+                  <% end %>
+                </li>
+                <% if current_user.hod? %>
+                  <li>
+                    <%= link_to employee_training_thematics_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if controller_name == 'employee_training_thematics'} text-sm text-gray-800 rounded-lg" do %>
+                      <span class="font-semibold">Thematic Master</span>
+                    <% end %>
+                  </li>
+                  <li>
+                    <%= link_to employee_training_topics_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if controller_name == 'employee_training_topics'} text-sm text-gray-800 rounded-lg" do %>
+                      <span class="font-semibold">Topic Master</span>
+                    <% end %>
+                  </li>
+                <% end %>
+              </ul>
+            </details>
           </li>
 
           <% if current_user.hod? %>

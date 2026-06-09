@@ -1,5 +1,5 @@
-<div class="main-content sidebar-hidden">
-  <div class="min-h-screen pl-64 pr-4 pt-4 pb-12 overflow-x-auto bg-gray-100">
+<div class="main-content sidebar-aware-content">
+  <div class="employee-details-page min-h-screen px-4 pt-4 pb-12 overflow-x-auto bg-gray-100">
     <!-- Flash Messages -->
     <% if flash[:notice] %>
       <div class="bg-green-100 text-green-800 px-4 py-2 rounded mb-4 mt-4 w-full max-w-7xl mx-auto">
@@ -12,13 +12,13 @@
     <% end %>
 
     <!-- Bulk Upload and Export Buttons -->
-    <div class="w-full max-w-7xl mx-auto mt-4 flex justify-between items-center bg-white p-6 rounded-xl shadow">
-      <%= form_with url: import_employee_details_path, local: true, html: { multipart: true }, class: "flex space-x-4 items-center" do |f| %>
+    <div class="w-full mx-auto mt-4 flex flex-wrap gap-4 justify-between items-center bg-white p-6 rounded-lg shadow">
+      <%= form_with url: import_employee_details_path, local: true, html: { multipart: true }, class: "flex flex-wrap gap-3 items-center" do |f| %>
         <%= f.file_field :file, class: "block w-full border border-gray-300 rounded-lg px-4 py-2" %>
         <%= f.submit "Upload Excel", class: "bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-800" %>
       <% end %>
 
-      <div class="flex space-x-4">
+      <div class="flex flex-wrap gap-3">
         <%= link_to export_quarterly_xlsx_employee_details_path, 
                     class: "inline-flex items-center px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md transition duration-200 transform hover:scale-105" do %>
           <i class="fas fa-file-excel mr-2"></i>
@@ -30,13 +30,14 @@
     </div>
 
     <!-- Form to Add Employee -->
-    <div class="w-full max-w-7xl mx-auto bg-white p-8 rounded-xl shadow-lg mt-8">
+    <div class="w-full mx-auto bg-white p-8 rounded-lg shadow-lg mt-8">
       <h2 class="text-3xl font-bold text-gray-800 mb-8 border-b pb-2">Add Employee Details</h2>
 
       <%= form_with(model: @employee_detail, url: employee_details_path, local: true, data: { turbo: false }) do |form| %>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           <% [:employee_name, :employee_email, :mobile_number, :employee_code,
-              :l1_code, :l1_employer_name, :l2_code, :l2_employer_name,:department].each do |field| %>
+    :l1_code, :l1_employer_name, :l2_code, :l2_employer_name,
+    :department, :office_type, :office_name, :designation, :position, :vertical].each do |field| %>
             <div>
               <%= form.label field, field.to_s.titleize, class: "block text-sm font-semibold text-gray-700 mb-1" %>
               <%= form.text_field field, class: "form-control w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500" %>
@@ -53,9 +54,9 @@
 
     <!-- Employee List -->
     <a name="employee-list"></a>
-    <div id="employee-list" class="w-full max-w-7xl mx-auto bg-white p-8 rounded-xl shadow-lg mt-12">
+    <div id="employee-list" class="w-full mx-auto bg-white p-8 rounded-lg shadow-lg mt-12">
       <!-- Heading and Search Box -->
-      <div class="flex items-center justify-between mb-6">
+      <div class="flex flex-wrap gap-3 items-center justify-between mb-6">
         <h2 class="text-2xl font-bold text-gray-800 border-b pb-2">Employee List</h2>
       <%= search_form_for @q, url: employee_details_path, method: :get, html: { class: "flex items-center space-x-2", id: "search-form" } do |f| %>
         <%= f.search_field :employee_name_or_employee_email_or_post_or_department_cont,
@@ -80,6 +81,11 @@
               <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">L2 Code</th>
               <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">L2 Name</th>
               <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Department</th>
+              <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Office Type</th>
+              <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Office Name</th>
+              <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Designation</th>
+              <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Position</th>
+              <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Vertical</th>
               <th class="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
@@ -95,7 +101,12 @@
                 <td class="px-4 py-4 whitespace-nowrap text-gray-900"><%= emp.l2_code %></td>
                 <td class="px-4 py-4 whitespace-nowrap text-gray-900"><%= emp.l2_employer_name %></td>
                 <td class="px-4 py-4 whitespace-nowrap text-gray-900"><%= emp.department %></td>
-                <td class="px-4 py-4 whitespace-nowrap space-x-2">
+                <td class="px-4 py-4 whitespace-nowrap text-gray-900"><%= emp.office_type %></td>
+                <td class="px-4 py-4 whitespace-nowrap text-gray-900"><%= emp.office_name %></td>
+                <td class="px-4 py-4 whitespace-nowrap text-gray-900"><%= emp.designation %></td>
+                <td class="px-4 py-4 whitespace-nowrap text-gray-900"><%= emp.position %></td>
+                <td class="px-4 py-4 whitespace-nowrap text-gray-900"><%= emp.vertical %></td>
+                                <td class="px-4 py-4 whitespace-nowrap space-x-2">
                   <%= link_to 'Edit', edit_employee_detail_path(emp), class: "text-gray-700 hover:text-gray-900 font-medium" %>
                   <%= link_to 'Delete', '#', 
                       onclick: "confirmDelete('#{emp.employee_name}', '#{employee_detail_path(emp)}')", 
@@ -163,30 +174,15 @@
   }
 </script>
 <style>
-  .min-h-screen {
-    padding-left: 16rem; 
+  .employee-details-page {
+    box-sizing: border-box;
   }
 
-  .sidebar-hidden .min-h-screen {
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
-  }
-
-  .sidebar-hidden .max-w-7xl {
-    max-width: 100% !important;
+  .employee-details-page .form-control {
     width: 100% !important;
   }
 
-  .sidebar-hidden .form-control {
-    width: 100% !important;
+  .employee-details-page .grid {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)) !important;
   }
-
-  .sidebar-hidden .grid {
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)) !important;
-  }
-  .main-content {
-  margin-left: 240px; 
-  padding: 1rem;
-  overflow-x: auto;
-}
 </style>

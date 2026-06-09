@@ -63,7 +63,8 @@ class EmployeeDetailsController < ApplicationController
     workbook.add_worksheet(name: "Employees") do |sheet|
       sheet.add_row [
         "Name", "Email", "Employee Code",
-        "L1 Code", "L2 Code", "L1 Name", "L2 Name", "Post", "Department"
+        "Mobile Number", "L1 Code", "L2 Code", "L1 Name", "L2 Name", "Post", "Department",
+        "Office Type", "Office Name", "Designation", "Position", "Vertical"
       ]
 
       @employee_details.each do |emp|
@@ -71,12 +72,18 @@ class EmployeeDetailsController < ApplicationController
           emp.employee_name,
           emp.employee_email,
           emp.employee_code,
+          emp.mobile_number,
           emp.l1_code,
           emp.l2_code,
           emp.l1_employer_name,
           emp.l2_employer_name,
           emp.post,
-          emp.department
+          emp.department,
+          emp.office_type,
+          emp.office_name,
+          emp.designation,
+          emp.position,
+          emp.vertical
         ]
       end
     end
@@ -205,7 +212,14 @@ class EmployeeDetailsController < ApplicationController
       "l2name" => "l2_employer_name",
       "l2employername" => "l2_employer_name",
       "post" => "post",
-      "department" => "department"
+      "designationpost" => "post",
+      "department" => "department",
+      "officetype" => "office_type",
+      "office" => "office_name",
+      "officename" => "office_name",
+      "designation" => "designation",
+      "position" => "position",
+      "vertical" => "vertical"
     }
 
     (2..spreadsheet.last_row).each do |i|
@@ -774,7 +788,8 @@ end
     params.require(:employee_detail).permit(
       :employee_id, :employee_name, :employee_email, :employee_code, :mobile_number,
       :l1_code, :l1_employer_name, :l2_code, :l2_employer_name,
-      :post, :department, :l1_remarks, :l1_percentage, :l2_remarks, :l2_percentage
+      :post, :department, :office_type, :office_name, :designation, :position, :vertical,
+      :l1_remarks, :l1_percentage, :l2_remarks, :l2_percentage
     )
   end
 

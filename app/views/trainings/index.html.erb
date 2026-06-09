@@ -1,4 +1,4 @@
-<div class="main-content ml-64 w-auto px-8 py-10" style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); min-height: 100vh; font-family: 'Georgia', serif;">
+<div class="main-content sidebar-aware-content px-8 py-10" style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); min-height: 100vh; font-family: 'Georgia', serif;">
 
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap');
@@ -124,7 +124,15 @@
 
     .cards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
     @media (max-width: 1100px) { .cards-grid { grid-template-columns: repeat(2,1fr); } }
-    @media (max-width: 700px)  { .cards-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 700px)  {
+      .main-content.sidebar-aware-content { padding: 18px 14px !important; }
+      .cards-grid { grid-template-columns: 1fr; }
+      .trainings-wrap > div:first-of-type,
+      .month-group > div:first-child { align-items: flex-start !important; flex-direction: column; gap: 12px; }
+      .filter-bar { align-items: stretch; }
+      .filter-select,
+      .filter-btn { width: 100%; }
+    }
   </style>
 
   <div class="trainings-wrap">

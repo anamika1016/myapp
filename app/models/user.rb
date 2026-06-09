@@ -4,12 +4,14 @@ class User < ApplicationRecord
          :recoverable, :rememberable, :validatable
 
   has_many :target_submissions
+  has_many :help_desk_tickets, dependent: :destroy
   has_one :employee_detail
   has_one_attached :profile_image
   has_many :l1_pulse_assessments, foreign_key: :l1_user_id, dependent: :destroy
   has_many :user_training_assignments, dependent: :destroy
   has_many :assigned_trainings, through: :user_training_assignments, source: :training
   has_many :user_training_progresses, dependent: :destroy
+  has_many :employee_trainings
 
   ROLES = %w[employee hod admin l1_employer l2_employer]
 
@@ -50,5 +52,15 @@ class User < ApplicationRecord
 
   def name
     email
+  end
+
+  def mapped_employee_detail
+    employee_detail ||
+      EmployeeDetail.find_by(employee_code: employee_code.to_s.strip) ||
+      EmployeeDetail.find_by("LOWER(employee_email) = ?", email.to_s.strip.downcase)
+  end
+
+  def display_name
+    mapped_employee_detail&.employee_name.presence || email.to_s.split("@").first.presence || email
   end
 end

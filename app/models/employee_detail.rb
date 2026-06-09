@@ -11,6 +11,7 @@ class EmployeeDetail < ApplicationRecord
   has_many :assigned_trainings, through: :user_training_assignments, source: :training
   after_initialize :set_default_status, if: :new_record?
   after_commit :sync_portal_account, on: [ :create, :update ]
+  after_commit :sync_department_record, on: [ :create, :update ]
   # belongs_to :department  # only if you have a departments table and department_id column
 
   # Mobile number validation removed as requested
@@ -32,6 +33,11 @@ class EmployeeDetail < ApplicationRecord
       l2_employer_name
       post
       department
+      office_type
+      office_name
+      designation
+      position
+      vertical
       created_at
       updated_at
     ]
@@ -94,6 +100,12 @@ scope :l1_pending_records, -> { where(status: [ "pending", "returned" ]) }
     ensure_portal_user!
   rescue ActiveRecord::RecordInvalid => e
     Rails.logger.error("EmployeeDetail##{id} portal account sync failed: #{e.message}")
+  end
+
+  def sync_department_record
+    Department.ensure_department_type!(department)
+  rescue ActiveRecord::RecordInvalid => e
+    Rails.logger.error("EmployeeDetail##{id} department sync failed: #{e.message}")
   end
 
   def portal_account_ready?

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_05_18_093000) do
+ActiveRecord::Schema[8.0].define(version: 2026_06_09_085711) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -116,7 +116,161 @@ ActiveRecord::Schema[8.0].define(version: 2026_05_18_093000) do
     t.float "l2_percentage"
     t.string "mobile_number"
     t.boolean "assignments_managed", default: false
+    t.string "office_type"
+    t.string "office_name"
+    t.string "designation"
+    t.string "position"
+    t.string "vertical"
     t.index ["user_id"], name: "index_employee_details_on_user_id"
+  end
+
+  create_table "employee_training_thematics", force: :cascade do |t|
+    t.string "thematic_type", null: false
+    t.string "department_name", null: false
+    t.boolean "active", default: true, null: false
+    t.bigint "created_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["thematic_type", "department_name"], name: "index_employee_training_thematics_on_type_and_department", unique: true
+  end
+
+  create_table "employee_training_topics", force: :cascade do |t|
+    t.string "thematic_department_name", null: false
+    t.string "name", null: false
+    t.boolean "active", default: true, null: false
+    t.bigint "created_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["thematic_department_name", "name"], name: "index_employee_training_topics_on_thematic_and_name", unique: true
+  end
+
+  create_table "employee_trainings", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.jsonb "office_types", default: [], null: false
+    t.jsonb "office_names", default: [], null: false
+    t.string "thematic_department_name", null: false
+    t.date "training_date", null: false
+    t.string "topic", null: false
+    t.string "other_topic"
+    t.text "details", null: false
+    t.string "training_location", null: false
+    t.integer "asa_participants", default: 0, null: false
+    t.integer "other_participants", default: 0, null: false
+    t.string "qr_id", null: false
+    t.jsonb "employee_detail_ids", default: [], null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["created_at"], name: "index_employee_trainings_on_created_at"
+    t.index ["thematic_department_name"], name: "index_employee_trainings_on_thematic_department_name"
+    t.index ["training_date"], name: "index_employee_trainings_on_training_date"
+    t.index ["user_id"], name: "index_employee_trainings_on_user_id"
+  end
+
+  create_table "help_desk_question_masters", force: :cascade do |t|
+    t.bigint "department_id", null: false
+    t.string "request_type", null: false
+    t.text "question_text", null: false
+    t.integer "position", default: 1, null: false
+    t.boolean "active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["department_id", "request_type", "active"], name: "index_help_desk_question_masters_on_context_and_active"
+    t.index ["department_id", "request_type", "position"], name: "index_help_desk_question_masters_on_context_and_position"
+    t.index ["department_id"], name: "index_help_desk_question_masters_on_department_id"
+  end
+
+  create_table "help_desk_requester_remarks", force: :cascade do |t|
+    t.bigint "help_desk_ticket_id", null: false
+    t.bigint "user_id"
+    t.text "message", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["help_desk_ticket_id", "created_at"], name: "index_help_desk_requester_remarks_on_ticket_and_created_at"
+    t.index ["help_desk_ticket_id"], name: "index_help_desk_requester_remarks_on_ticket_id"
+    t.index ["user_id"], name: "index_help_desk_requester_remarks_on_user_id"
+  end
+
+  create_table "help_desk_support_updates", force: :cascade do |t|
+    t.bigint "help_desk_ticket_id", null: false
+    t.bigint "user_id"
+    t.text "message", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["help_desk_ticket_id", "created_at"], name: "index_help_desk_support_updates_on_ticket_and_created_at"
+    t.index ["help_desk_ticket_id"], name: "index_help_desk_support_updates_on_ticket_id"
+    t.index ["user_id"], name: "index_help_desk_support_updates_on_user_id"
+  end
+
+  create_table "help_desk_tickets", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "department_id", null: false
+    t.string "request_type", null: false
+    t.string "status", default: "submitted", null: false
+    t.string "requester_name", null: false
+    t.string "requester_email", null: false
+    t.string "requester_employee_code"
+    t.text "message", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "assigned_to_user_id"
+    t.bigint "responded_by_user_id"
+    t.integer "current_escalation_position", default: 1, null: false
+    t.datetime "assigned_at"
+    t.datetime "escalation_due_at"
+    t.text "response_message"
+    t.datetime "responded_at"
+    t.bigint "submitted_by_user_id"
+    t.boolean "raised_on_behalf", default: false, null: false
+    t.datetime "requester_response_due_at"
+    t.text "requester_remark"
+    t.datetime "closed_at"
+    t.boolean "closed_automatically", default: false, null: false
+    t.bigint "closed_by_user_id"
+    t.bigint "help_desk_question_master_id"
+    t.text "question_subject"
+    t.bigint "approval_user_id"
+    t.string "final_action_mode"
+    t.integer "reopen_count", default: 0, null: false
+    t.datetime "request_received_at"
+    t.jsonb "failed_response_counts", default: {}, null: false
+    t.index ["approval_user_id"], name: "index_help_desk_tickets_on_approval_user_id"
+    t.index ["assigned_to_user_id", "status"], name: "index_help_desk_tickets_on_assignee_and_status"
+    t.index ["assigned_to_user_id"], name: "index_help_desk_tickets_on_assigned_to_user_id"
+    t.index ["closed_by_user_id"], name: "index_help_desk_tickets_on_closed_by_user_id"
+    t.index ["department_id"], name: "index_help_desk_tickets_on_department_id"
+    t.index ["escalation_due_at"], name: "index_help_desk_tickets_on_escalation_due_at"
+    t.index ["help_desk_question_master_id"], name: "index_help_desk_tickets_on_help_desk_question_master_id"
+    t.index ["request_type"], name: "index_help_desk_tickets_on_request_type"
+    t.index ["requester_response_due_at"], name: "index_help_desk_tickets_on_requester_response_due_at"
+    t.index ["responded_by_user_id"], name: "index_help_desk_tickets_on_responded_by_user_id"
+    t.index ["status"], name: "index_help_desk_tickets_on_status"
+    t.index ["submitted_by_user_id"], name: "index_help_desk_tickets_on_submitted_by_user_id"
+    t.index ["user_id", "created_at"], name: "index_help_desk_tickets_on_user_id_and_created_at"
+    t.index ["user_id"], name: "index_help_desk_tickets_on_user_id"
+  end
+
+  create_table "helpdesk_escalation_levels", force: :cascade do |t|
+    t.bigint "helpdesk_escalation_matrix_id", null: false
+    t.bigint "user_id", null: false
+    t.integer "position", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["helpdesk_escalation_matrix_id", "position"], name: "index_helpdesk_levels_on_matrix_and_position", unique: true
+    t.index ["helpdesk_escalation_matrix_id"], name: "index_helpdesk_levels_on_matrix_id"
+    t.index ["user_id"], name: "index_helpdesk_escalation_levels_on_user_id"
+  end
+
+  create_table "helpdesk_escalation_matrices", force: :cascade do |t|
+    t.bigint "department_id", null: false
+    t.bigint "l1_user_id"
+    t.bigint "l2_user_id"
+    t.bigint "l3_user_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["department_id"], name: "index_helpdesk_escalation_matrices_on_department_id", unique: true
+    t.index ["l1_user_id"], name: "index_helpdesk_escalation_matrices_on_l1_user_id"
+    t.index ["l2_user_id"], name: "index_helpdesk_escalation_matrices_on_l2_user_id"
+    t.index ["l3_user_id"], name: "index_helpdesk_escalation_matrices_on_l3_user_id"
   end
 
   create_table "l1_pulse_assessments", force: :cascade do |t|
@@ -279,6 +433,26 @@ ActiveRecord::Schema[8.0].define(version: 2026_05_18_093000) do
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "activities", "departments"
   add_foreign_key "employee_details", "users"
+  add_foreign_key "employee_trainings", "users"
+  add_foreign_key "help_desk_question_masters", "departments"
+  add_foreign_key "help_desk_requester_remarks", "help_desk_tickets"
+  add_foreign_key "help_desk_requester_remarks", "users"
+  add_foreign_key "help_desk_support_updates", "help_desk_tickets"
+  add_foreign_key "help_desk_support_updates", "users"
+  add_foreign_key "help_desk_tickets", "departments"
+  add_foreign_key "help_desk_tickets", "help_desk_question_masters", on_delete: :nullify
+  add_foreign_key "help_desk_tickets", "users"
+  add_foreign_key "help_desk_tickets", "users", column: "approval_user_id"
+  add_foreign_key "help_desk_tickets", "users", column: "assigned_to_user_id"
+  add_foreign_key "help_desk_tickets", "users", column: "closed_by_user_id"
+  add_foreign_key "help_desk_tickets", "users", column: "responded_by_user_id"
+  add_foreign_key "help_desk_tickets", "users", column: "submitted_by_user_id"
+  add_foreign_key "helpdesk_escalation_levels", "helpdesk_escalation_matrices"
+  add_foreign_key "helpdesk_escalation_levels", "users"
+  add_foreign_key "helpdesk_escalation_matrices", "departments"
+  add_foreign_key "helpdesk_escalation_matrices", "users", column: "l1_user_id"
+  add_foreign_key "helpdesk_escalation_matrices", "users", column: "l2_user_id"
+  add_foreign_key "helpdesk_escalation_matrices", "users", column: "l3_user_id"
   add_foreign_key "l1_pulse_assessments", "employee_details"
   add_foreign_key "l1_pulse_assessments", "users", column: "l1_user_id"
   add_foreign_key "sms_logs", "employee_details"

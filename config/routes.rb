@@ -8,6 +8,10 @@ Rails.application.routes.draw do
     end
   end
 
+  resources :employee_trainings, only: [ :index, :show, :new, :create ]
+  resources :employee_training_thematics, only: [ :index, :create, :destroy ]
+  resources :employee_training_topics, only: [ :index, :create, :destroy ]
+
   resources :trainings do
     member do
       post :start
@@ -119,6 +123,25 @@ Rails.application.routes.draw do
   get "settings", to: "settings#show"
   patch "settings", to: "settings#update"
   patch "settings/password", to: "settings#update_password"
+
+  resources :help_desk_tickets, path: "helpdesk", only: [ :index, :create ] do
+    collection do
+      get :assigned_queue
+    end
+
+    member do
+      patch :respond
+      patch :finalize_resolution
+    end
+  end
+
+  resources :help_desk_reports, path: "helpdesk-report", only: [ :index ]
+  resources :help_desk_question_masters, path: "helpdesk-question-master", except: [ :show, :new ] do
+    collection do
+      post :import
+    end
+  end
+  resources :helpdesk_escalation_matrices, path: "helpdesk-escalation-matrix", except: [ :show, :new ]
 
   # Keep your other routes
   devise_scope :user do
