@@ -312,10 +312,22 @@ class HomeController < ApplicationController
       {
         name: name,
         percentage: l1_percentages.any? ? (l1_percentages.sum / l1_percentages.size).round(1) : 0.0,
+        scored: l1_percentages.any?,
         l1_remarks: l1_rems,
         remarks: l1_rems
       }
     end
+  end
+
+  def scored_quarter_summaries(quarter_summaries)
+    quarter_summaries.select { |quarter| quarter[:scored] }
+  end
+
+  def annual_percentage_for(quarter_summaries)
+    scored_quarters = scored_quarter_summaries(quarter_summaries)
+    return 0.0 if scored_quarters.empty?
+
+    (scored_quarters.sum { |quarter| quarter[:percentage].to_f } / scored_quarters.size).round(2)
   end
 
   def pulse_category_details(ts)
@@ -557,7 +569,7 @@ class HomeController < ApplicationController
       ed.user_details
     end
     qs = quarter_summaries_for(ud)
-    ap = (qs.sum { |q| q[:percentage] } / 4.0).round(2)
+    ap = annual_percentage_for(qs)
     pa = ed.l1_pulse_assessments.max_by(&:updated_at)
     ps = pa ? pulse_scores_from_assessment(pa) : blank_pulse_scores
     manager_feedback = manager_feedback_summary_for(pa)
@@ -688,7 +700,7 @@ class HomeController < ApplicationController
       UserDetail.none
     end
     qs = quarter_summaries_for(@user_details)
-    ap = (qs.sum { |q| q[:percentage] } / 4.0).round(2)
+    ap = annual_percentage_for(qs)
     pa = @employee_detail&.l1_pulse_assessments&.max_by(&:updated_at)
     ps = pa ? pulse_scores_from_assessment(pa) : blank_pulse_scores
     manager_feedback = manager_feedback_summary_for(pa)

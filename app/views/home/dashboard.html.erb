@@ -101,7 +101,7 @@
           <div class="box-header">
             <div>
               <h2>SECTION A: Annually / Weightage : 75%</h2>
-              <p>Sabhi users ka Q1, Q2, Q3, Q4 aur annual score sirf L1 percentage ke hisab se. Formula: Annual Score = (Q1 + Q2 + Q3 + Q4) / 4.</p>
+              <p>Sabhi users ka annual score sirf un quarters ke L1 percentage ke hisab se hai jisme KRA score available hai. Formula: Annual Score = scored quarters total / scored quarters count.</p>
             </div>
             <%= link_to "Export", export_dashboard_section_xlsx_path("annual", format: :xlsx, financial_year: @selected_financial_year), class: "section-export-btn" %>
           </div>
@@ -166,7 +166,7 @@
           <div class="box-header">
             <div>
               <h2>SECTION A: Annually / Weightage : 75%</h2>
-              <p>Quarter-wise annual score for your dashboard. Formula: Annual Score = (Q1 + Q2 + Q3 + Q4) / 4.</p>
+              <p>Quarter-wise annual score for your dashboard. Formula: Annual Score = scored quarters total / scored quarters count.</p>
             </div>
             <%= link_to "Export", export_dashboard_section_xlsx_path("annual", format: :xlsx, financial_year: @selected_financial_year), class: "section-export-btn" %>
           </div>
