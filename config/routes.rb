@@ -91,6 +91,7 @@ Rails.application.routes.draw do
       get :export_xlsx
       get :export_quarterly_xlsx  # Export quarterly L1 L2 data
       post :import
+      patch :bulk_update_portal_status
       get "l1"
       get "l2"  # ➤ this is your sidebar L1 view
     end
@@ -101,6 +102,7 @@ Rails.application.routes.draw do
       patch :l2_return
       patch :edit_l1  # Edit L1 remarks and percentage
       patch :edit_l2  # Edit L2 remarks and percentage
+      patch :toggle_portal_status
       get :show_l2  # This maps to /employee_details/:id/show_l2
     end
   end

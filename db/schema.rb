@@ -116,6 +116,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_06_22_153500) do
     t.float "l2_percentage"
     t.string "mobile_number"
     t.boolean "assignments_managed", default: false
+    t.boolean "portal_active", default: true, null: false
     t.string "office_type"
     t.string "office_name"
     t.string "designation"
