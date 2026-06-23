@@ -12,6 +12,11 @@ class User < ApplicationRecord
   has_many :assigned_trainings, through: :user_training_assignments, source: :training
   has_many :user_training_progresses, dependent: :destroy
   has_many :employee_trainings
+  has_many :guest_house_bookings, dependent: :destroy
+  has_many :guest_house_notifications, dependent: :destroy
+  has_many :guest_house_waitlists, dependent: :destroy
+  has_many :managed_guest_houses, class_name: "GuestHouse", foreign_key: :manager_user_id, dependent: :nullify
+
 
   ROLES = %w[employee hod admin l1_employer l2_employer]
 

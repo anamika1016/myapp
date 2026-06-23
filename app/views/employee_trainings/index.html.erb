@@ -2,14 +2,12 @@
   <style>
     .employee-training-list-page {
       min-height: 100vh;
-      height: 100vh;
       background: #f3f4f6;
       padding: 18px clamp(14px, 1.8vw, 28px) 28px;
       box-sizing: border-box;
       font-family: Arial, sans-serif;
-      overflow: hidden;
     }
-    .employee-training-list-shell { display: flex; flex-direction: column; gap: 16px; height: 100%; min-height: 0; }
+    .employee-training-list-shell { display: flex; flex-direction: column; gap: 16px; }
     .employee-training-list-head,
     .employee-training-list-card {
       background: #fff;
@@ -68,8 +66,8 @@
       transition: transform 0.18s ease, box-shadow 0.18s ease;
     }
     .employee-training-primary-link:hover { transform: translateY(-1px); box-shadow: 0 16px 28px rgba(55, 65, 81, 0.2); }
-    .employee-training-list-card { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
-    .employee-training-table-wrap { overflow: auto; min-height: 0; }
+    .employee-training-list-card { overflow: hidden; }
+    .employee-training-table-wrap { overflow-x: auto; }
     .employee-training-table { width: 100%; min-width: 980px; border-collapse: collapse; font-size: 14px; }
     .employee-training-table th {
       background: #f8fafc;

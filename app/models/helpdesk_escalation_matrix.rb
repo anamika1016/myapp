@@ -16,7 +16,6 @@ class HelpdeskEscalationMatrix < ApplicationRecord
 
   before_validation :normalize_escalation_levels
   before_save :sync_legacy_level_columns
-  after_save :remove_extra_escalation_levels
 
   scope :ordered_by_department, -> { joins(:department).order("departments.department_type ASC") }
 
@@ -73,9 +72,5 @@ class HelpdeskEscalationMatrix < ApplicationRecord
     self.l1_user_id = levels[0]&.user_id
     self.l2_user_id = levels[1]&.user_id if has_attribute?(:l2_user_id)
     self.l3_user_id = nil if has_attribute?(:l3_user_id)
-  end
-
-  def remove_extra_escalation_levels
-    escalation_levels.reload.order(:position).drop(2).each(&:destroy)
   end
 end

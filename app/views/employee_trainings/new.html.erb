@@ -2,14 +2,12 @@
   <style>
     .employee-training-page {
       min-height: 100vh;
-      height: 100vh;
       background: #f3f4f6;
       padding: 18px clamp(14px, 1.8vw, 28px) 28px;
       box-sizing: border-box;
       font-family: Arial, sans-serif;
-      overflow: hidden;
     }
-    .employee-training-wrap { width: 100%; max-width: none; height: 100%; margin: 0; display: flex; flex-direction: column; min-height: 0; }
+    .employee-training-wrap { width: 100%; max-width: none; margin: 0; display: flex; flex-direction: column; min-height: calc(100vh - 46px); }
     .employee-training-page-head {
       display: flex;
       justify-content: space-between;
@@ -60,15 +58,10 @@
       overflow: visible;
       display: flex;
       flex-direction: column;
-      flex: 1 1 auto;
-      min-height: 0;
       animation: employeeTrainingRise 0.5s ease 0.06s both;
     }
     .employee-training-scroll {
-      flex: 1 1 auto;
-      min-height: 0;
-      overflow-y: auto;
-      overflow-x: hidden;
+      overflow: visible;
       overscroll-behavior: contain;
     }
     .employee-training-section {
@@ -167,7 +160,7 @@
     }
     @media (max-width: 900px) {
       .employee-training-page { padding: 14px 12px 22px; }
-      .employee-training-wrap { height: 100%; min-height: 0; }
+      .employee-training-wrap { min-height: calc(100vh - 36px); }
       .employee-training-page-head { align-items: flex-start; }
       .employee-training-grid,
       .employee-training-grid.three,
