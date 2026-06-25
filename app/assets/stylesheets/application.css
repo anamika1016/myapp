@@ -180,7 +180,18 @@ body.sidebar-collapsed .app-sidebar-toggle {
     padding-right: 0.75rem !important;
   }
 
+  body.sidebar-collapsed #hs-application-sidebar nav summary.flex.items-center {
+    justify-content: center !important;
+    gap: 0 !important;
+    width: 100%;
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+
   body.sidebar-collapsed #hs-application-sidebar nav a.flex.items-center span,
+  body.sidebar-collapsed #hs-application-sidebar nav summary.flex.items-center span,
+  body.sidebar-collapsed #hs-application-sidebar nav summary.flex.items-center svg:last-child,
+  body.sidebar-collapsed #hs-application-sidebar nav details > ul,
   body.sidebar-collapsed #hs-application-sidebar .sidebar-logout span {
     display: none !important;
   }

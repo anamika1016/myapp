@@ -44,8 +44,8 @@
 <div class="receipt">
   <div class="header">
     <div class="brand">
-      <img src="<%= wicked_pdf_asset_base64('asa-removebg-preview.png') %>" alt="ASA Logo">
-      <h1>ASA Guest House</h1>
+      <img src="<%= wicked_pdf_asset_base64('PAPL logo-dark-green.png') %>" alt="PAPL Logo">
+      <h1>PAPL Guest House</h1>
     </div>
     <div class="receipt-meta">
       <strong><%= payment_status == "waived" ? "PAYMENT WAIVER RECEIPT" : "PAYMENT RECEIPT" %></strong>
@@ -99,7 +99,7 @@
   </div>
 
   <div class="footer">
-    <div><b>Received by</b><br>ASA Guest House Administration<div class="computer">This is a computer-generated payment receipt.</div></div>
+    <div><b>Received by</b><br>PAPL Guest House Administration<div class="computer">This is a computer-generated payment receipt.</div></div>
     <div class="right"><b>Authorized Record</b><br><%= booking.accepted_by&.display_name || "Guest House Administrator" %></div>
   </div>
 </div>
