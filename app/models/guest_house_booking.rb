@@ -6,7 +6,7 @@ class GuestHouseBooking < ApplicationRecord
   GUEST_GENDERS = %w[male female other].freeze
   BOOKING_FOR_OPTIONS = %w[self guest auditor].freeze
   DISPLAY_TIME_ZONE = "Asia/Kolkata".freeze
-  SINGLE_ROOM_DESIGNATION_PATTERN = /\b(md|m\.d\.|director|ceo|chief executive officer|managing director)\b/i
+  SINGLE_ROOM_DESIGNATION_PATTERN = /\b(md|m\.d\.|director|ceo|c\.e\.o\.|coo|c\.o\.o\.|chief executive officer|chief operating officer|managing director)\b/i
 
   belongs_to :guest_house
   belongs_to :user
@@ -438,9 +438,9 @@ class GuestHouseBooking < ApplicationRecord
 
   def room_type_matches_designation
     if single_room_eligible?
-      errors.add(:room_type, "Director, MD and CEO bookings must use single room") unless single?
+      errors.add(:room_type, "Director, MD, CEO and COO bookings must use single room") unless single?
     elsif single?
-      errors.add(:room_type, "single room is allowed only when every occupant is Director, MD or CEO")
+      errors.add(:room_type, "single room is allowed only when every occupant is Director, MD, CEO or COO")
     end
   end
 

@@ -80,23 +80,23 @@
               <%= form.hidden_field :room_type, value: "single", disabled: external_booking, data: { guest_house_self_room_type_input: true } %>
               <div class="guest-house-readonly-field">
                 <strong>Single Room</strong>
-                <span>Director, MD and CEO bookings are single-room only.</span>
+                <span>Director, MD, CEO and COO bookings are single-room only.</span>
               </div>
             <% else %>
               <%= form.hidden_field :room_type, value: "sharing", disabled: external_booking, data: { guest_house_self_room_type_input: true } %>
               <div class="guest-house-readonly-field">
                 <strong>Sharing Room</strong>
-                <span>Single room is reserved for Director, MD and CEO.</span>
+                <span>Single room is reserved for Director, MD, CEO and COO.</span>
               </div>
             <% end %>
           </div>
           <div data-guest-house-external-room-type <%= "hidden" unless external_booking %>>
             <%= select_tag "guest_house_booking[room_type]",
-                           options_for_select([ [ "Sharing Room", "sharing" ] ], "sharing"),
+                           options_for_select([ [ "Sharing Room", "sharing" ], [ "Single Room", "single" ] ], "sharing"),
                            class: "guest-house-select",
                            disabled: !external_booking,
                            data: { guest_house_external_room_type_input: true } %>
-            <div class="guest-house-field-hint">Single room is enabled only when every guest or auditor is MD, Director or CEO.</div>
+            <div class="guest-house-field-hint">Single room is enabled only when every guest or auditor is MD, Director, CEO or COO.</div>
           </div>
         </div>
         <div class="guest-house-field" data-guest-house-booking-gender-field <%= "hidden" unless booking_type_selected && !external_booking %>>
