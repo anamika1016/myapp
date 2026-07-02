@@ -195,7 +195,7 @@
     <div class="employee-training-page-head">
       <div>
         <span class="employee-training-eyebrow">Training</span>
-        <h1 class="employee-training-title">TOT Training</h1>
+        <h1 class="employee-training-title">Training of Trainer (TOT)</h1>
       </div>
       <%= link_to "View Submitted Trainings", employee_trainings_path, class: "inline-flex items-center justify-center rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700 hover:bg-blue-100" %>
     </div>
@@ -205,7 +205,7 @@
         <section class="employee-training-section">
           <h2 class="employee-training-section-title">
             <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/></svg>
-            Training Details
+            Staff Training details
           </h2>
 
         <div class="employee-training-grid">
@@ -256,7 +256,7 @@
           </div>
           <div class="employee-training-field" style="grid-column: 1 / -1;">
             <%= label_tag :details do %>Details <span class="employee-training-required">*</span><% end %>
-            <%= text_area_tag :details, nil, placeholder: "Enter training details...", required: true, class: "employee-training-textarea" %>
+            <%= text_area_tag :details, nil, placeholder: "Enter staff training details...", required: true, class: "employee-training-textarea" %>
           </div>
           <div class="employee-training-field" style="grid-column: 1 / -1;">
             <%= label_tag :training_location do %>Training Location <span class="employee-training-required">*</span><% end %>
