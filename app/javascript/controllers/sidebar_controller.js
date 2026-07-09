@@ -8,8 +8,8 @@ export default class extends Controller {
   connect() {
     this.handleResize = this.handleResize.bind(this)
     const storedState = window.localStorage.getItem(STORAGE_KEY)
-    const defaultCollapsed = window.matchMedia("(max-width: 1023px)").matches
-    const collapsed = storedState === null ? defaultCollapsed : storedState === "true"
+    const desktop = window.matchMedia("(min-width: 1024px)").matches
+    const collapsed = desktop ? false : (storedState === null ? true : storedState === "true")
 
     this.applyState(collapsed)
     window.addEventListener("resize", this.handleResize)
@@ -25,7 +25,8 @@ export default class extends Controller {
   }
 
   handleResize() {
-    this.applyState(this.collapsed)
+    const desktop = window.matchMedia("(min-width: 1024px)").matches
+    this.applyState(desktop ? false : this.collapsed)
   }
 
   applyState(collapsed) {

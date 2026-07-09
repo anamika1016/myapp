@@ -1,4 +1,4 @@
-<!-- Fixed Quarterly Edit Form - Dynamic with Sidebar Support -->
+<!-- Monthly edit Form - Dynamic with Sidebar Support -->
 <div class="min-h-screen bg-gray-50 content-wrapper">
   <div class="w-full px-4 py-6">
     <!-- Header Section -->
@@ -7,7 +7,7 @@
         <div class="flex justify-between items-center">
           <h1 class="text-3xl font-bold flex items-center">
             <i class="fas fa-edit me-3 text-2xl"></i>
-            Quarterly Achievement Editor
+            Monthly Achievement Editor
           </h1>
           <%= link_to user_details_path(financial_year: @selected_financial_year), class: "bg-white bg-opacity-90 hover:bg-opacity-100 text-black px-4 py-2 rounded-lg transition-all duration-200 flex items-center" do %>
             <i class="fas fa-arrow-left me-2"></i>Back to List
@@ -17,14 +17,14 @@
       
       <div class="p-6">
         <div class="text-gray-600 mb-4">
-          <p class="mb-4">Select a quarter to edit achievements and remarks for ALL activities in that quarter.</p>
+          <p class="mb-4">Select a month to edit achievements and remarks for all key result indicators in that month.</p>
         </div>
         
-        <!-- Quarter and Month Filter Dropdowns -->
+        <!-- Month Filter Dropdown -->
         <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
           <div class="flex flex-wrap items-center gap-4">
             <%= form_with url: quarterly_edit_all_user_details_path, method: :get, local: true, class: "flex items-center gap-2" do |form| %>
-              <%= form.label :financial_year, "Financial Year:", class: "text-sm font-medium text-gray-700" %>
+              <%= form.label :financial_year, "Financial year:", class: "text-sm font-medium text-gray-700" %>
               <%= form.select :financial_year,
                   options_for_select(@financial_years, @selected_financial_year),
                   {},
@@ -32,42 +32,42 @@
                   onchange: "this.form.submit();" %>
             <% end %>
 
-            <label class="text-sm font-medium text-gray-700">Choose Quarter to Edit:</label>
-            <select id="quarterFilter" class="bg-white border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent min-w-[200px] text-gray-700">
-              <option value="" selected disabled>Select Quarter</option>
-              <option value="Q1">Q1 (April, May, June)</option>
-              <option value="Q2">Q2 (July, August, September)</option>
-              <option value="Q3">Q3 (October, November, December)</option>
-              <option value="Q4">Q4 (January, February, March)</option>
+            <label class="text-sm font-medium text-gray-700">Choose month to edit:</label>
+            <select id="monthFilter" class="bg-white border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent min-w-[200px] text-gray-700">
+              <option value="" selected disabled>Select month</option>
+              <% @active_month_options.each do |label, value| %>
+                <% next if value.blank? %>
+                <option value="<%= value %>" <%= "selected" if value == @selected_month %>><%= label %></option>
+              <% end %>
             </select>
 
             <div class="ml-4">
-              <span id="selectedQuarterInfo" class="text-sm text-gray-600 hidden"></span>
+              <span id="selectedMonthInfo" class="text-sm text-gray-600 hidden"></span>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- No Quarter Selected Message -->
-    <div id="selectQuarterMessage" class="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center mb-6">
+    <!-- No Month Selected Message -->
+    <div id="selectMonthMessage" class="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center mb-6">
       <i class="fas fa-hand-point-up text-4xl text-gray-500 mb-4"></i>
-      <h3 class="text-lg font-semibold text-gray-800 mb-2">Please Select a Quarter</h3>
-      <p class="text-gray-600">Choose a quarter from the dropdown above to edit achievements and remarks for all activities.</p>
+      <h3 class="text-lg font-semibold text-gray-800 mb-2">Please select a month</h3>
+      <p class="text-gray-600">Choose a month from the dropdown above to edit achievements and remarks for all key result indicators.</p>
     </div>
 
-    <!-- Quarterly Edit Form -->
+    <!-- Monthly edit Form -->
     <% if @user_details.any? %>
       <%= form_with url: update_quarterly_achievements_user_details_path, method: :patch, local: true, class: "quarterly-form hidden w-full" do |form| %>
-        <%= hidden_field_tag :selected_quarter, "", id: "selected_quarter_field" %>
+        <%= hidden_field_tag :selected_month, "", id: "selected_month_field" %>
         <%= hidden_field_tag :financial_year, @selected_financial_year %>
         
-        <!-- Quarter Header -->
-        <div id="quarterHeader" class="bg-white border border-gray-200 rounded-xl shadow-lg mb-6 hidden">
-          <div id="quarterHeaderContent" class="bg-gray-600 text-white px-6 py-4 rounded-t-xl">
+        <!-- Month Header -->
+        <div id="monthHeader" class="bg-white border border-gray-200 rounded-xl shadow-lg mb-6 hidden">
+          <div id="monthHeaderContent" class="bg-gray-600 text-white px-6 py-4 rounded-t-xl">
             <div class="flex justify-between items-center">
-              <h2 class="text-2xl font-bold">Quarterly Activity Editor</h2>
-              <span id="quarterTitle" class="text-xl font-bold"></span>
+              <h2 class="text-2xl font-bold">Monthly key result indicators editor</h2>
+              <span id="monthTitle" class="text-xl font-bold"></span>
             </div>
           </div>
         </div>
@@ -86,30 +86,33 @@
               <table class="quarterly-table w-full min-w-full" id="quarterlyActivityTable">
                 <thead class="bg-gray-800">
                   <tr>
-                    <th rowspan="3" class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 activity-column">Activity</th>
-                    <th rowspan="3" class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 theme-column">Theme</th>
-                    <th rowspan="3" class="px-4 py-3 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 unit-column">Unit</th>
+                    <th rowspan="3" class="px-4 py-3 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 serial-column">S.No</th>
+                    <th rowspan="3" class="px-4 py-3 text-left text-xs font-medium text-white tracking-wider border-r border-gray-600 activity-column">Key result indicators</th>
+                    <th rowspan="3" class="px-4 py-3 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 unit-column">Unit of measurement</th>
+                    <th rowspan="3" class="px-4 py-3 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 annual-target-column"><%= annual_target_fy_label(@selected_financial_year) %></th>
                     <% all_quarters.each do |quarter_name, months| %>
-                      <th colspan="9" class="px-4 py-3 text-center text-xs font-semibold text-white uppercase tracking-widest border-r border-gray-500 bg-gray-900 quarter-block-header hidden" data-quarter="<%= quarter_name %>">
-                        <%= quarter_name %> Quarter
-                      </th>
+                      <% months.each do |month| %>
+                        <th colspan="3" class="px-4 py-3 text-center text-xs font-semibold text-white tracking-widest border-r border-gray-500 bg-gray-900 quarter-block-header hidden" data-quarter="<%= quarter_name %>" data-month="<%= month %>">
+                          <%= short_month_label(month) %>
+                        </th>
+                      <% end %>
                     <% end %>
                   </tr>
                   <tr>
                     <% all_quarters.each do |quarter_name, months| %>
                       <% months.each do |month| %>
-                        <th colspan="3" class="px-4 py-3 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 bg-gray-700 quarter-month-header hidden" data-quarter="<%= quarter_name %>">
-                          <%= month.capitalize %>
+                        <th colspan="3" class="px-4 py-3 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700 quarter-month-header hidden" data-quarter="<%= quarter_name %>" data-month="<%= month %>">
+                          <%= short_month_label(month) %>
                         </th>
                       <% end %>
                     <% end %>
                   </tr>
                   <tr class="bg-gray-700">
                     <% all_quarters.each do |quarter_name, months| %>
-                      <% months.each do |_month| %>
-                        <th class="px-3 py-2 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 quarter-subheader hidden" data-quarter="<%= quarter_name %>">Target</th>
-                        <th class="px-3 py-2 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 quarter-subheader hidden" data-quarter="<%= quarter_name %>">Achievement</th>
-                        <th class="px-3 py-2 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 quarter-subheader hidden" data-quarter="<%= quarter_name %>">Remarks</th>
+                      <% months.each do |month| %>
+                        <th class="px-3 py-2 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 quarter-subheader hidden" data-quarter="<%= quarter_name %>" data-month="<%= month %>">Target</th>
+                        <th class="px-3 py-2 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 quarter-subheader hidden" data-quarter="<%= quarter_name %>" data-month="<%= month %>">Achievement</th>
+                        <th class="px-3 py-2 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 quarter-subheader hidden" data-quarter="<%= quarter_name %>" data-month="<%= month %>">Remarks</th>
                       <% end %>
                     <% end %>
                   </tr>
@@ -119,24 +122,27 @@
                     <% existing_achievements = detail.achievements.present? ? detail.achievements.index_by(&:month) : {} %>
                     <% all_quarters.each do |quarter_name, months| %>
                       <tr class="quarter-row hidden <%= detail_index.even? ? 'bg-gray-50' : 'bg-white' %>" data-quarter="<%= quarter_name %>" data-detail-id="<%= detail.id %>">
+                        <td class="px-4 py-3 text-sm text-gray-800 text-center border-r border-gray-200 serial-column"><%= detail_index + 1 %></td>
                         <td class="px-4 py-3 text-sm text-gray-800 border-r border-gray-200 activity-column"><%= detail.activity.activity_name %></td>
-                        <td class="px-4 py-3 text-sm text-gray-800 border-r border-gray-200 theme-column"><%= detail.activity.theme_name.present? ? detail.activity.theme_name : 'Technical Support' %></td>
                         <td class="px-4 py-3 text-sm text-gray-800 text-center border-r border-gray-200 unit-column"><%= detail.activity.unit.present? ? detail.activity.unit : '%' %></td>
+                        <td class="px-4 py-3 text-sm text-gray-800 text-center border-r border-gray-200 annual-target-column"><%= annual_target_display(detail.activity) %></td>
 
                         <% months.each do |month| %>
-                          <% target_value = detail.respond_to?(month.to_sym) ? detail.send(month.to_sym) : "" %>
+                          <% target_value = detail.respond_to?(month.to_sym) ? clean_spreadsheet_display_value(detail.send(month.to_sym)) : "" %>
                           <% existing_achievement = existing_achievements[month] %>
-                          <td class="px-3 py-3 text-sm text-gray-800 text-center border-r border-gray-200 bg-gray-50 target-cell">
-                            <span class="<%= target_value.present? ? 'text-gray-800 font-semibold' : 'text-gray-400' %>">
-                              <%= target_value.present? ? target_value : '-' %>
+                          <% has_target = target_value.present? && target_value.to_s.strip != "0" %>
+                          <td class="px-3 py-3 text-sm text-gray-800 text-center border-r border-gray-200 bg-gray-50 target-cell quarter-month-cell" data-month="<%= month %>">
+                            <span class="<%= has_target ? 'text-gray-800 font-semibold monthly-target-value' : 'text-gray-400' %>">
+                              <%= has_target ? target_value : '-' %>
                             </span>
                           </td>
-                          <td class="px-3 py-3 text-sm text-center border-r border-gray-200 achievement-cell">
-                            <%= text_field_tag "achievements[#{detail.id}][#{month}][achievement]",
+                          <td class="px-3 py-3 text-sm text-center border-r border-gray-200 achievement-cell quarter-month-cell" data-month="<%= month %>">
+                            <%= number_field_tag "achievements[#{detail.id}][#{month}][achievement]",
                                                existing_achievement&.achievement,
                                                class: "achievement-input w-full",
                                                placeholder: "Achievement",
-                                               disabled: !target_value.present?,
+                                               step: "any",
+                                               disabled: !has_target,
                                                data: {
                                                  target: target_value,
                                                  detail_id: detail.id,
@@ -144,13 +150,14 @@
                                                  quarter: quarter_name
                                                } %>
                           </td>
-                          <td class="px-3 py-3 text-sm text-center border-r border-gray-200 remarks-cell">
+                          <td class="px-3 py-3 text-sm text-center border-r border-gray-200 remarks-cell quarter-month-cell" data-month="<%= month %>">
                             <%= text_area_tag "achievements[#{detail.id}][#{month}][employee_remarks]",
                                               existing_achievement&.employee_remarks,
                                               class: "remarks-textarea w-full",
                                               rows: 2,
+                                              maxlength: UserDetailsController::REMARKS_MAX_LENGTH,
                                               placeholder: "Remarks",
-                                              disabled: !target_value.present? %>
+                                              disabled: !has_target %>
                           </td>
                         <% end %>
                       </tr>
@@ -165,7 +172,7 @@
         <!-- Submit Section -->
         <div id="submitSection" class="bg-white border border-gray-200 rounded-xl shadow-lg p-6 hidden mt-6">
           <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <%= submit_tag "Update All Achievements", 
+            <%= submit_tag "Update Monthly Achievements", 
                           class: "bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white px-8 py-3 rounded-lg font-semibold transition-all duration-200 flex items-center transform hover:scale-105 shadow-lg",
                           id: "submitBtn" %>
             
@@ -175,7 +182,7 @@
           
           <div class="text-center mt-4 text-sm text-gray-600">
             <i class="fas fa-info-circle me-1"></i>
-            <span id="submitInfo">Fill achievements and remarks for the selected quarter</span>
+            <span id="submitInfo">Fill achievements and remarks for the selected month</span>
           </div>
         </div>
       <% end %>
@@ -184,7 +191,7 @@
       <!-- No Data State -->
       <div class="bg-white border border-gray-200 rounded-xl shadow-lg p-12 text-center">
         <i class="fas fa-inbox text-6xl text-gray-300 mb-4"></i>
-        <h3 class="text-xl font-semibold text-gray-800 mb-2">No Activities Found</h3>
+        <h3 class="text-xl font-semibold text-gray-800 mb-2">No key result indicators found</h3>
         <p class="text-gray-600 mb-6">There are no user details available for quarterly editing.</p>
         <%= link_to "Go to User Details", user_details_path, 
                     class: "bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg transition-colors duration-200" %>
@@ -197,14 +204,16 @@
   .quarter-row,
   .quarter-block-header,
   .quarter-month-header,
-  .quarter-subheader {
+  .quarter-subheader,
+  .quarter-month-cell {
     transition: all 0.3s ease;
   }
 
   .quarter-row.hidden,
   .quarter-block-header.hidden,
   .quarter-month-header.hidden,
-  .quarter-subheader.hidden {
+  .quarter-subheader.hidden,
+  .quarter-month-cell.hidden {
     display: none;
   }
 
@@ -249,16 +258,15 @@
     line-height: 1.45;
   }
 
-  .theme-column {
-    width: 15rem;
-    max-width: 15rem;
-    white-space: normal;
-    word-break: break-word;
+  .serial-column {
+    width: 4.5rem;
+    min-width: 4.5rem;
+    max-width: 4.5rem;
   }
 
   .unit-column {
-    width: 3.5rem;
-    min-width: 3.5rem;
+    width: 8rem;
+    min-width: 8rem;
   }
 
   .target-cell {
@@ -319,13 +327,13 @@
     background: #f9fafb;
   }
 
-  #quarterHeader {
+  #monthHeader {
     background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
     border: 1px solid #e2e8f0;
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
   }
 
-  #quarterHeaderContent {
+  #monthHeaderContent {
     background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
   }
 
@@ -355,20 +363,20 @@
     border-radius: 12px;
   }
 
-  #quarterFilter {
+  #monthFilter {
     transition: all 0.3s ease;
     border-radius: 8px;
     border: 2px solid #e5e7eb;
     background: white;
   }
 
-  #quarterFilter:focus {
+  #monthFilter:focus {
     border-color: #6b7280;
     box-shadow: 0 0 0 3px rgba(107, 114, 128, 0.1);
     transform: scale(1.02);
   }
 
-  #quarterFilter:hover {
+  #monthFilter:hover {
     border-color: #9ca3af;
   }
 
@@ -432,169 +440,210 @@
 </style>
 
 <script>
-  function initializeQuarterlyEditor() {
-    const quarterFilter = document.getElementById('quarterFilter');
-    const selectQuarterMessage = document.getElementById('selectQuarterMessage');
-    const quarterlyForm = document.querySelector('.quarterly-form');
-    const quarterHeader = document.getElementById('quarterHeader');
+  function initializeMonthlyEditor() {
+    const monthFilter = document.getElementById('monthFilter');
+    const selectMonthMessage = document.getElementById('selectMonthMessage');
+    const monthlyForm = document.querySelector('.quarterly-form');
+    const monthHeader = document.getElementById('monthHeader');
     const submitSection = document.getElementById('submitSection');
-    const selectedQuarterField = document.getElementById('selected_quarter_field');
-    
-    if (!quarterFilter || !quarterlyForm) {
-      console.log('Quarterly editor elements not found, retrying...');
-      setTimeout(initializeQuarterlyEditor, 100);
+    const selectedMonthField = document.getElementById('selected_month_field');
+
+    if (!monthFilter || !monthlyForm) {
+      setTimeout(initializeMonthlyEditor, 100);
       return;
     }
 
-    if (!quarterFilter.value) {
-      quarterFilter.selectedIndex = 0;
-    }
-    
-    const quarterData = {
-      'Q1': {
-        title: 'Q1 Quarter (April - May - June)',
-        months: ['April', 'May', 'June']
-      },
-      'Q2': {
-        title: 'Q2 Quarter (July - August - September)',
-        months: ['July', 'August', 'September']
-      },
-      'Q3': {
-        title: 'Q3 Quarter (October - November - December)',
-        months: ['October', 'November', 'December']
-      },
-      'Q4': {
-        title: 'Q4 Quarter (January - February - March)',
-        months: ['January', 'February', 'March']
-      }
+    const monthLabels = {
+      april: 'APR',
+      may: 'MAY',
+      june: 'JUN',
+      july: 'JUL',
+      august: 'AUG',
+      september: 'SEP',
+      october: 'OCT',
+      november: 'NOV',
+      december: 'DEC',
+      january: 'JAN',
+      february: 'FEB',
+      march: 'MAR'
     };
 
-    // Enhanced quarter filter change handler
-    function handleQuarterChange() {
-      const selectedQuarter = quarterFilter.value;
-      console.log('Quarter selected:', selectedQuarter);
+    const monthToQuarter = {
+      april: 'Q1',
+      may: 'Q1',
+      june: 'Q1',
+      july: 'Q2',
+      august: 'Q2',
+      september: 'Q2',
+      october: 'Q3',
+      november: 'Q3',
+      december: 'Q3',
+      january: 'Q4',
+      february: 'Q4',
+      march: 'Q4'
+    };
+
+    function parseNumber(value) {
+      const number = parseFloat((value || '').toString().replace(/,/g, ''));
+      return Number.isFinite(number) ? number : null;
+    }
+
+    function formatNumber(value) {
+      if (!Number.isFinite(value)) return '-';
+      return Number.isInteger(value) ? value.toString() : value.toFixed(2).replace(/\.?0+$/, '');
+    }
+
+    function updateMonthlyTotals(selectedMonth, selectedQuarter) {
+      let targetTotal = 0;
+      let achievementTotal = 0;
+      let progressTotal = 0;
+      let progressCount = 0;
+      let hasTarget = false;
+      let hasAchievement = false;
+
+      document.querySelectorAll(`.quarter-row[data-quarter="${selectedQuarter}"]:not(.hidden)`).forEach((row) => {
+        const input = row.querySelector(`.achievement-input[data-month="${selectedMonth}"]`);
+        if (!input || input.disabled) return;
+
+        const target = parseNumber(input.dataset.target);
+        if (target !== null && target > 0) {
+          targetTotal += target;
+          hasTarget = true;
+        }
+
+        const achievement = parseNumber(input.value);
+        if (achievement !== null) {
+          achievementTotal += achievement;
+          hasAchievement = true;
+        }
+
+        if (target !== null && target > 0) {
+          progressTotal += achievement !== null ? Math.floor(((achievement / target) * 100) * 100) / 100 : 0;
+          progressCount += 1;
+        }
+      });
+
+      const percentage = progressCount > 0 ? progressTotal / progressCount : null;
+
+      const targetCell = document.querySelector(`.monthly-total-cell[data-month="${selectedMonth}"][data-total-kind="target"]`);
+      const achievementCell = document.querySelector(`.monthly-total-cell[data-month="${selectedMonth}"][data-total-kind="achievement"]`);
+      const percentageCell = document.querySelector(`.monthly-total-cell[data-month="${selectedMonth}"][data-total-kind="percentage"]`);
+
+      if (targetCell) targetCell.textContent = hasTarget ? formatNumber(targetTotal) : '-';
+      if (achievementCell) achievementCell.textContent = hasAchievement ? formatNumber(achievementTotal) : '-';
+      if (percentageCell) percentageCell.textContent = percentage !== null ? `${formatNumber(percentage)}%` : '-';
+    }
+
+    function hideEditor() {
+      selectMonthMessage.classList.remove('hidden');
+      monthlyForm.classList.add('hidden');
+      monthHeader.classList.add('hidden');
+      submitSection.classList.add('hidden');
+      document.getElementById('activitiesList')?.classList.add('hidden');
+      document.getElementById('selectedMonthInfo')?.classList.add('hidden');
+      selectedMonthField.value = '';
+      document.querySelectorAll('.quarter-row, .quarter-block-header, .quarter-month-header, .quarter-subheader, .quarter-month-cell').forEach((element) => {
+        element.classList.add('hidden');
+      });
+    }
+
+    function handleMonthChange() {
+      const selectedMonth = monthFilter.value;
+      const selectedQuarter = monthToQuarter[selectedMonth];
+      const monthLabel = monthLabels[selectedMonth] || selectedMonth;
       const activitiesList = document.getElementById('activitiesList');
-      const quarterTitleElement = document.getElementById('quarterTitle');
+      const monthTitleElement = document.getElementById('monthTitle');
       const submitInfoElement = document.getElementById('submitInfo');
       const submitBtnElement = document.getElementById('submitBtn');
-      const selectedQuarterInfo = document.getElementById('selectedQuarterInfo');
-      
-      if (selectedQuarter === '') {
-        selectQuarterMessage.classList.remove('hidden');
-        quarterlyForm.classList.add('hidden');
-        quarterHeader.classList.add('hidden');
-        submitSection.classList.add('hidden');
-        if (activitiesList) activitiesList.classList.add('hidden');
-        if (selectedQuarterInfo) selectedQuarterInfo.classList.add('hidden');
-        selectedQuarterField.value = '';
-        document.querySelectorAll('.quarter-row, .quarter-block-header, .quarter-month-header, .quarter-subheader').forEach(element => {
-          element.classList.add('hidden');
-        });
+      const selectedMonthInfo = document.getElementById('selectedMonthInfo');
+
+      if (!selectedMonth || !selectedQuarter) {
+        hideEditor();
         return;
       }
 
-      const quarterInfo = quarterData[selectedQuarter];
-
-      selectQuarterMessage.classList.add('hidden');
-      quarterlyForm.classList.remove('hidden');
-      quarterHeader.classList.remove('hidden');
+      selectMonthMessage.classList.add('hidden');
+      monthlyForm.classList.remove('hidden');
+      monthHeader.classList.remove('hidden');
       submitSection.classList.remove('hidden');
-      if (activitiesList) activitiesList.classList.remove('hidden');
-      selectedQuarterField.value = selectedQuarter;
+      activitiesList?.classList.remove('hidden');
+      selectedMonthField.value = selectedMonth;
 
-      if (quarterTitleElement) quarterTitleElement.textContent = quarterInfo.title;
-      if (submitInfoElement) submitInfoElement.textContent = `Fill achievements and remarks for all activities in ${quarterInfo.title}`;
-      if (submitBtnElement) submitBtnElement.value = `Update ${selectedQuarter} Achievements`;
-      if (selectedQuarterInfo) {
-        selectedQuarterInfo.textContent = `Editing ${quarterInfo.title}`;
-        selectedQuarterInfo.classList.remove('hidden');
+      if (monthTitleElement) monthTitleElement.textContent = `${monthLabel} Achievement Editor`;
+      if (submitInfoElement) submitInfoElement.textContent = `Fill achievements and remarks for all activities in ${monthLabel}`;
+      if (submitBtnElement) submitBtnElement.value = `Update ${monthLabel} Achievements`;
+      if (selectedMonthInfo) {
+        selectedMonthInfo.textContent = `Editing ${monthLabel}`;
+        selectedMonthInfo.classList.remove('hidden');
       }
 
-      document.querySelectorAll('.quarter-row, .quarter-block-header, .quarter-month-header, .quarter-subheader').forEach(element => {
+      document.querySelectorAll('.quarter-row, .quarter-block-header, .quarter-month-header, .quarter-subheader, .quarter-month-cell').forEach((element) => {
         element.classList.add('hidden');
       });
 
-      document.querySelectorAll(`.quarter-block-header[data-quarter="${selectedQuarter}"], .quarter-month-header[data-quarter="${selectedQuarter}"], .quarter-subheader[data-quarter="${selectedQuarter}"]`).forEach(element => {
+      document.querySelectorAll(`.quarter-block-header[data-month="${selectedMonth}"], .quarter-month-header[data-month="${selectedMonth}"], .quarter-subheader[data-month="${selectedMonth}"], .quarter-month-cell[data-month="${selectedMonth}"]`).forEach((element) => {
         element.classList.remove('hidden');
       });
 
-      const selectedRows = document.querySelectorAll(`.quarter-row[data-quarter="${selectedQuarter}"]`);
-      selectedRows.forEach((row, index) => {
+      document.querySelectorAll(`.quarter-row[data-quarter="${selectedQuarter}"]`).forEach((row, index) => {
         row.classList.remove('hidden');
+        row.style.opacity = '0';
+        row.style.transform = 'translateY(10px)';
+        row.style.transition = 'all 0.3s ease';
         setTimeout(() => {
-          row.style.opacity = '0';
-          row.style.transform = 'translateY(10px)';
-          row.style.transition = 'all 0.3s ease';
-          
-          setTimeout(() => {
-            row.style.opacity = '1';
-            row.style.transform = 'translateY(0)';
-          }, 50);
-        }, index * 50);
+          row.style.opacity = '1';
+          row.style.transform = 'translateY(0)';
+        }, index * 30);
       });
 
-      console.log('Quarter form displayed successfully for:', selectedQuarter);
+      updateMonthlyTotals(selectedMonth, selectedQuarter);
     }
 
-    // Remove existing event listeners to prevent duplicates
-    quarterFilter.removeEventListener('change', quarterFilter.changeHandler);
-    
-    quarterFilter.changeHandler = handleQuarterChange;
-    quarterFilter.addEventListener('change', quarterFilter.changeHandler);
+    monthFilter.removeEventListener('change', monthFilter.changeHandler);
+    monthFilter.changeHandler = handleMonthChange;
+    monthFilter.addEventListener('change', monthFilter.changeHandler);
 
-    // Auto-calculate percentages when achievement values change
     function handleAchievementInput(e) {
-      if (e.target.classList.contains('achievement-input')) {
-        const target = parseFloat(e.target.dataset.target) || 0;
-        const achievement = parseFloat(e.target.value) || 0;
-        
-        // Update input styling based on value
-        if (e.target.value.trim() !== '') {
-          e.target.classList.remove('bg-gray-100');
-          e.target.classList.add('bg-white', 'border-blue-500');
-        } else {
-          e.target.classList.remove('bg-white', 'border-blue-500');
-          e.target.classList.add('bg-gray-100');
-        }
+      if (!e.target.classList.contains('achievement-input')) return;
+
+      if (e.target.value.trim() !== '') {
+        e.target.classList.remove('bg-gray-100');
+        e.target.classList.add('bg-white', 'border-blue-500');
+      } else {
+        e.target.classList.remove('bg-white', 'border-blue-500');
+        e.target.classList.add('bg-gray-100');
       }
+
+      const selectedMonth = monthFilter.value;
+      const selectedQuarter = monthToQuarter[selectedMonth];
+      if (selectedMonth && selectedQuarter) updateMonthlyTotals(selectedMonth, selectedQuarter);
     }
 
-    // Remove existing input event listeners
     document.removeEventListener('input', document.achievementInputHandler);
-    
-    // Create new input handler
     document.achievementInputHandler = handleAchievementInput;
     document.addEventListener('input', document.achievementInputHandler);
 
-    // Enhanced form validation
     function handleFormSubmit(e) {
-      const selectedQuarter = quarterFilter.value;
-      
-      if (!selectedQuarter) {
+      const selectedMonth = monthFilter.value;
+      if (!selectedMonth) {
         e.preventDefault();
-        alert('Please select a quarter first.');
+        alert('Please select a month first.');
         return false;
       }
-      
-      const visibleInputs = document.querySelectorAll(`.quarter-row[data-quarter="${selectedQuarter}"]:not(.hidden) .achievement-input`);
-      let hasAnyValue = false;
-      
-      visibleInputs.forEach(input => {
-        if (input.value && input.value.trim() !== '') {
-          hasAnyValue = true;
-        }
-      });
-      
+
+      const selectedQuarter = monthToQuarter[selectedMonth];
+      const visibleInputs = document.querySelectorAll(`.quarter-row[data-quarter="${selectedQuarter}"]:not(.hidden) .achievement-input[data-month="${selectedMonth}"]`);
+      const hasAnyValue = Array.from(visibleInputs).some((input) => input.value && input.value.trim() !== '');
+
       if (!hasAnyValue) {
         e.preventDefault();
-        alert(`Please enter at least one achievement value in ${quarterData[selectedQuarter].title}.`);
+        alert(`Please enter at least one achievement value in ${monthLabels[selectedMonth] || selectedMonth}.`);
         return false;
       }
-      
-      return confirm(`Are you sure you want to update all achievements for ${quarterData[selectedQuarter].title}?`);
+
+      return confirm(`Are you sure you want to update achievements for ${monthLabels[selectedMonth] || selectedMonth}?`);
     }
 
-    // Remove existing form submit listeners
     const form = document.querySelector('.quarterly-form');
     if (form) {
       form.removeEventListener('submit', form.submitHandler);
@@ -602,16 +651,20 @@
       form.addEventListener('submit', form.submitHandler);
     }
 
-    console.log('Quarterly editor initialized successfully');
+    if (monthFilter.value) {
+      handleMonthChange();
+    } else {
+      hideEditor();
+    }
   }
 
-  document.addEventListener('DOMContentLoaded', initializeQuarterlyEditor);
-  document.addEventListener('turbo:load', initializeQuarterlyEditor);
-  document.addEventListener('turbo:render', initializeQuarterlyEditor);
-  
+  document.addEventListener('DOMContentLoaded', initializeMonthlyEditor);
+  document.addEventListener('turbo:load', initializeMonthlyEditor);
+  document.addEventListener('turbo:render', initializeMonthlyEditor);
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeQuarterlyEditor);
+    document.addEventListener('DOMContentLoaded', initializeMonthlyEditor);
   } else {
-    initializeQuarterlyEditor();
+    initializeMonthlyEditor();
   }
 </script>

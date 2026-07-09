@@ -1,24 +1,66 @@
 wb = xlsx_package.workbook
 
 wb.add_worksheet(name: "Departments") do |sheet|
-  # Updated headers to include Employee Name and proper column mapping
-  sheet.add_row [ "Financial Year", "Department", "Employee Name", "Theme Name", "Activity Name", "Unit", "Weight" ]
+  headers = [
+    "Financial year", "Mobile No.", "Employee name", "Employee email", "Employee code",
+    "Post", "Location", "Department",
+    "L1 Code", "L1 Employer Name",
+    "OBS Code 1", "OBS Code 2", "OBS Code 3", "OBS Code 4",
+    "Key result indicators", "Unit of measurement", "Annual target",
+    "APR", "MAY", "JUN", "JUL", "AUG", "SEP",
+    "OCT", "NOV", "DEC", "JAN", "FEB", "MAR"
+  ]
+  sheet.add_row headers
 
   @employee_activities.each do |key, data|
-    # Use the data structure from get_all_employee_activities
-    employee_name = data[:employee_name]
-    department_type = data[:department_type]
+    employee = EmployeeDetail.find_by(employee_id: data[:employee_id]) ||
+               EmployeeDetail.find_by(employee_code: data[:employee_id]) ||
+               EmployeeDetail.find_by(employee_name: data[:employee_name], department: data[:department])
+    l1_employer = nil
+    l1_employer = EmployeeDetail.find_by("employee_code LIKE ?", employee.l1_code.strip + "%") if employee&.l1_code.present?
 
     data[:activities].each do |activity|
+      user_detail = if employee
+        UserDetail.find_by(
+          employee_detail_id: employee.id,
+          activity_id: activity[:id],
+          financial_year: data[:financial_year]
+        )
+      end
+
       sheet.add_row [
         data[:financial_year],
-        department_type,
-        employee_name,
-        activity[:theme_name],
+        employee&.mobile_number,
+        employee&.employee_name || data[:employee_name],
+        employee&.employee_email,
+        employee&.employee_code || data[:employee_code],
+        employee&.post,
+        employee&.location,
+        employee&.department || data[:department],
+        l1_employer&.employee_code || employee&.l1_code,
+        l1_employer&.employee_name || employee&.l1_employer_name,
+        employee&.obs_code1,
+        employee&.obs_code2,
+        employee&.obs_code3,
+        employee&.obs_code4,
         activity[:activity_name],
         activity[:unit],
-        activity[:weight]
+        annual_target_display(activity[:annual_target_fy], activity[:unit]),
+        user_detail&.april,
+        user_detail&.may,
+        user_detail&.june,
+        user_detail&.july,
+        user_detail&.august,
+        user_detail&.september,
+        user_detail&.october,
+        user_detail&.november,
+        user_detail&.december,
+        user_detail&.january,
+        user_detail&.february,
+        user_detail&.march
       ]
     end
   end
+
+  sheet.column_widths 16, 16, 22, 28, 16, 18, 18, 16, 14, 22, 14, 14, 34, 18, 16, 10, 10, 10, 10, 10, 12, 10, 10, 10, 10, 10, 10
 end

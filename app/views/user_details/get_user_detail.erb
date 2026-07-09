@@ -4,15 +4,15 @@
     <div class="filter-hero px-6 py-5 border-b border-white/40">
       <h2 class="text-2xl font-bold text-slate-900 flex items-center">
         <i class="fas fa-filter me-3 text-teal-700"></i>
-        Filter Activities
+        key result indicators
       </h2>
-      <p class="filter-subtitle">Choose financial year and quarter to keep the target sheet focused and easy to review.</p>
+      <p class="filter-subtitle">Choose financial year and month to keep the target sheet focused and easy to review.</p>
     </div>
     <div class="p-6 md:p-7">
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
         <div class="filter-field">
           <%= form_with url: get_user_detail_user_details_path, method: :get, local: true do |form| %>
-            <%= form.label :financial_year, "Financial Year", class: "block text-xs font-semibold text-slate-600 uppercase tracking-[0.18em] mb-2" %>
+            <%= form.label :financial_year, "Financial year", class: "block text-xs font-semibold text-slate-600 tracking-[0.08em] mb-2" %>
             <%= form.select :financial_year,
                 options_for_select(@financial_years, @selected_financial_year),
                 {},
@@ -22,34 +22,37 @@
         </div>
 
         <select id="activityFilter" class="hidden">
-          <option value="">All Activities</option>
+          <option value="">All key result indicators</option>
         </select>
 
         <div class="filter-field">
-          <label class="block text-xs font-semibold text-slate-600 uppercase tracking-[0.18em] mb-2">Select Quarter</label>
-          <select id="quarterFilter" class="dashboard-select w-full">
-            <option value="april-june">April - June</option>
-            <option value="july-september">July - September</option>
-            <option value="october-december">October - December</option>
-            <option value="january-march">January - March</option>
+          <label class="block text-xs font-semibold text-slate-600 tracking-[0.08em] mb-2">Select month</label>
+          <select id="monthFilter" class="dashboard-select w-full">
+            <option value="">-- Select Month --</option>
+            <% @active_month_options.each do |label, value| %>
+              <option value="<%= value %>" <%= "selected" if value == @selected_month %>><%= label %></option>
+            <% end %>
           </select>
         </div>
         
-        <input type="hidden" id="monthFilter" value="">
+        <input type="hidden" id="quarterFilter" value="april-june">
         
         <div class="flex gap-3 filter-actions">
-          <button id="showSelected" class="dashboard-action-btn dashboard-action-btn-primary">
-            <i class="fas fa-eye me-1"></i> Show Selected
+          <button type="button" id="showSelected" class="dashboard-action-btn dashboard-action-btn-primary">
+            <i class="fas fa-eye me-1"></i> Show Month
           </button>
         </div>
       </div>
     </div>
   </div>
 
-  <% if @user_details.any? %>
+  <% if @user_details.any? && @selected_month.present? %>
     <!-- ======================== FORM TO SUBMIT ACHIEVEMENTS ======================== -->
     <%= form_with url: submit_achievements_user_details_path, method: :post, local: true, id: "achievementForm" do %>
       <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
+      <%= hidden_field_tag :financial_year, @selected_financial_year %>
+      <%= hidden_field_tag :month, @selected_month, id: "selectedSubmissionMonth" %>
+      <%= hidden_field_tag :employee_detail_id, @employee_detail&.id %>
       <!-- Success Message Display -->
       <div id="successMessage" class="hidden bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
         <div class="flex items-center">
@@ -112,11 +115,31 @@
 
       <div class="submission-shell border border-slate-200 rounded-[28px] shadow-lg mt-4 overflow-hidden">
         <div class="submission-hero px-6 py-5 border-b border-slate-200/80">
-          <h2 class="text-3xl font-bold text-slate-900 flex items-center">
-            <i class="fas fa-users me-3 text-sky-700"></i>
-            Monthly Activity Target Submit 
-          </h2>
-          <p class="submission-subtitle">Clean quarter-wise entry sheet with saved achievements visible and ready for update.</p>
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <h2 class="text-3xl font-bold text-slate-900 flex items-center">
+              <i class="fas fa-users me-3 text-sky-700"></i>
+              Monthly key result indicator submission
+            </h2>
+            <% if @employee_detail.present? %>
+              <button type="button"
+                      id="addKriRowBtn"
+                      data-kri-limit="<%= @remaining_manual_kri_slots %>"
+                      data-selected-month="<%= @selected_month %>"
+                      class="inline-flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-800 text-white text-sm font-semibold rounded-lg shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="<%= @achievement_entry_locked ? @achievement_entry_lock_message : (@remaining_manual_kri_slots.positive? ? "You can add #{@remaining_manual_kri_slots} key result indicator row(s) for #{short_month_label(@selected_month)}" : "Maximum 3 key result indicator rows already added for #{short_month_label(@selected_month)}") %>"
+                      <%= "disabled" if @achievement_entry_locked || @remaining_manual_kri_slots.zero? %>>
+                <i class="fas fa-plus"></i>
+                Add key result indicator
+              </button>
+            <% end %>
+          </div>
+          <p class="submission-subtitle"></p>
+          <% if @achievement_entry_locked %>
+            <div class="entry-lock-banner mt-4">
+              <i class="fas fa-lock"></i>
+              <span><%= @achievement_entry_lock_message %> Changes are disabled for this month.</span>
+            </div>
+          <% end %>
         </div>
 
         <div class="p-6">
@@ -124,97 +147,173 @@
             <table class="table table-hover w-full min-w-full" id="activityTable">
               <thead class="bg-gray-800">
                 <% quarter_groups = [
-                  { label: "April - June", months: ["April", "May", "June"] },
-                  { label: "July - September", months: ["July", "August", "September"] },
-                  { label: "October - December", months: ["October", "November", "December"] },
-                  { label: "January - March", months: ["January", "February", "March"] }
+                  { label: "APR - JUN", key: "april-june", months: [["APR", "april"], ["MAY", "may"], ["JUN", "june"]] },
+                  { label: "JUL - SEP", key: "july-september", months: [["JUL", "july"], ["AUG", "august"], ["SEP", "september"]] },
+                  { label: "OCT - DEC", key: "october-december", months: [["OCT", "october"], ["NOV", "november"], ["DEC", "december"]] },
+                  { label: "JAN - MAR", key: "january-march", months: [["JAN", "january"], ["FEB", "february"], ["MAR", "march"]] }
                 ] %>
                 <tr>
-                  <th rowspan="3" class="activity-column px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Activity</th>
-                  <th rowspan="3" class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Theme</th>
-                  <th rowspan="3" class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Unit</th>
+                  <th rowspan="3" class="serial-column px-4 py-3 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600">S.No</th>
+                  <th rowspan="3" class="activity-column px-4 py-3 text-left text-xs font-medium text-white tracking-wider border-r border-gray-600">Key result indicators</th>
+                  <th rowspan="3" class="unit-column px-4 py-3 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600">Unit of measurement</th>
+                  <th rowspan="3" class="annual-target-column px-4 py-3 text-left text-xs font-medium text-white tracking-wider border-r border-gray-600"><%= annual_target_fy_label(@selected_financial_year) %></th>
                   <% quarter_groups.each do |quarter| %>
-                    <th colspan="9" class="px-4 py-3 text-center text-xs font-semibold text-white uppercase tracking-widest border-r border-gray-500 bg-gray-900 quarter-header" data-quarter="<%= quarter[:label].parameterize %>">
+                    <th colspan="12" class="px-4 py-3 text-center text-xs font-semibold text-white tracking-widest border-r border-gray-500 bg-gray-900 quarter-header" data-quarter="<%= quarter[:key] %>">
                       <%= quarter[:label] %>
                     </th>
                   <% end %>
                 </tr>
                 <tr>
                   <% quarter_groups.each do |quarter| %>
-                    <% quarter[:months].each do |month| %>
-                      <th colspan="3" class="px-4 py-3 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 bg-gray-700 month-header" data-month="<%= month.downcase %>" data-quarter="<%= quarter[:label].parameterize %>"><%= month %></th>
+                    <% quarter[:months].each do |month_label, month_key| %>
+                      <th colspan="4" class="px-4 py-3 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700 month-header" data-month="<%= month_key %>" data-quarter="<%= quarter[:key] %>"><%= month_label %></th>
                     <% end %>
                   <% end %>
                 </tr>
                 <tr class="bg-gray-700">
                   <% quarter_groups.each do |quarter| %>
-                    <% quarter[:months].each do |month| %>
-                      <th class="px-3 py-2 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 month-subheader" data-month="<%= month.downcase %>" data-quarter="<%= quarter[:label].parameterize %>">Target</th>
-                      <th class="px-3 py-2 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 month-subheader" data-month="<%= month.downcase %>" data-quarter="<%= quarter[:label].parameterize %>">Achievement</th>
-                      <th class="px-3 py-2 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 month-subheader" data-month="<%= month.downcase %>" data-quarter="<%= quarter[:label].parameterize %>">Remarks</th>
+                    <% quarter[:months].each do |month_label, month_key| %>
+                      <th class="px-3 py-2 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 month-subheader" data-month="<%= month_key %>" data-quarter="<%= quarter[:key] %>">Target</th>
+                      <th class="achievement-header px-3 py-2 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 month-subheader" data-month="<%= month_key %>" data-quarter="<%= quarter[:key] %>">Achievement</th>
+                      <th class="total-achievement-header px-3 py-2 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 month-subheader" data-month="<%= month_key %>" data-quarter="<%= quarter[:key] %>">% Progress</th>
+                      <th class="px-3 py-2 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 month-subheader remarks-header" data-month="<%= month_key %>" data-quarter="<%= quarter[:key] %>"><%= employee_remarks_column_label(month_label) %></th>
                     <% end %>
                   <% end %>
                 </tr>
               </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
+              <tbody class="bg-white divide-y divide-gray-200" id="activityTableBody">
+                <%
+                  months = [:april, :may, :june, :july, :august, :september, :october, :november, :december, :january, :february, :march]
+                  monthly_summary_totals = months.each_with_object({}) do |month, totals|
+                    totals[month] = {
+                      progress_sum: 0.0,
+                      progress_count: 0
+                    }
+                  end
+                %>
                 <% @user_details.each_with_index do |detail, index| %>
                   <%
                     # Create target data for JavaScript filtering
-                    months = [:april, :may, :june, :july, :august, :september, :october, :november, :december, :january, :february, :march]
                     achievements_by_month = detail.achievements.index_by { |achievement| achievement.month.to_s.downcase }
+                    is_manual_kri = detail.activity.theme_name.to_s == UserDetailsController::MANUAL_KRI_THEME
                     target_data = {}
                     has_any_target = false
-                    
+                    selected_month_key = @selected_month.to_s
+                    selected_month_target = clean_spreadsheet_display_value(detail.send(selected_month_key.to_sym))
+                    selected_month_target_text = selected_month_target.to_s.delete(",").strip
+                    selected_month_target_numeric = selected_month_target_text.match?(/\A-?\d+(?:\.\d+)?\z/)
+                    has_selected_month_target = selected_month_target.present? && (!selected_month_target_numeric || selected_month_target_text.to_f.positive?)
+
+                    if is_manual_kri
+                      manual_kri_month = months.find do |month|
+                        value = clean_spreadsheet_display_value(detail.send(month))
+                        target_text = value.to_s.delete(",").strip
+                        next false if value.blank?
+
+                        !target_text.match?(/\A-?\d+(?:\.\d+)?\z/) || target_text.to_f.positive?
+                      end
+                      has_selected_month_target = manual_kri_month.to_s == selected_month_key
+                    end
+
                     months.each do |month|
-                      target_value = detail.send(month)
-                      # Consider a target valid if it's not nil, not empty, and not 0
-                      is_valid_target = target_value.present? && target_value.to_s != '0'
+                      target_value = clean_spreadsheet_display_value(detail.send(month))
+                      target_text_for_filter = target_value.to_s.delete(",").strip
+                      target_is_numeric_for_filter = target_text_for_filter.match?(/\A-?\d+(?:\.\d+)?\z/)
+                      # Consider a target valid if it is filled; numeric zero still counts as blank.
+                      is_valid_target = target_value.present? && (!target_is_numeric_for_filter || target_text_for_filter.to_f.positive?)
                       target_data[month.to_s] = is_valid_target ? target_value.to_s : ''
                       has_any_target = true if is_valid_target
                     end
                   %>
                   
                   <tr class="<%= index.even? ? 'bg-gray-50' : 'bg-white' %> hover:bg-gray-100 transition-colors duration-200 activity-row" 
+                      data-detail-id="<%= detail.id %>"
                       data-activity="<%= detail.activity.activity_name %>" 
                       data-targets='<%= target_data.to_json.html_safe %>'
-                      data-has-any-target="<%= has_any_target %>">
-                    
+                      data-has-any-target="<%= has_any_target %>"
+                      <%= 'data-manual-kri="true"'.html_safe if is_manual_kri %>
+                      <%= 'data-manual-kri-month="' + manual_kri_month.to_s + '"'.html_safe if is_manual_kri && manual_kri_month.present? %>
+                      <%= 'data-filtered-hidden="true" style="display:none;"'.html_safe unless has_selected_month_target %>>
+
+                    <td class="serial-cell px-4 py-3 text-sm text-gray-800 border-r border-gray-200 text-center"><%= index + 1 %></td>
                     <td class="activity-cell px-4 py-3 text-sm text-gray-800 border-r border-gray-200"><%= detail.activity.activity_name %></td>
-                    <td class="px-4 py-3 text-sm text-gray-800 border-r border-gray-200"><%= detail.activity.theme_name.presence || 'No Theme' %></td>
-                    <td class="px-4 py-3 text-sm text-gray-800 border-r border-gray-200 text-center"><%= detail.activity.unit %></td>
+                    <td class="unit-column px-4 py-3 text-sm text-gray-800 border-r border-gray-200 text-center"><%= detail.activity.unit %></td>
+                    <td class="annual-target-column px-4 py-3 text-sm text-gray-800 border-r border-gray-200 text-center"><%= annual_target_display(detail.activity) %></td>
 
                     <% months.each do |month| %>
-                      <% target_value = detail.send(month) %>
-                      <% has_target = target_value.present? && target_value.to_s != '0' %>
+                      <% target_value = clean_spreadsheet_display_value(detail.send(month)) %>
+                      <% target_text = target_value.to_s.delete(",").strip %>
+                      <% target_is_numeric = target_text.match?(/\A-?\d+(?:\.\d+)?\z/) %>
+                      <% has_target = target_value.present? && (!target_is_numeric || target_text.to_f.positive?) %>
                       <% existing_achievement = achievements_by_month[month.to_s] %>
+                      <% target_number = target_is_numeric ? target_text.to_f : 0.0 %>
+                      <% achievement_number = existing_achievement&.achievement.to_s.delete(",").to_f %>
+                      <% month_locked = (@achievement_entry_locked && month.to_s == @selected_month.to_s) || %w[l1_approved l2_approved].include?(existing_achievement&.status.to_s) %>
+                      <% total_achievement_percentage = has_target && target_number.positive? && existing_achievement&.achievement.present? ? (((achievement_number / target_number) * 100.0 * 100).floor / 100.0) : nil %>
+                      <%
+                        if has_target && target_number.positive?
+                          row_progress = total_achievement_percentage || 0.0
+                          monthly_summary_totals[month][:progress_sum] += row_progress
+                          monthly_summary_totals[month][:progress_count] += 1
+                        end
+                      %>
                       
-                      <td class="px-3 py-3 text-sm text-gray-800 text-center border-r border-gray-200 bg-gray-50 month-cell" data-month="<%= month %>" data-has-target="<%= has_target %>">
-                        <span class="<%= has_target ? 'text-gray-800 font-medium' : 'text-gray-400' %>">
-                          <%= has_target ? target_value : '-' %>
+                      <td class="target-cell px-3 py-3 text-sm text-gray-800 text-center border-r border-gray-200 bg-gray-50 month-cell" data-month="<%= month %>" data-has-target="<%= has_target %>">
+                        <span class="<%= has_target ? 'target-static-value text-gray-800 font-medium' : 'target-static-value text-gray-400' %>">
+                          <%= target_value.presence || '-' %>
                         </span>
                       </td>
-                      <td class="px-3 py-3 text-sm text-center border-r border-gray-200 month-cell" data-month="<%= month %>" data-has-target="<%= has_target %>">
+                      <td class="achievement-cell px-3 py-3 text-sm text-center border-r border-gray-200 month-cell" data-month="<%= month %>" data-has-target="<%= has_target %>">
                         <input 
-                          type="text" 
+                          type="number" 
+                          step="any"
+                          inputmode="decimal"
                           name="achievement[<%= detail.id %>][<%= month.to_s.downcase %>][achievement]" 
-                          placeholder="Achievement" 
+                          placeholder="Value"
                           value="<%= existing_achievement&.achievement %>"
-                          class="achievement-input border border-gray-300 p-2 rounded-lg w-full bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-indigo-200 transition-all duration-200 text-sm"
-                          <%= 'disabled' unless has_target %>
+                          class="achievement-input border border-gray-300 p-2 rounded-lg w-full bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-indigo-200 transition-all duration-200 text-sm <%= 'locked-field' if month_locked %>"
+                          <%= 'disabled' if !has_target || month_locked %>
+                          <%= raw('data-locked="true" readonly') if month_locked %>
                         />
                       </td>
-                      <td class="px-3 py-3 text-sm text-center border-r border-gray-200 month-cell" data-month="<%= month %>" data-has-target="<%= has_target %>">
+                      <td class="total-achievement-cell px-3 py-3 text-sm text-center border-r border-gray-200 month-cell"
+                          data-month="<%= month %>"
+                          data-has-target="<%= has_target %>"
+                          data-target-value="<%= target_value %>">
+                        <span class="<%= total_achievement_percentage ? 'total-achievement-value text-emerald-700 font-semibold bg-emerald-50 px-2 py-1 rounded' : 'total-achievement-value text-gray-400' %>">
+                          <%= total_achievement_percentage ? "#{format('%.2f', total_achievement_percentage)}%" : '-' %>
+                        </span>
+                      </td>
+                      <td class="remarks-cell px-3 py-3 text-sm text-center border-r border-gray-200 month-cell" data-month="<%= month %>" data-has-target="<%= has_target %>">
                         <textarea 
                           name="achievement[<%= detail.id %>][<%= month.to_s.downcase %>][employee_remarks]" 
-                          placeholder="Remarks" 
+                          placeholder="EMP RM"
                           rows="1"
-                          class="remarks-textarea border border-gray-300 p-1 rounded-lg w-full bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all duration-200 text-xs resize-none"
-                          <%= 'disabled' unless has_target %>
+                          maxlength="<%= UserDetailsController::REMARKS_MAX_LENGTH %>"
+                          class="remarks-textarea border border-gray-300 p-1 rounded w-full bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200 transition-all duration-200 text-xs resize-none <%= 'locked-field' if month_locked %>"
+                          <%= 'disabled' if !has_target || month_locked %>
+                          <%= raw('data-locked="true" readonly') if month_locked %>
                         ><%= existing_achievement&.employee_remarks %></textarea>
                       </td>
                     <% end %>
                   </tr>
                 <% end %>
+                <tr class="monthly-summary-footer">
+                  <td colspan="4" class="monthly-summary-label px-4 py-3 text-right text-sm font-bold border-r border-gray-600"></td>
+                  <% months.each do |month| %>
+                    <% month_total = monthly_summary_totals[month] %>
+                    <% progress_total = month_total[:progress_count].positive? ? ((month_total[:progress_sum] / month_total[:progress_count]) * 100).floor / 100.0 : nil %>
+                    <td class="monthly-summary-target px-3 py-3 text-center text-sm font-bold border-r border-gray-600 month-cell" data-month="<%= month %>" data-summary-month="<%= month %>">
+                    </td>
+                    <td class="monthly-summary-achievement px-3 py-3 text-center text-sm font-bold border-r border-gray-600 month-cell" data-month="<%= month %>" data-summary-month="<%= month %>">
+                    </td>
+                    <td class="monthly-summary-total px-3 py-3 text-center text-sm font-bold border-r border-gray-600 month-cell" data-month="<%= month %>" data-summary-month="<%= month %>">
+                      <span class="<%= progress_total ? 'summary-total-achievement-value text-emerald-900 font-bold bg-emerald-100 px-2 py-1 rounded' : 'summary-total-achievement-value text-gray-300' %>"><%= progress_total ? "#{format('%.2f', progress_total)}%" : '-' %></span>
+                    </td>
+                    <td class="monthly-summary-remarks px-3 py-3 text-center text-sm font-bold border-r border-gray-600 month-cell" data-month="<%= month %>" data-summary-month="<%= month %>">
+                    </td>
+                  <% end %>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -222,9 +321,19 @@
       </div>
 
       <div class="mt-6 flex justify-center">
-        <%= submit_tag "Submit Achievements", class: "inline-flex items-center px-8 py-3 bg-gray-700 hover:bg-gray-800 text-white font-semibold rounded-lg shadow-md transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2", id: "submitBtn" %>
+        <%= submit_tag "Submit achievements", class: "inline-flex items-center px-8 py-3 bg-gray-700 hover:bg-gray-800 text-white font-semibold rounded-lg shadow-md transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none", id: "submitBtn", disabled: @achievement_entry_locked %>
       </div>
     <% end %>
+  <% elsif @user_details.any? %>
+    <div class="flex justify-center mt-10">
+      <div class="w-full max-w-2xl bg-white border border-slate-200 rounded-3xl shadow-xl p-10 text-center">
+        <i class="fas fa-calendar-alt text-5xl text-teal-600 mb-5"></i>
+        <h2 class="text-2xl font-bold text-slate-900 mb-3">Please select a month first</h2>
+        <p class="text-slate-600 leading-relaxed">
+          Select a month from the filter above and click Show Month to open the monthly key result indicator submission sheet.
+        </p>
+      </div>
+    </div>
   <% else %>
     <div class="flex justify-center mt-10">
       <div class="w-full max-w-lg bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 border border-indigo-100 rounded-3xl shadow-xl p-10 text-center">
@@ -272,15 +381,73 @@
     display: none !important;
   }
   
-  .month-cell[data-month-hidden="true"] {
-    display: none !important;
-  }
+.month-cell[data-month-hidden="true"] {
+  display: none !important;
+}
+
+.total-achievement-header {
+  width: 8.5rem;
+  min-width: 8.5rem;
+  max-width: 8.5rem;
+  white-space: normal;
+  line-height: 1.25;
+}
+
+.total-achievement-cell {
+  width: 8.5rem;
+  min-width: 8.5rem;
+  max-width: 8.5rem;
+  background: #f8fafc;
+}
+
+.total-achievement-value {
+  display: inline-flex;
+  justify-content: center;
+  min-width: 4.5rem;
+}
+
+.monthly-summary-footer td {
+  background: linear-gradient(135deg, #1f2937 0%, #111827 100%) !important;
+  color: #ffffff;
+  vertical-align: middle;
+}
+
+.monthly-summary-label {
+  letter-spacing: 0.02em;
+}
+
+.monthly-summary-target,
+.monthly-summary-achievement,
+.monthly-summary-remarks,
+.monthly-summary-total {
+  font-weight: 700;
+}
+
+.summary-target-value,
+.summary-achievement-value,
+.summary-total-achievement-value {
+  display: inline-flex;
+  justify-content: center;
+  min-width: 4.5rem;
+  white-space: normal;
+}
   
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    initializeAchievementFilters();
+});
+
+document.addEventListener('turbo:load', function() {
+    initializeAchievementFilters();
+});
+
+function initializeAchievementFilters() {
     const activityFilter = document.getElementById('activityFilter');
+    if (!activityFilter || activityFilter.dataset.filtersBound === 'true') return;
+    activityFilter.dataset.filtersBound = 'true';
+
     const quarterFilter = document.getElementById('quarterFilter');
     const monthFilter = document.getElementById('monthFilter');
     const showSelectedBtn = document.getElementById('showSelected');
@@ -321,8 +488,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        // Clear existing options except "All Activities"
-        activityFilter.innerHTML = '<option value="">All Activities</option>';
+        // Clear existing options except "All key result indicators"
+        activityFilter.innerHTML = '<option value="">All key result indicators</option>';
         
         // Add unique activities
         Array.from(activities).sort().forEach(activity => {
@@ -344,20 +511,31 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function filterByQuarter(selectedQuarter, selectedMonth) {
+    function filterByMonth(selectedMonth) {
         const months = ['april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december', 'january', 'february', 'march'];
-        const activeQuarterMonths = quarterMonths[selectedQuarter] || quarterMonths['april-june'];
+        if (!selectedMonth) {
+            months.forEach(month => {
+                monthHeaders.forEach(header => {
+                    if (header.dataset.month === month) header.setAttribute('data-month-hidden', 'true');
+                });
+                monthSubheaders.forEach(subheader => {
+                    if (subheader.dataset && subheader.dataset.month === month) subheader.setAttribute('data-month-hidden', 'true');
+                });
+                monthCells.forEach(cell => {
+                    if (cell.dataset.month === month) cell.setAttribute('data-month-hidden', 'true');
+                });
+            });
+            activityRows.forEach(row => row.setAttribute('data-filtered-hidden', 'true'));
+            return;
+        }
+
+        const activeMonth = selectedMonth;
+        const selectedQuarter = monthToQuarter[activeMonth] || '';
         
-        quarterHeaders.forEach(header => {
-            if (header.dataset.quarter === selectedQuarter) {
-                header.removeAttribute('data-quarter-hidden');
-            } else {
-                header.setAttribute('data-quarter-hidden', 'true');
-            }
-        });
+        quarterHeaders.forEach(header => header.setAttribute('data-quarter-hidden', 'true'));
 
         months.forEach(month => {
-            const shouldShowMonth = selectedMonth ? month === selectedMonth : activeQuarterMonths.includes(month);
+            const shouldShowMonth = month === activeMonth;
             
             monthHeaders.forEach(header => {
                 if (header.dataset.month === month) {
@@ -391,36 +569,40 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         activityRows.forEach(row => {
-            try {
-                const targets = JSON.parse(row.dataset.targets || '{}');
-
-                if (selectedMonth) {
-                    const targetValue = targets[selectedMonth];
-                    const hasTargetForMonth = targetValue && 
-                                           targetValue !== '' && 
-                                           targetValue !== '0' && 
-                                           targetValue !== null && 
-                                           targetValue !== undefined;
-
-                    if (hasTargetForMonth) {
-                        row.removeAttribute('data-filtered-hidden');
-                    } else {
-                        row.setAttribute('data-filtered-hidden', 'true');
-                    }
+            if (row.dataset.newRow === 'true') {
+                const manualMonth = row.dataset.manualKriMonth;
+                if (!manualMonth || manualMonth === activeMonth) {
+                    row.removeAttribute('data-filtered-hidden');
                 } else {
-                    const hasQuarterTarget = activeQuarterMonths.some(month => {
-                        const target = targets[month];
-                        return target && target !== '' && target !== '0' && target !== null && target !== undefined;
-                    });
-
-                    if (hasQuarterTarget) {
-                        row.removeAttribute('data-filtered-hidden');
-                    } else {
-                        row.setAttribute('data-filtered-hidden', 'true');
-                    }
+                    row.setAttribute('data-filtered-hidden', 'true');
                 }
-            } catch (e) {
-                console.error('Error parsing targets:', e);
+                return;
+            }
+
+            if (row.dataset.manualKri === 'true' && row.dataset.manualKriMonth) {
+                if (row.dataset.manualKriMonth === activeMonth) {
+                    row.removeAttribute('data-filtered-hidden');
+                } else {
+                    row.setAttribute('data-filtered-hidden', 'true');
+                }
+                return;
+            }
+
+            let targets = {};
+            try {
+                targets = JSON.parse(row.dataset.targets || '{}');
+            } catch (error) {
+                targets = {};
+            }
+
+            const monthTarget = targets[activeMonth];
+            const hasTarget = monthTarget && String(monthTarget).trim() !== '' && String(monthTarget).trim() !== '0';
+            const numericTarget = String(monthTarget || '').replace(/,/g, '');
+            const isPositiveTarget = hasTarget && (!/^-?\d+(?:\.\d+)?$/.test(numericTarget) || parseFloat(numericTarget) > 0);
+
+            if (isPositiveTarget) {
+                row.removeAttribute('data-filtered-hidden');
+            } else {
                 row.setAttribute('data-filtered-hidden', 'true');
             }
         });
@@ -428,12 +610,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function applyFilters() {
         const selectedActivity = activityFilter.value;
-        const selectedQuarter = quarterFilter.value || 'april-june';
         const selectedMonth = monthFilter.value;
-
-        if (selectedMonth && monthToQuarter[selectedMonth] !== selectedQuarter) {
-            quarterFilter.value = monthToQuarter[selectedMonth];
-        }
+        quarterFilter.value = monthToQuarter[selectedMonth] || '';
 
         // Reset all filters first
         activityRows.forEach(row => {
@@ -441,14 +619,14 @@ document.addEventListener('DOMContentLoaded', function() {
             row.removeAttribute('data-filtered-hidden');
         });
 
-        quarterHeaders.forEach(header => header.removeAttribute('data-quarter-hidden'));
+        quarterHeaders.forEach(header => header.setAttribute('data-quarter-hidden', 'true'));
         monthHeaders.forEach(header => header.removeAttribute('data-month-hidden'));
         monthSubheaders.forEach(subheader => subheader.removeAttribute('data-month-hidden'));
         monthCells.forEach(cell => cell.removeAttribute('data-month-hidden'));
 
         // Apply filters
         filterByActivity(selectedActivity);
-        filterByQuarter(quarterFilter.value || selectedQuarter, selectedMonth);
+        filterByMonth(selectedMonth);
 
         // Update visibility
         updateRowVisibility();
@@ -465,39 +643,63 @@ document.addEventListener('DOMContentLoaded', function() {
                 row.style.display = '';
             }
         });
+
+        if (typeof updateMonthlySummaryRows === 'function') {
+            updateMonthlySummaryRows();
+        }
+
+        if (typeof updateActivityRowSerials === 'function') {
+            updateActivityRowSerials();
+        }
     }
 
     function showAll() {
         activityFilter.value = '';
-        quarterFilter.value = 'april-june';
-        monthFilter.value = '';
+        monthFilter.value = '<%= @selected_month.to_s %>';
+        quarterFilter.value = monthToQuarter[monthFilter.value] || '';
         applyFilters();
     }
 
+    function showSelectedMonth() {
+        const selectedMonth = monthFilter?.value || '';
+        if (!selectedMonth) {
+            alert('Please select a month first.');
+            return;
+        }
+
+        const url = new URL(window.location.href);
+        url.searchParams.set('month', selectedMonth);
+
+        const financialYearSelect = document.querySelector('select[name="financial_year"]');
+        if (financialYearSelect?.value) {
+            url.searchParams.set('financial_year', financialYearSelect.value);
+        }
+
+        window.location.href = url.toString();
+    }
+
     // Event listeners
-    if (showSelectedBtn) showSelectedBtn.addEventListener('click', applyFilters);
+    if (showSelectedBtn) showSelectedBtn.addEventListener('click', showSelectedMonth);
     if (showAllBtn) showAllBtn.addEventListener('click', showAll);
     
     activityFilter.addEventListener('change', applyFilters);
-    quarterFilter.addEventListener('change', function() {
-        const selectedMonth = monthFilter.value;
-        const selectedQuarter = quarterFilter.value;
-
-        if (selectedMonth && monthToQuarter[selectedMonth] !== selectedQuarter) {
-            monthFilter.value = '';
-        }
-
-        applyFilters();
-    });
-    monthFilter.addEventListener('change', applyFilters);
 
     // Initialize
     populateActivityFilter();
     
-    quarterFilter.value = 'april-june';
-    monthFilter.value = '';
+    quarterFilter.value = monthToQuarter[monthFilter.value] || '';
     applyFilters();
-});
+}
+
+function hasFilledTargetValueForFilter(value) {
+    const rawValue = String(value || '').trim();
+    if (!rawValue) return false;
+
+    const normalizedValue = rawValue.replace(/,/g, '');
+    if (!/^-?\d+(?:\.\d+)?$/.test(normalizedValue)) return true;
+
+    return parseFloat(normalizedValue) > 0;
+}
 </script>
 
   <!-- ======================== READ-ONLY VIEW WITH ACTIVITY-WISE STATUS ======================== -->
@@ -597,25 +799,36 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .table {
-  min-width: 1800px;
-  width: 100%;
+  min-width: 100%;
+  width: max-content;
   border-collapse: separate;
   border-spacing: 0;
+  table-layout: fixed;
 }
 
 .table th, .table td {
-  padding: 12px 16px;
+  padding: 8px 10px;
   text-align: center;
   border-right: 1px solid #dbe5f0;
-  white-space: nowrap;
-  vertical-align: middle;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  vertical-align: top;
+  line-height: 1.35;
 }
 
 .table .activity-column,
 .table .activity-cell {
-  width: 260px;
-  min-width: 260px;
-  max-width: 260px;
+  width: 16rem;
+  min-width: 16rem;
+  max-width: 16rem;
+}
+
+.table .serial-column,
+.table .serial-cell {
+  width: 4rem;
+  min-width: 4rem;
+  max-width: 4rem;
 }
 
 .table .activity-cell {
@@ -626,11 +839,67 @@ document.addEventListener('DOMContentLoaded', function() {
   line-height: 1.5;
 }
 
+.table th.unit-column {
+  width: auto;
+  min-width: 8.5rem;
+  max-width: none;
+  white-space: nowrap;
+  text-align: center;
+  vertical-align: middle;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+}
+
+.table td.unit-column {
+  width: 5rem;
+  min-width: 5rem;
+  max-width: 6rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  line-height: 1.25;
+}
+
+.table .annual-target-column {
+  width: 7rem;
+  min-width: 7rem;
+  max-width: 7rem;
+}
+
+.table .target-cell {
+  width: 5rem;
+  min-width: 5rem;
+  max-width: 5rem;
+}
+
+.table .achievement-header,
+.table .achievement-cell {
+  width: 6rem;
+  min-width: 6rem;
+  max-width: 6rem;
+  white-space: normal;
+  line-height: 1.2;
+}
+
+.table .remarks-cell {
+  width: 7rem;
+  min-width: 7rem;
+  max-width: 7rem;
+}
+
+.table th.remarks-header {
+  white-space: nowrap;
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  padding-left: 0.35rem;
+  padding-right: 0.35rem;
+}
+
 .table th {
   background: linear-gradient(135deg, #273447 0%, #1e293b 100%);
   color: white;
   font-weight: 600;
-  text-transform: uppercase;
   font-size: 0.75rem;
   letter-spacing: 0.08em;
 }
@@ -655,11 +924,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .achievement-input {
   width: 100%;
-  min-width: 120px;
-  padding: 10px 12px;
-  font-size: 14px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 7px 8px;
+  font-size: 12px;
   border: 1px solid #cbd5e1;
-  border-radius: 14px;
+  border-radius: 12px;
   box-sizing: border-box;
   transition: all 0.3s ease;
   background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
@@ -669,18 +939,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .remarks-textarea {
   width: 100%;
-  min-width: 120px;
-  padding: 8px 10px;
-  font-size: 12px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 4px 6px;
+  font-size: 11px;
   border: 1px solid #cbd5e1;
-  border-radius: 14px;
+  border-radius: 8px;
   box-sizing: border-box;
-  transition: all 0.3s ease;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-  resize: vertical;
-  min-height: 42px;
+  transition: all 0.2s ease;
+  background: #fff;
+  resize: none;
+  min-height: 28px;
+  max-height: 42px;
+  line-height: 1.25;
   color: #0f172a;
-  box-shadow: inset 0 1px 2px rgba(148, 163, 184, 0.12);
+  box-shadow: inset 0 1px 2px rgba(148, 163, 184, 0.1);
 }
 
 .achievement-input:focus, .remarks-textarea:focus {
@@ -694,6 +967,43 @@ document.addEventListener('DOMContentLoaded', function() {
 .achievement-input:hover, .remarks-textarea:hover {
   border-color: #94a3b8;
   background-color: white;
+}
+
+.target-input:disabled,
+.achievement-input:disabled,
+.remarks-textarea:disabled {
+  cursor: not-allowed;
+  color: #94a3b8;
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  box-shadow: none;
+  opacity: 0.75;
+}
+
+.entry-lock-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid #fed7aa;
+  border-radius: 14px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.locked-field:disabled,
+.locked-field[readonly] {
+  background: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+  color: #64748b !important;
+  opacity: 1;
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.18);
+}
+
+.total-achievement-cell {
+  background: linear-gradient(180deg, #f8fafc 0%, #eefdf5 100%);
 }
 
 .main-content h2 {
@@ -819,6 +1129,8 @@ input[type="submit"] {
 </style>
 
 <script>
+const achievementEntryLocked = <%= @achievement_entry_locked ? "true" : "false" %>;
+
 // Message handling functions
 function showMessage(messageType, title, text) {
   // Hide all messages first
@@ -858,6 +1170,460 @@ function hideAllMessages() {
   });
 }
 
+function parseAchievementNumber(value) {
+  const normalizedValue = String(value || '').replace(/,/g, '').replace(/[^0-9.-]/g, '');
+  const number = parseFloat(normalizedValue);
+  return Number.isFinite(number) ? number : null;
+}
+
+function hasFilledTargetValue(value) {
+  const rawValue = String(value || '').trim();
+  if (!rawValue) return false;
+
+  const normalizedValue = rawValue.replace(/,/g, '');
+  if (!/^-?\d+(?:\.\d+)?$/.test(normalizedValue)) return true;
+
+  return parseFloat(normalizedValue) > 0;
+}
+
+function formatAchievementPercentage(value) {
+  if (!Number.isFinite(value)) return '-';
+
+  const truncatedValue = Math.floor(value * 100) / 100;
+  return `${Number.isInteger(truncatedValue) ? truncatedValue : truncatedValue.toFixed(2)}%`;
+}
+
+var targetSubmitMonths = ['april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december', 'january', 'february', 'march'];
+
+function monthLabel(month) {
+  const labels = {
+    april: 'APR',
+    may: 'MAY',
+    june: 'JUN',
+    july: 'JUL',
+    august: 'AUG',
+    september: 'SEP',
+    october: 'OCT',
+    november: 'NOV',
+    december: 'DEC',
+    january: 'JAN',
+    february: 'FEB',
+    march: 'MAR'
+  };
+
+  return labels[month] || month.toUpperCase();
+}
+
+function updateActivityRowSerials() {
+  let visibleIndex = 1;
+  document.querySelectorAll('#activityTableBody .activity-row').forEach(row => {
+    const cell = row.querySelector('.serial-cell');
+    if (!cell) return;
+
+    const isHidden = row.style.display === 'none' ||
+      row.hasAttribute('data-activity-hidden') ||
+      row.hasAttribute('data-filtered-hidden');
+
+    if (!isHidden) {
+      cell.textContent = visibleIndex++;
+    }
+  });
+}
+
+function applySelectedMonthVisibilityToRow(row) {
+  const monthFilter = document.getElementById('monthFilter');
+  const selectedMonth = monthFilter?.value || '<%= @selected_month.to_s %>';
+  if (!selectedMonth) return;
+
+  row.querySelectorAll('.month-cell').forEach(cell => {
+    cell.style.display = cell.dataset.month === selectedMonth ? '' : 'none';
+  });
+}
+
+function selectedSubmissionMonthValue() {
+  return document.getElementById('selectedSubmissionMonth')?.value ||
+         document.getElementById('monthFilter')?.value ||
+         document.getElementById('addKriRowBtn')?.dataset.selectedMonth ||
+         '<%= @selected_month.to_s %>';
+}
+
+function newKriRowHtml(rowIndex) {
+  const selectedMonth = selectedSubmissionMonthValue();
+  const monthCells = targetSubmitMonths.map(month => {
+    if (month !== selectedMonth) return '';
+
+    return `
+    <td class="target-cell px-3 py-3 text-sm text-gray-800 text-center border-r border-gray-200 bg-gray-50 month-cell" data-month="${month}" data-has-target="false">
+      <input type="text"
+             name="new_targets[${rowIndex}][${month}]"
+             class="target-input border border-gray-300 p-2 rounded-lg w-full bg-white focus:border-indigo-500 focus:ring-indigo-200 transition-all duration-200 text-sm text-center"
+             placeholder="Target"
+             data-month="${month}"
+             required>
+    </td>
+    <td class="achievement-cell px-3 py-3 text-sm text-center border-r border-gray-200 month-cell" data-month="${month}" data-has-target="false">
+      <input type="number"
+             step="any"
+             inputmode="decimal"
+             name="new_targets[${rowIndex}][achievements][${month}][achievement]"
+             placeholder="Value"
+             class="achievement-input border border-gray-300 p-2 rounded-lg w-full bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-indigo-200 transition-all duration-200 text-sm"
+             >
+    </td>
+    <td class="total-achievement-cell px-3 py-3 text-sm text-center border-r border-gray-200 month-cell" data-month="${month}" data-has-target="false" data-target-value="">
+      <span class="total-achievement-value text-gray-400">-</span>
+    </td>
+    <td class="remarks-cell px-3 py-3 text-sm text-center border-r border-gray-200 month-cell" data-month="${month}" data-has-target="false">
+      <textarea name="new_targets[${rowIndex}][achievements][${month}][employee_remarks]"
+                placeholder="EMP RM"
+                rows="1"
+                maxlength="<%= UserDetailsController::REMARKS_MAX_LENGTH %>"
+                class="remarks-textarea border border-gray-300 p-1 rounded-lg w-full bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all duration-200 text-xs resize-none"
+                ></textarea>
+    </td>
+  `;
+  }).join('');
+
+  return `
+    <tr class="bg-white hover:bg-gray-100 transition-colors duration-200 activity-row" data-activity="" data-targets="{}" data-has-any-target="false" data-new-row="true" data-manual-kri-month="${selectedMonth}">
+      <td class="serial-cell px-4 py-3 text-sm text-gray-800 border-r border-gray-200 text-center"></td>
+      <td class="activity-cell px-4 py-3 text-sm text-gray-800 border-r border-gray-200">
+        <div class="flex items-start gap-2">
+          <input type="text"
+                 name="new_targets[${rowIndex}][activity_name]"
+                 class="new-kri-name border border-gray-300 p-2 rounded-lg w-full bg-white focus:border-indigo-500 focus:ring-indigo-200 transition-all duration-200 text-sm"
+                 placeholder="Key result indicators"
+                 required>
+          <button type="button" class="remove-new-kri-row inline-flex items-center justify-center px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg">
+            Remove
+          </button>
+        </div>
+      </td>
+      <td class="unit-column px-4 py-3 text-sm text-gray-800 border-r border-gray-200 text-center">
+        <input type="text"
+               name="new_targets[${rowIndex}][unit]"
+               class="border border-gray-300 p-2 rounded-lg w-full bg-white focus:border-indigo-500 focus:ring-indigo-200 transition-all duration-200 text-sm text-center"
+               placeholder="Unit of measurement">
+      </td>
+      <td class="annual-target-column px-4 py-3 text-sm text-gray-800 border-r border-gray-200 text-center">
+        <input type="text"
+               name="new_targets[${rowIndex}][annual_target_fy]"
+               class="border border-gray-300 p-2 rounded-lg w-full bg-white focus:border-indigo-500 focus:ring-indigo-200 transition-all duration-200 text-sm text-center"
+               placeholder="Annual target">
+      </td>
+      ${monthCells}
+    </tr>
+  `;
+}
+
+function updateNewRowTargetState(input) {
+  const row = input.closest('.activity-row');
+  const month = input.dataset.month;
+  const targetValue = input.value.trim();
+  const hasTarget = hasFilledTargetValue(targetValue);
+  const isNewRow = row?.dataset.newRow === 'true';
+  const targetCell = input.closest('.target-cell');
+  const achievementInput = row?.querySelector(`.achievement-cell[data-month="${month}"] .achievement-input`);
+  const remarksInput = row?.querySelector(`.remarks-cell[data-month="${month}"] .remarks-textarea`);
+  const totalCell = row?.querySelector(`.total-achievement-cell[data-month="${month}"]`);
+
+  if (targetCell) targetCell.dataset.hasTarget = String(hasTarget);
+  if (totalCell) {
+    totalCell.dataset.hasTarget = String(hasTarget);
+    totalCell.dataset.targetValue = targetValue;
+  }
+  if (achievementInput) achievementInput.disabled = !isNewRow && !hasTarget;
+  if (remarksInput) remarksInput.disabled = !isNewRow && !hasTarget;
+  if (typeof updateMonthlyAchievementRemarksRequirements === 'function') {
+    updateMonthlyAchievementRemarksRequirements();
+  }
+
+  const targets = {};
+  row?.querySelectorAll('.target-input').forEach(targetInput => {
+    const value = targetInput.value.trim();
+    if (hasFilledTargetValue(value)) targets[targetInput.dataset.month] = value;
+  });
+  if (row) {
+    row.dataset.targets = JSON.stringify(targets);
+    row.dataset.hasAnyTarget = Object.keys(targets).length > 0 ? 'true' : 'false';
+  }
+
+  if (!hasTarget && !isNewRow && achievementInput) achievementInput.value = '';
+  if (!hasTarget && !isNewRow && remarksInput) remarksInput.value = '';
+  if (achievementInput) updateTotalAchievementCell(achievementInput);
+  updateMonthlySummaryRows();
+}
+
+function initializeNewKriRows() {
+  const addButton = document.getElementById('addKriRowBtn');
+  const tableBody = document.getElementById('activityTableBody');
+  if (!addButton || !tableBody) return;
+
+  if (achievementEntryLocked) {
+    addButton.disabled = true;
+    addButton.title = '<%= j(@achievement_entry_lock_message || "This month is locked after L1 approval.") %>';
+    return;
+  }
+
+  if (addButton.dataset.bound === 'true') return;
+  addButton.dataset.bound = 'true';
+
+  let newKriRowIndex = Date.now();
+  const maxNewRows = parseInt(addButton.dataset.kriLimit || '0', 10);
+
+  function updateAddKriButtonState() {
+    const newRowsCount = tableBody.querySelectorAll('.activity-row[data-new-row="true"]').length;
+    const limitReached = maxNewRows <= 0 || newRowsCount >= maxNewRows;
+    addButton.disabled = maxNewRows <= 0 || limitReached;
+    const selectedMonth = selectedSubmissionMonthValue();
+    addButton.title = addButton.disabled
+      ? (maxNewRows <= 0 ? `Maximum 3 key result indicator rows already added for ${monthLabel(selectedMonth)}` : 'Maximum 3 key result indicator rows allowed for this month')
+      : `You can add ${maxNewRows - newRowsCount} more key result indicator row(s) for ${monthLabel(selectedMonth)}`;
+  }
+
+  addButton.addEventListener('click', () => {
+    const newRowsCount = tableBody.querySelectorAll('.activity-row[data-new-row="true"]').length;
+    if (newRowsCount >= maxNewRows) {
+      showMessage('warning', 'Add key result indicator limit', `You can add maximum 3 key result indicator rows for ${monthLabel(selectedSubmissionMonthValue())}.`);
+      updateAddKriButtonState();
+      return;
+    }
+
+    const summaryRow = tableBody.querySelector('.monthly-summary-footer');
+    const template = document.createElement('tbody');
+    template.innerHTML = newKriRowHtml(newKriRowIndex++).trim();
+    const newRow = template.firstElementChild;
+    tableBody.insertBefore(newRow, summaryRow);
+    updateActivityRowSerials();
+    applySelectedMonthVisibilityToRow(newRow);
+    initializeTotalAchievementCalculations();
+    updateAddKriButtonState();
+    newRow?.querySelector('.new-kri-name')?.focus();
+  });
+
+  tableBody.addEventListener('click', (event) => {
+    const removeButton = event.target.closest('.remove-new-kri-row');
+    if (!removeButton) return;
+
+    removeButton.closest('tr')?.remove();
+    updateActivityRowSerials();
+    updateMonthlySummaryRows();
+    updateAddKriButtonState();
+  });
+
+  tableBody.addEventListener('input', (event) => {
+    if (event.target.classList.contains('target-input')) {
+      updateNewRowTargetState(event.target);
+      return;
+    }
+
+    if (event.target.classList.contains('new-kri-name')) {
+      const row = event.target.closest('.activity-row');
+      if (row) row.dataset.activity = event.target.value.trim();
+    }
+  });
+
+  updateAddKriButtonState();
+}
+
+function updateTotalAchievementCell(input) {
+  const achievementCell = input.closest('td');
+  const targetCell = achievementCell?.previousElementSibling;
+  const totalCell = achievementCell?.nextElementSibling;
+  const valueElement = totalCell?.querySelector('.total-achievement-value');
+
+  if (!targetCell || !totalCell || !valueElement) return;
+
+  const targetValue = parseAchievementNumber(totalCell.dataset.targetValue || targetCell.querySelector('.target-input')?.value || targetCell.textContent);
+  const achievementValue = parseAchievementNumber(input.value);
+
+  if (targetValue === null || targetValue <= 0 || achievementValue === null) {
+    valueElement.textContent = '-';
+    valueElement.className = 'total-achievement-value text-gray-400';
+    updateMonthlySummaryRows();
+    return;
+  }
+
+  const percentage = (achievementValue / targetValue) * 100;
+  valueElement.textContent = formatAchievementPercentage(percentage);
+  valueElement.className = 'total-achievement-value text-emerald-700 font-semibold bg-emerald-50 px-2 py-1 rounded';
+
+  updateMonthlySummaryRows();
+}
+
+function setSummaryText(element, value, placeholderClass = 'text-gray-300') {
+  if (!element) return;
+  const baseClass = Array.from(element.classList).find(className => className.startsWith('summary-')) || 'summary-value';
+
+  if (value === null || value === undefined) {
+    element.textContent = '-';
+    element.className = `${baseClass} ${placeholderClass}`.trim();
+    return;
+  }
+
+  element.textContent = Number.isFinite(value) ? formatAchievementNumber(value) : value;
+  element.className = `${baseClass} text-white`;
+}
+
+function formatAchievementNumber(value) {
+  if (!Number.isFinite(value)) return '-';
+
+  const roundedValue = Math.round(value * 100) / 100;
+  return Number.isInteger(roundedValue) ? String(roundedValue) : roundedValue.toFixed(2);
+}
+
+function visibleActivityRows() {
+  return Array.from(document.querySelectorAll('.activity-row')).filter(row => {
+    return row.style.display !== 'none' &&
+      !row.hasAttribute('data-activity-hidden') &&
+      !row.hasAttribute('data-filtered-hidden');
+  });
+}
+
+function updateMonthlySummaryRows() {
+  const months = ['april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december', 'january', 'february', 'march'];
+  const rows = visibleActivityRows();
+
+  months.forEach(month => {
+    let progressTotal = 0;
+    let progressCount = 0;
+
+    rows.forEach(row => {
+      const targetCell = row.querySelector(`.target-cell[data-month="${month}"]`);
+      const achievementInput = row.querySelector(`.achievement-cell[data-month="${month}"] .achievement-input`);
+      const targetValue = parseAchievementNumber(targetCell?.querySelector('.target-input')?.value || targetCell?.textContent);
+      const achievementValue = parseAchievementNumber(achievementInput?.value);
+
+      if (targetValue !== null && targetValue > 0) {
+        progressTotal += achievementValue !== null ? Math.floor(((achievementValue / targetValue) * 100) * 100) / 100 : 0;
+        progressCount += 1;
+      }
+    });
+
+    const targetSummaryCell = document.querySelector(`.monthly-summary-target[data-summary-month="${month}"]`);
+    const achievementSummaryCell = document.querySelector(`.monthly-summary-achievement[data-summary-month="${month}"]`);
+    const totalElement = document.querySelector(`.monthly-summary-total[data-summary-month="${month}"] .summary-total-achievement-value`);
+
+    if (targetSummaryCell) targetSummaryCell.textContent = '';
+    if (achievementSummaryCell) achievementSummaryCell.textContent = '';
+
+    if (totalElement) {
+      if (progressCount > 0) {
+        totalElement.textContent = formatAchievementPercentage(progressTotal / progressCount);
+        totalElement.className = 'summary-total-achievement-value text-emerald-900 font-bold bg-emerald-100 px-2 py-1 rounded';
+      } else {
+        totalElement.textContent = '-';
+        totalElement.className = 'summary-total-achievement-value text-gray-300';
+      }
+    }
+  });
+}
+
+function updateAllTotalAchievementCells() {
+  document.querySelectorAll('.achievement-input').forEach(input => {
+    updateTotalAchievementCell(input);
+  });
+
+  updateMonthlySummaryRows();
+}
+
+function initializeTotalAchievementCalculations() {
+  updateAllTotalAchievementCells();
+
+  document.querySelectorAll('.achievement-input').forEach(input => {
+    if (input.dataset.totalAchievementBound === 'true') return;
+
+    input.addEventListener('input', () => {
+      updateTotalAchievementCell(input);
+      updateMonthlySummaryRows();
+    });
+    input.dataset.totalAchievementBound = 'true';
+  });
+
+  updateMonthlySummaryRows();
+}
+
+function submissionTargetValueForRow(row, month) {
+  const targetCell = row?.querySelector(`.target-cell[data-month="${month}"]`);
+  if (!targetCell) return '';
+
+  const targetInput = targetCell.querySelector('.target-input');
+  const rawValue = targetInput ? targetInput.value : targetCell.querySelector('.target-static-value')?.textContent || targetCell.textContent;
+  const value = String(rawValue || '').trim();
+
+  return value === '-' ? '' : value;
+}
+
+function rowKriName(row) {
+  const newKriName = row?.querySelector('.new-kri-name')?.value.trim();
+  if (newKriName) return newKriName;
+
+  const activityCell = row?.querySelector('.activity-cell');
+  return activityCell ? activityCell.textContent.replace(/\s*Remove\s*$/, '').trim() : 'selected key result indicator';
+}
+
+function clearMonthlyAchievementRemarksValidation() {
+  document.querySelectorAll('.achievement-input, .remarks-textarea').forEach(input => {
+    input.classList.remove('border-red-500', 'ring-2', 'ring-red-200');
+  });
+}
+
+function updateMonthlyAchievementRemarksRequirements() {
+  const selectedMonth = selectedSubmissionMonthValue();
+  if (!selectedMonth) return;
+
+  document.querySelectorAll('#activityTableBody .activity-row').forEach(row => {
+    const achievementInput = row.querySelector(`.achievement-cell[data-month="${selectedMonth}"] .achievement-input`);
+    const remarksInput = row.querySelector(`.remarks-cell[data-month="${selectedMonth}"] .remarks-textarea`);
+    if (!achievementInput || !remarksInput || achievementInput.disabled || remarksInput.disabled) return;
+
+    const targetValue = submissionTargetValueForRow(row, selectedMonth);
+    const needsRemarks = hasFilledTargetValue(targetValue) && achievementInput.value.trim() === '';
+    remarksInput.required = needsRemarks;
+    remarksInput.placeholder = needsRemarks ? 'EMP RM required' : 'EMP RM';
+  });
+}
+
+function validateBlankAchievementRemarks(selectedMonth) {
+  clearMonthlyAchievementRemarksValidation();
+  updateMonthlyAchievementRemarksRequirements();
+
+  const invalidRow = Array.from(document.querySelectorAll('#activityTableBody .activity-row')).find(row => {
+    const achievementInput = row.querySelector(`.achievement-cell[data-month="${selectedMonth}"] .achievement-input`);
+    const remarksInput = row.querySelector(`.remarks-cell[data-month="${selectedMonth}"] .remarks-textarea`);
+    if (!achievementInput || !remarksInput || achievementInput.disabled || remarksInput.disabled) return false;
+
+    const targetValue = submissionTargetValueForRow(row, selectedMonth);
+    return hasFilledTargetValue(targetValue) && achievementInput.value.trim() === '' && remarksInput.value.trim() === '';
+  });
+
+  if (!invalidRow) return true;
+
+  const achievementInput = invalidRow.querySelector(`.achievement-cell[data-month="${selectedMonth}"] .achievement-input`);
+  const remarksInput = invalidRow.querySelector(`.remarks-cell[data-month="${selectedMonth}"] .remarks-textarea`);
+  achievementInput?.classList.add('border-red-500', 'ring-2', 'ring-red-200');
+  remarksInput?.classList.add('border-red-500', 'ring-2', 'ring-red-200');
+
+  showMessage('warning', 'Remarks required', `${monthLabel(selectedMonth)}: Please enter employee remarks when Achievement is blank for ${rowKriName(invalidRow)}.`);
+  remarksInput?.focus();
+  return false;
+}
+
+function initializeAchievementRemarksRequirements() {
+  const form = document.getElementById('achievementForm');
+  if (!form || form.dataset.remarksRequirementBound === 'true') return;
+
+  form.dataset.remarksRequirementBound = 'true';
+  form.addEventListener('input', event => {
+    if (event.target.matches('.achievement-input, .remarks-textarea, .target-input')) {
+      clearMonthlyAchievementRemarksValidation();
+      updateMonthlyAchievementRemarksRequirements();
+    }
+  });
+
+  updateMonthlyAchievementRemarksRequirements();
+}
+
 // Form submission handling
 function handleAchievementFormSubmission() {
   const form = document.getElementById('achievementForm');
@@ -866,10 +1632,7 @@ function handleAchievementFormSubmission() {
   console.log('Form found:', form ? 'Yes' : 'No');
   console.log('Submit button found:', submitBtn ? 'Yes' : 'No');
   
-  if (!form) {
-    console.error('Achievement form not found!');
-    return;
-  }
+  if (!form) return;
   
   // Form validation
   form.addEventListener('submit', function(e) {
@@ -877,6 +1640,12 @@ function handleAchievementFormSubmission() {
     console.log('Form action:', form.action);
     console.log('Form method:', form.method);
     e.preventDefault();
+
+    if (achievementEntryLocked) {
+      showMessage('warning', 'Month locked', '<%= j(@achievement_entry_lock_message || "This month is locked after L1 approval.") %>');
+      resetSubmitButton();
+      return;
+    }
     
     // Show loading state
     if (submitBtn) {
@@ -885,23 +1654,85 @@ function handleAchievementFormSubmission() {
     }
     
     // Check if any data is entered
-    const achievementInputs = document.querySelectorAll('.achievement-input:not([disabled])');
+    const selectedMonthForSubmit = selectedSubmissionMonthValue();
+    if (!selectedMonthForSubmit) {
+      showMessage('warning', 'Month required', 'Please select a month and click Show Month before submitting.');
+      resetSubmitButton();
+      return;
+    }
+
+    const selectedSubmissionMonth = document.getElementById('selectedSubmissionMonth');
+    if (selectedSubmissionMonth) selectedSubmissionMonth.value = selectedMonthForSubmit;
+
+    const achievementInputs = document.querySelectorAll(`.achievement-cell[data-month="${selectedMonthForSubmit}"] .achievement-input:not([disabled])`);
+    const targetInputs = document.querySelectorAll(`.target-cell[data-month="${selectedMonthForSubmit}"] .target-input`);
+    const newKriNameInputs = document.querySelectorAll('.new-kri-name');
+    const remarksInputs = document.querySelectorAll(`.remarks-cell[data-month="${selectedMonthForSubmit}"] .remarks-textarea:not([disabled])`);
     let hasAnyData = false;
+
+    if (!validateBlankAchievementRemarks(selectedMonthForSubmit)) {
+      resetSubmitButton();
+      return;
+    }
     
     achievementInputs.forEach(input => {
       if (input.value && input.value.trim() !== '') {
         hasAnyData = true;
       }
     });
+
+    targetInputs.forEach(input => {
+      const originalValue = input.dataset.originalValue || '';
+      if (input.value.trim() !== originalValue) {
+        hasAnyData = true;
+      }
+    });
+
+    newKriNameInputs.forEach(input => {
+      if (input.value && input.value.trim() !== '') {
+        hasAnyData = true;
+      }
+    });
+
+    remarksInputs.forEach(input => {
+      if (input.value && input.value.trim() !== '') {
+        hasAnyData = true;
+      }
+    });
     
     if (!hasAnyData) {
-      showMessage('warning', 'No Data Entered', 'Please enter at least one achievement value before submitting.');
+      showMessage('warning', 'No Data Entered', 'Please enter at least one achievement, employee remark, or new key result indicator target before submitting.');
+      resetSubmitButton();
+      return;
+    }
+
+    const incompleteNewRow = Array.from(document.querySelectorAll('.activity-row[data-new-row="true"]')).find(row => {
+      const hasAnyField = Array.from(row.querySelectorAll('input, textarea')).some(input => input.value.trim() !== '');
+      const hasKriName = row.querySelector('.new-kri-name')?.value.trim() !== '';
+      return hasAnyField && !hasKriName;
+    });
+
+    if (incompleteNewRow) {
+      showMessage('warning', 'Key result indicator required', 'Please enter key result indicators before submitting the new row.');
+      incompleteNewRow.querySelector('.new-kri-name')?.focus();
+      resetSubmitButton();
+      return;
+    }
+
+    const invalidAchievement = Array.from(achievementInputs).find(input => {
+      return input.value.trim() !== '' && !/^-?\d+(?:\.\d+)?$/.test(input.value.trim());
+    });
+
+    if (invalidAchievement) {
+      showMessage('warning', 'Invalid Achievement', 'Achievement value must be a number only.');
+      invalidAchievement.focus();
       resetSubmitButton();
       return;
     }
     
     // Submit form via AJAX
     const formData = new FormData(form);
+    formData.set('month', selectedMonthForSubmit);
     
     // Debug: Log form data
     console.log('Form data entries:');
@@ -943,15 +1774,7 @@ function handleAchievementFormSubmission() {
       if (data.success) {
         showMessage('success', 'Success!', data.message || 'Achievements have been submitted successfully.');
         
-        // Clear form inputs
-        achievementInputs.forEach(input => {
-          input.value = '';
-        });
-        
-        // Clear remarks
-        document.querySelectorAll('.remarks-textarea').forEach(textarea => {
-          textarea.value = '';
-        });
+        updateAllTotalAchievementCells();
         
         // Update the Submitted Achievements table immediately
         updateSubmittedAchievementsTable();
@@ -983,14 +1806,23 @@ function handleAchievementFormSubmission() {
 function resetSubmitButton() {
   const submitBtn = document.getElementById('submitBtn');
   if (submitBtn) {
+    if (achievementEntryLocked) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = 'Submit achievements';
+      return;
+    }
+
     submitBtn.disabled = false;
-    submitBtn.innerHTML = 'Submit Achievements';
+    submitBtn.innerHTML = 'Submit achievements';
   }
 }
 
 // Initialize form handling
 function initializeAchievementForm() {
   handleAchievementFormSubmission();
+  initializeNewKriRows();
+  initializeTotalAchievementCalculations();
+  initializeAchievementRemarksRequirements();
   
   // Check for flash messages from controller
   checkForFlashMessages();
@@ -1026,6 +1858,7 @@ function updateSubmittedAchievementsTable() {
   
   const formData = new FormData(form);
   const achievements = {};
+  const selectedMonth = document.getElementById('monthFilter')?.value || formData.get('month');
   
   // Parse form data to get achievements
   for (let [key, value] of formData.entries()) {
@@ -1067,35 +1900,27 @@ function updateSubmittedAchievementsTable() {
         });
         
         if (monthIndex !== -1) {
-          // Calculate the cell position: 5 (fixed columns) + (monthIndex * 3) + 1 (achievement is second in month group)
-          const achievementCellIndex = 5 + (monthIndex * 3) + 1;
+          // Fixed cells: S.No, key result indicator, unit of measurement, annual target. Achievement is second in each month group.
+          const achievementCellIndex = 4 + (monthIndex * 4) + 1;
           if (allCells[achievementCellIndex]) {
             allCells[achievementCellIndex].innerHTML = `<span class="text-green-700 font-semibold bg-green-50 px-2 py-1 rounded">${achievementValue}</span>`;
           }
         }
       });
       
-      // Update the status to "submitted" for all quarters
-      const statusCells = tableRow.querySelectorAll('td:last-child, td:nth-last-child(2)');
-      statusCells.forEach(statusCell => {
-        if (statusCell && statusCell.querySelector('span')) {
-          const statusSpan = statusCell.querySelector('span');
-          statusSpan.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800';
-          statusSpan.innerHTML = '<i class="fas fa-paper-plane mr-1 text-xs"></i>Submitted';
-        }
-      });
+      if (selectedMonth) {
+        tableRow.setAttribute(`data-${selectedMonth}-status`, 'submitted');
+      }
+
+      const statusSpan = tableRow.querySelector('.status-column span');
+      if (statusSpan) {
+        statusSpan.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border bg-blue-100 text-blue-800 border-blue-300';
+        statusSpan.innerHTML = '<i class="fas fa-paper-plane mr-1 text-xs"></i>Submitted';
+      }
     }
   });
   
-  // Show a message that the table has been updated
   console.log('Submitted Achievements table updated with new data');
-  
-  // Optionally refresh the page after a short delay to show the updated data
-  setTimeout(() => {
-    if (confirm('Achievements submitted successfully! Would you like to refresh the page to see the updated data?')) {
-      window.location.reload();
-    }
-  }, 2000);
 }
 
 document.addEventListener('turbo:load', function() {
@@ -1337,19 +2162,57 @@ document.addEventListener('turbo:load', function() {
             if (!activityFilter || !quarterFilter || !monthFilter) return; // Guard clause
 
             const selectedActivity = activityFilter.value;
-            const selectedQuarter = quarterFilter.value || 'april-june';
-            const selectedMonth = monthFilter.value;
-            const activeQuarterMonths = quarterMonths[selectedQuarter] || quarterMonths['april-june'];
-
-            if (selectedMonth && monthToQuarter[selectedMonth] !== selectedQuarter) {
-                quarterFilter.value = monthToQuarter[selectedMonth];
-            }
+            const selectedMonth = monthFilter.value || '<%= @selected_month.to_s %>';
+            const selectedQuarter = monthToQuarter[selectedMonth] || '';
+            quarterFilter.value = selectedQuarter;
             
             // Filter activity rows
             document.querySelectorAll('.activity-row').forEach(row => {
+                if (row.dataset.newRow === 'true') {
+                    const manualMonth = row.dataset.manualKriMonth;
+                    if (!manualMonth || manualMonth === selectedMonth) {
+                        row.removeAttribute('data-filtered-hidden');
+                        row.style.display = '';
+                    } else {
+                        row.setAttribute('data-filtered-hidden', 'true');
+                        row.style.display = 'none';
+                    }
+                    return;
+                }
+
+                if (row.dataset.manualKri === 'true' && row.dataset.manualKriMonth) {
+                    const shouldShowManualKri = row.dataset.manualKriMonth === selectedMonth;
+                    if (!shouldShowManualKri) {
+                        row.setAttribute('data-filtered-hidden', 'true');
+                        row.style.display = 'none';
+                    } else {
+                        row.removeAttribute('data-filtered-hidden');
+                        row.style.display = '';
+                    }
+                    return;
+                }
+
                 const rowActivity = row.dataset.activity;
-                const shouldShowRow = !selectedActivity || rowActivity === selectedActivity;
-                row.style.display = shouldShowRow ? '' : 'none';
+                const shouldShowActivity = !selectedActivity || rowActivity === selectedActivity;
+
+                let targets = {};
+                try {
+                    targets = JSON.parse(row.dataset.targets || '{}');
+                } catch (error) {
+                    targets = {};
+                }
+
+                const hasTargetForMonth = typeof hasFilledTargetValue === 'function'
+                    ? hasFilledTargetValue(targets[selectedMonth])
+                    : false;
+
+                if (!shouldShowActivity || !hasTargetForMonth) {
+                    row.setAttribute('data-filtered-hidden', 'true');
+                    row.style.display = 'none';
+                } else {
+                    row.removeAttribute('data-filtered-hidden');
+                    row.style.display = '';
+                }
             });
             
             // Filter submitted activity rows
@@ -1360,43 +2223,30 @@ document.addEventListener('turbo:load', function() {
             });
 
             document.querySelectorAll('.quarter-header').forEach(header => {
-                const shouldShowQuarter = header.dataset.quarter === (quarterFilter.value || selectedQuarter);
-                header.style.display = shouldShowQuarter ? '' : 'none';
+                header.style.display = 'none';
             });
             
             // Filter month columns
-            if (selectedMonth) {
-                document.querySelectorAll('.month-header, .submitted-month-header').forEach((header, index) => {
-                    const monthName = header.dataset.month || Object.keys(monthMapping)[index];
-                    header.style.display = monthName === selectedMonth ? '' : 'none';
-                });
-                
-                document.querySelectorAll('.month-subheader, .submitted-month-subheader').forEach((subheader, index) => {
-                    const monthName = subheader.dataset.month || Object.keys(monthMapping)[Math.floor(index / 3)];
-                    subheader.style.display = monthName === selectedMonth ? '' : 'none';
-                });
-                
-                document.querySelectorAll('.month-cell, .submitted-month-cell').forEach(cell => {
-                    cell.style.display = cell.dataset.month === selectedMonth ? '' : 'none';
-                });
-            } else {
-                document.querySelectorAll('.month-header, .submitted-month-header').forEach((header, index) => {
-                    const monthName = header.dataset.month || Object.keys(monthMapping)[index];
-                    header.style.display = activeQuarterMonths.includes(monthName) ? '' : 'none';
-                });
-
-                document.querySelectorAll('.month-subheader, .submitted-month-subheader').forEach((subheader, index) => {
-                    const monthName = subheader.dataset.month || Object.keys(monthMapping)[Math.floor(index / 3)];
-                    subheader.style.display = activeQuarterMonths.includes(monthName) ? '' : 'none';
-                });
-
-                document.querySelectorAll('.month-cell, .submitted-month-cell').forEach(cell => {
-                    cell.style.display = activeQuarterMonths.includes(cell.dataset.month) ? '' : 'none';
-                });
-            }
+            document.querySelectorAll('.month-header, .submitted-month-header').forEach((header, index) => {
+                const monthName = header.dataset.month || Object.keys(monthMapping)[index];
+                header.style.display = monthName === selectedMonth ? '' : 'none';
+            });
+            
+            document.querySelectorAll('.month-subheader, .submitted-month-subheader').forEach((subheader, index) => {
+                const monthName = subheader.dataset.month || Object.keys(monthMapping)[Math.floor(index / 3)];
+                subheader.style.display = monthName === selectedMonth ? '' : 'none';
+            });
+            
+            document.querySelectorAll('.month-cell, .submitted-month-cell').forEach(cell => {
+                cell.style.display = cell.dataset.month === selectedMonth ? '' : 'none';
+            });
             
             // FIXED: Update status after filtering
             updateStatusBasedOnMonth();
+
+            if (typeof updateMonthlySummaryRows === 'function') {
+                updateMonthlySummaryRows();
+            }
         }
 
         function resetAllFilters() {
@@ -1404,48 +2254,16 @@ document.addEventListener('turbo:load', function() {
              const quarterFilter = document.getElementById('quarterFilter');
              const monthFilter = document.getElementById('monthFilter');
              if (activityFilter) activityFilter.value = '';
-             if (quarterFilter) quarterFilter.value = 'april-june';
-             if (monthFilter) monthFilter.value = '';
+             if (monthFilter) monthFilter.value = '<%= @selected_month.to_s %>';
+             if (quarterFilter) quarterFilter.value = monthToQuarter[monthFilter?.value || '<%= @selected_month.to_s %>'] || '';
              filterTable(); // Apply the reset state
         }
         
         // --- Setup ---
-        // Populate dropdown immediately
-        populateActivityDropdown();
-        
         // Setup modal functionality
         setupModal();
 
-        // Attach event listeners
-        const showSelectedBtn = document.getElementById('showSelected');
-        const showAllBtn = document.getElementById('showAll');
-        const clearFiltersBtn = document.getElementById('clearFilters');
-        const activityFilterSelect = document.getElementById('activityFilter');
-        const quarterFilterSelect = document.getElementById('quarterFilter');
-        const monthFilterSelect = document.getElementById('monthFilter');
-
-        if (showSelectedBtn) showSelectedBtn.addEventListener('click', filterTable);
-        if (showAllBtn) showAllBtn.addEventListener('click', resetAllFilters);
-        if (clearFiltersBtn) clearFiltersBtn.addEventListener('click', resetAllFilters);
-        if (activityFilterSelect) activityFilterSelect.addEventListener('change', filterTable);
-        if (quarterFilterSelect) {
-            quarterFilterSelect.addEventListener('change', function() {
-                const monthFilter = document.getElementById('monthFilter');
-                if (monthFilter && monthFilter.value && monthToQuarter[monthFilter.value] !== quarterFilterSelect.value) {
-                    monthFilter.value = '';
-                }
-                filterTable();
-            });
-        }
-        if (monthFilterSelect) monthFilterSelect.addEventListener('change', filterTable);
-
-        if (quarterFilterSelect && !quarterFilterSelect.value) {
-            quarterFilterSelect.value = 'april-june';
-        }
-        if (monthFilterSelect && monthToQuarter[monthFilterSelect.value] !== (quarterFilterSelect && quarterFilterSelect.value)) {
-            monthFilterSelect.value = '';
-        }
-        filterTable();
+        // Filtering is handled by initializeAchievementFilters()
     }
     
     // Run the setup function for the page

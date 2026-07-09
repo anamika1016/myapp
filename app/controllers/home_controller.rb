@@ -306,13 +306,24 @@ class HomeController < ApplicationController
         end
       end
 
-      l1_percentages = quarter_achievements.filter_map { |achievement| achievement.achievement_remark&.l1_percentage&.to_f }
+      progress_values = user_details.flat_map do |detail|
+        achievements_by_month = detail.achievements.index_by { |achievement| achievement.month.to_s.downcase }
+
+        months.filter_map do |month|
+          target = detail.public_send(month).to_s.delete(",").to_f
+          achievement = achievements_by_month[month]
+          next unless target.positive? && achievement&.achievement.present? && achievement.achievement_remark.present?
+
+          achievement_value = achievement.achievement.to_s.delete(",").to_f
+          (((achievement_value / target) * 100.0 * 100).floor / 100.0)
+        end
+      end
       l1_rems = quarter_achievements.filter_map { |achievement| achievement.achievement_remark&.l1_remarks }.uniq.compact
 
       {
         name: name,
-        percentage: l1_percentages.any? ? (l1_percentages.sum / l1_percentages.size).round(1) : 0.0,
-        scored: l1_percentages.any?,
+        percentage: progress_values.any? ? ((progress_values.sum / progress_values.size) * 100).floor / 100.0 : 0.0,
+        scored: progress_values.any?,
         l1_remarks: l1_rems,
         remarks: l1_rems
       }

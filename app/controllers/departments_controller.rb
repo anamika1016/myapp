@@ -1,13 +1,17 @@
 require "roo"
+require "securerandom"
 
 class DepartmentsController < ApplicationController
+  SPREADSHEET_ERROR_VALUES = %w[#DIV/0! #N/A #NAME? #NULL! #NUM! #REF! #VALUE!].freeze
+
   before_action :set_department, only: [ :show, :edit, :update, :destroy, :delete_user_activities, :delete_user_from_department ]
+  helper_method :employee_reference_value, :employee_display_code
 
   def index
     set_financial_year_context
 
     if params[:employee_id].present?
-      @selected_employee = EmployeeDetail.find_by(employee_id: params[:employee_id])
+      @selected_employee = find_employee_by_reference(params[:employee_id])
       if @selected_employee
         # Get activities for the selected employee using UserDetail
         @employee_activities = get_employee_activities(@selected_employee, @selected_financial_year)
@@ -38,8 +42,7 @@ class DepartmentsController < ApplicationController
     @employee_departments = EmployeeDetail.distinct.pluck(:department).compact.reject(&:blank?)
     # @employees = EmployeeDetail.where("employee_name IS NOT NULL AND employee_id IS NOT NULL AND department IS NOT NULL")
     #                           .order(:employee_name)
-    @employees = EmployeeDetail.where.not(employee_name: nil, employee_id: nil)
-                           .order(:employee_name)
+    @employees = employees_for_department_form
 
     respond_to do |format|
       format.html
@@ -54,8 +57,7 @@ class DepartmentsController < ApplicationController
 
     @department = Department.new(financial_year: @selected_financial_year)
     @employee_departments = EmployeeDetail.distinct.pluck(:department).compact.reject(&:blank?)
-    @employees = EmployeeDetail.where("employee_name IS NOT NULL AND employee_id IS NOT NULL AND department IS NOT NULL")
-                              .order(:employee_name)
+    @employees = employees_for_department_form
     # Only build one activity by default to prevent duplicates
     @department.activities.build
   end
@@ -78,8 +80,7 @@ class DepartmentsController < ApplicationController
           @department.activities.build
           @departments = Department.includes(:activities).all
           @employee_departments = EmployeeDetail.distinct.pluck(:department).compact.reject(&:blank?)
-          @employees = EmployeeDetail.where("employee_name IS NOT NULL AND employee_id IS NOT NULL AND department IS NOT NULL")
-                                   .order(:employee_name)
+          @employees = employees_for_department_form
           # Set employee_activities to avoid nil error in view
           @employee_activities = get_all_employee_activities(@selected_financial_year)
           flash.now[:alert] = "Failed to create department: #{@department.errors.full_messages.join(', ')}"
@@ -93,7 +94,7 @@ class DepartmentsController < ApplicationController
   def edit
     @department = Department.find(params[:id])
     @employee_departments = EmployeeDetail.distinct.pluck(:department).compact
-    @employees = EmployeeDetail.select(:employee_name, :employee_id, :department).distinct.compact
+    @employees = employees_for_department_form
   end
 
   def edit_data
@@ -113,7 +114,8 @@ class DepartmentsController < ApplicationController
     if department
       # If department exists, get its activities and employee info
       # But activities are actually linked through UserDetail records
-      employee = EmployeeDetail.find_by(department: department.department_type)
+      employee = find_employee_by_reference(department.employee_reference) ||
+                 EmployeeDetail.find_by(department: department.department_type)
 
       if employee
         # FIXED: Get only activities that are specific to this employee
@@ -132,22 +134,24 @@ class DepartmentsController < ApplicationController
             id: activity.id,
             theme_name: activity.theme_name,
             activity_name: activity.activity_name,
+            key_result_indicator: activity.activity_name,
             unit: activity.unit,
-            weight: activity.weight
+            annual_target_fy: annual_target_display_value(activity),
+            annual_target_fy_2026_27: annual_target_display_value(activity)
           }
         end.uniq { |activity| activity[:id] } # Remove duplicates
 
         employee_name = employee.employee_name
-        employee_code = employee.employee_code
+        employee_code = employee_display_code(employee)
 
         render json: {
           id: department.id,
           department_type: department.department_type,
           theme_name: department.theme_name,
-          employee_reference: employee.employee_id,
+          employee_reference: employee_reference_value(employee),
           employee_name: employee_name,
           employee_code: employee_code,
-          employee_display_name: employee ? "#{employee_name} (#{employee_code})" : "N/A",
+          employee_display_name: employee ? "#{employee_name} (#{employee_display_code(employee)})" : "N/A",
           financial_year: department.financial_year.presence || @selected_financial_year,
           activities: activities,
           timestamp: Time.current.to_i
@@ -159,7 +163,7 @@ class DepartmentsController < ApplicationController
     else
       # If department doesn't exist, try to find employee activities by employee ID
       # This handles the case where the ID might actually be an employee ID
-      employee = EmployeeDetail.find_by(employee_id: params[:id])
+      employee = find_employee_by_reference(params[:id])
 
       if employee
         # Get activities for this employee using UserDetail
@@ -174,8 +178,10 @@ class DepartmentsController < ApplicationController
             id: activity.id,
             theme_name: activity.theme_name,
             activity_name: activity.activity_name,
+            key_result_indicator: activity.activity_name,
             unit: activity.unit,
-            weight: activity.weight
+            annual_target_fy: annual_target_display_value(activity),
+            annual_target_fy_2026_27: annual_target_display_value(activity)
           }
         end
 
@@ -183,13 +189,13 @@ class DepartmentsController < ApplicationController
         department_type = user_details.first&.department&.department_type || employee.department
 
         render json: {
-          id: employee.employee_id, # Use employee ID as the identifier
+          id: employee_reference_value(employee), # Use employee ID/code as the identifier
           department_type: department_type,
           theme_name: "", # No theme name for employee activities
-          employee_reference: employee.employee_id,
+          employee_reference: employee_reference_value(employee),
           employee_name: employee.employee_name,
-          employee_code: employee.employee_code,
-          employee_display_name: "#{employee.employee_name} (#{employee.employee_code || employee.employee_id})",
+          employee_code: employee_display_code(employee),
+          employee_display_name: "#{employee.employee_name} (#{employee_display_code(employee)})",
           financial_year: @selected_financial_year,
           activities: activities,
           timestamp: Time.current.to_i
@@ -239,7 +245,7 @@ class DepartmentsController < ApplicationController
             next if activity_attrs[:_destroy] == "true" || activity_attrs[:_destroy] == true
 
             # Skip if incomplete
-            next if activity_attrs[:theme_name].blank? || activity_attrs[:activity_name].blank? || activity_attrs[:weight].blank?
+            next if activity_attrs[:activity_name].blank?
 
             activity_id = activity_attrs[:id]
             if activity_id.present?
@@ -247,10 +253,10 @@ class DepartmentsController < ApplicationController
               activity = Activity.find(activity_id)
               Rails.logger.info "Updating activity #{activity_id} with new data"
               activity.update!(
-                theme_name: activity_attrs[:theme_name],
+                theme_name: activity_attrs[:theme_name].presence || "",
                 activity_name: activity_attrs[:activity_name],
                 unit: activity_attrs[:unit],
-                weight: activity_attrs[:weight]
+                annual_target_fy: annual_target_value(activity_attrs)
               )
               Rails.logger.info "Updated activity #{activity_id}: theme=#{activity.theme_name}, name=#{activity.activity_name}"
 
@@ -323,7 +329,7 @@ class DepartmentsController < ApplicationController
       respond_to do |format|
         format.html {
           @employee_departments = EmployeeDetail.distinct.pluck(:department).compact
-          @employees = EmployeeDetail.select(:employee_name, :employee_id, :department).distinct.compact
+          @employees = employees_for_department_form
           render :edit, status: :unprocessable_entity
         }
         format.json { render json: { success: false, errors: @department.errors.full_messages } }
@@ -337,7 +343,7 @@ class DepartmentsController < ApplicationController
       respond_to do |format|
         format.html {
           @employee_departments = EmployeeDetail.distinct.pluck(:department).compact
-          @employees = EmployeeDetail.select(:employee_name, :employee_id, :department).distinct.compact
+          @employees = employees_for_department_form
           flash.now[:alert] = "Failed to update department: #{e.message}"
           render :edit, status: :unprocessable_entity
         }
@@ -382,10 +388,9 @@ class DepartmentsController < ApplicationController
                dept.activities.each do |existing_activity|
                  # Check if this activity still exists in the form data
                  activity_still_exists = params[:activities].any? do |form_activity|
-                   form_activity[:theme_name] == existing_activity.theme_name &&
                    form_activity[:activity_name] == existing_activity.activity_name &&
                    form_activity[:unit] == existing_activity.unit &&
-                   form_activity[:weight].to_s == existing_activity.weight.to_s
+                   annual_target_value(form_activity).to_s == existing_activity.annual_target_fy.to_s
                  end
 
                  unless activity_still_exists
@@ -414,29 +419,27 @@ class DepartmentsController < ApplicationController
                params[:activities].each do |activity_params|
                  # Try to find existing activity by content
                  existing_activity = dept.activities.find_by(
-                   theme_name: activity_params[:theme_name],
                    activity_name: activity_params[:activity_name],
-                   unit: activity_params[:unit],
-                   weight: activity_params[:weight]
+                   unit: activity_params[:unit]
                  )
 
                  if existing_activity
                    # Update existing activity
                    Rails.logger.info "Updating existing activity #{existing_activity.id}"
                    existing_activity.update!(
-                     theme_name: activity_params[:theme_name],
+                     theme_name: activity_params[:theme_name].presence || "",
                      activity_name: activity_params[:activity_name],
                      unit: activity_params[:unit],
-                     weight: activity_params[:weight]
+                     annual_target_fy: annual_target_value(activity_params)
                    )
                  else
                    # Create new activity
                    Rails.logger.info "Creating new activity for department #{dept.id}"
                    new_activity = dept.activities.create!(
-                     theme_name: activity_params[:theme_name],
+                     theme_name: activity_params[:theme_name].presence || "",
                      activity_name: activity_params[:activity_name],
                      unit: activity_params[:unit],
-                     weight: activity_params[:weight]
+                     annual_target_fy: annual_target_value(activity_params)
                    )
                    Rails.logger.info "Created new activity #{new_activity.id}"
                  end
@@ -470,7 +473,7 @@ class DepartmentsController < ApplicationController
 
     # If not a department, try to find an employee
     if !department
-      employee = EmployeeDetail.find_by(employee_id: id)
+      employee = find_employee_by_reference(id)
       if employee
         Rails.logger.info "Found employee: #{employee.employee_id} - #{employee.employee_name}"
         handle_employee_activity_update(employee)
@@ -495,15 +498,14 @@ class DepartmentsController < ApplicationController
               next if activity_attrs[:_destroy] == "true" || activity_attrs[:_destroy] == true
 
               # Check if all required fields are present (unit is now optional)
-              if activity_attrs[:theme_name].present? && activity_attrs[:activity_name].present? &&
-                 activity_attrs[:weight].present?
+              if activity_attrs[:activity_name].present?
                 valid_activities_count += 1
                 activities_to_process << index
               end
             end
 
             if valid_activities_count == 0
-              raise "At least one complete activity is required. Please fill in all fields (Theme Name, Activity Name, and Weight) for at least one activity. Unit is optional."
+              raise "At least one complete key result indicator is required. Please fill key result indicators for at least one row. Unit of measurement is optional."
             end
 
             # First, handle activities marked for destruction
@@ -537,8 +539,7 @@ class DepartmentsController < ApplicationController
               end
 
               # Skip if any required field is blank (incomplete activity) - unit is now optional
-              if activity_attrs[:theme_name].blank? || activity_attrs[:activity_name].blank? ||
-                 activity_attrs[:weight].blank?
+              if activity_attrs[:activity_name].blank?
                 next
               end
 
@@ -548,15 +549,15 @@ class DepartmentsController < ApplicationController
                 existing_activity = department.activities.find_by(id: activity_attrs[:id])
                 if existing_activity
                   existing_activity.update!(
-                    theme_name: activity_attrs[:theme_name],
+                    theme_name: activity_attrs[:theme_name].presence || "",
                     activity_name: activity_attrs[:activity_name],
                     unit: activity_attrs[:unit],
-                    weight: activity_attrs[:weight]
+                    annual_target_fy: annual_target_value(activity_attrs)
                   )
 
                   # Ensure UserDetail record exists for this activity
                   if department.employee_reference.present?
-                    employee = EmployeeDetail.find_by(employee_id: department.employee_reference)
+                    employee = find_employee_by_reference(department.employee_reference)
                     if employee
                       existing_user_detail = UserDetail.find_by(
                         department_id: department.id,
@@ -582,16 +583,16 @@ class DepartmentsController < ApplicationController
                 # Create new activity
                 Rails.logger.info "Creating new activity for department #{department.id}"
                 new_activity = department.activities.create!(
-                  theme_name: activity_attrs[:theme_name],
+                  theme_name: activity_attrs[:theme_name].presence || "",
                   activity_name: activity_attrs[:activity_name],
                   unit: activity_attrs[:unit],
-                  weight: activity_attrs[:weight]
+                  annual_target_fy: annual_target_value(activity_attrs)
                 )
                 Rails.logger.info "Created new activity #{new_activity.id}"
 
                 # Create UserDetail record to link activity to employee
                 if department.employee_reference.present?
-                  employee = EmployeeDetail.find_by(employee_id: department.employee_reference)
+                  employee = find_employee_by_reference(department.employee_reference)
                   if employee
                     UserDetail.create!(
                       department_id: department.id,
@@ -656,7 +657,7 @@ class DepartmentsController < ApplicationController
       end
     else
       # Try to find employee by ID
-      employee = EmployeeDetail.find_by(employee_id: id)
+      employee = find_employee_by_reference(id)
 
       if employee
         # This would require a different approach since we're dealing with UserDetail records
@@ -679,16 +680,31 @@ class DepartmentsController < ApplicationController
     end
 
     spreadsheet = Roo::Spreadsheet.open(file.path)
-    header = spreadsheet.row(1)
+    header = import_spreadsheet_row(spreadsheet, 1)
 
     header_map = {
       "Financial Year" => "financial_year",
       "Department" => "department_type",
+      "Department / Region" => "department_type",
+      "Mobile No." => "mobile_number",
+      "Mobile Number" => "mobile_number",
       "Employee Name" => "employee_name",
+      "Employee Email" => "employee_email",
+      "Employee Code" => "employee_code",
+      "L1 Code" => "l1_code",
+      "L1 Employer Name" => "l1_employer_name",
+      "L2 Code" => "l2_code",
+      "L2 Employer Name" => "l2_employer_name",
       "Theme Name" => "theme_name",
       "Activity Name" => "activity_name",
+      "Key Result Indicator" => "activity_name",
+      "Key Result Indicators" => "activity_name",
       "Unit" => "unit",
-      "Weight" => "weight"
+      "Unit of Measurement" => "unit",
+      "Annual Target" => "annual_target_fy",
+      "Annual Target FY" => "annual_target_fy",
+      annual_target_fy_label(@selected_financial_year) => "annual_target_fy",
+      "Annual Target FY 2026-27" => "annual_target_fy"
     }
 
     departments_hash = {}
@@ -696,55 +712,92 @@ class DepartmentsController < ApplicationController
     success_count = 0
 
     (2..spreadsheet.last_row).each do |i|
-      row_data = spreadsheet.row(i)
+      row_data = import_spreadsheet_row(spreadsheet, i)
       row = Hash[[ header, row_data ].transpose]
-      mapped = row.transform_keys { |key| header_map[key] }.compact
+      mapped = {}
+      row.each do |column_name, value|
+        mapped_key = header_map[column_name]
+        normalized_column = column_name.to_s.strip.downcase.gsub(/[^a-z0-9]+/, "_").gsub(/\A_|_\z/, "")
+        mapped_key ||= {
+          "mobile_no" => "mobile_number",
+          "mobile_number" => "mobile_number",
+          "employee_name" => "employee_name",
+          "employee_email" => "employee_email",
+          "employee_code" => "employee_code",
+          "l1_code" => "l1_code",
+          "l1_employer_name" => "l1_employer_name",
+          "l2_code" => "l2_code",
+          "l2_employer_name" => "l2_employer_name",
+          "unit_of_measurement" => "unit",
+          "annual_target" => "annual_target_fy",
+          "department_region" => "department_type"
+        }[normalized_column]
+        mapped_key ||= "activity_name" if %w[key_result_indicator key_result_indicators].include?(normalized_column)
+        mapped_key ||= "annual_target_fy" if normalized_column.start_with?("annual_target_fy")
+        mapped_key ||= normalized_column if %w[april may june july august september october november december january february march].include?(normalized_column)
+        mapped[mapped_key] = value if mapped_key.present?
+      end
       financial_year = normalize_financial_year(mapped["financial_year"]) || @selected_financial_year
 
       # Skip empty rows
-      next if mapped["department_type"].blank? && mapped["employee_name"].blank? && mapped["theme_name"].blank?
+      next if mapped["department_type"].blank? && mapped["employee_name"].blank? && mapped["activity_name"].blank?
 
       # Validate required fields
-      if mapped["department_type"].blank?
-        import_errors << "Row #{i}: Department is required"
-        next
-      end
-
       if mapped["employee_name"].blank?
-        import_errors << "Row #{i}: Employee Name is required"
+        import_errors << "Row #{i}: Employee name is required"
         next
       end
 
-      if mapped["theme_name"].blank?
-        import_errors << "Row #{i}: Theme Name is required"
+      if mapped["activity_name"].blank?
+        import_errors << "Row #{i}: Key result indicator is required"
         next
       end
 
-      # Find employee reference by employee name
-      employee = EmployeeDetail.find_by(employee_name: mapped["employee_name"])
-      if employee.nil?
-        import_errors << "Row #{i}: Employee '#{mapped["employee_name"]}' not found in system"
+      employee = find_or_initialize_department_import_employee(mapped)
+      department_type = mapped["department_type"].presence || employee.department
+      if department_type.blank?
+        import_errors << "Row #{i}: Department is required when employee department is not already available"
         next
       end
+      employee.assign_attributes(
+        employee_name: mapped["employee_name"].to_s.strip,
+        employee_email: mapped["employee_email"].to_s.strip.presence || employee.employee_email,
+        employee_code: mapped["employee_code"].to_s.strip.presence || employee.employee_code,
+        mobile_number: mapped["mobile_number"].to_s.strip.presence || employee.mobile_number,
+        l1_code: mapped["l1_code"].to_s.strip.presence || employee.l1_code,
+        l1_employer_name: mapped["l1_employer_name"].to_s.strip.presence || employee.l1_employer_name,
+        l2_code: mapped["l2_code"].to_s.strip.presence || employee.l2_code,
+        l2_employer_name: mapped["l2_employer_name"].to_s.strip.presence || employee.l2_employer_name,
+        department: department_type.to_s.strip
+      )
+      employee.post = "Imported" if employee.post.blank?
+      employee.save!
 
-      # Create unique key for each department-employee-theme combination
-      key = "#{financial_year}-#{mapped["department_type"]}-#{employee.employee_id}-#{mapped["theme_name"]}"
+      months = monthly_target_values_from_mapped_row(mapped)
+
+      # Create unique key for each department-employee combination
+      employee_reference = employee_reference_value(employee)
+      key = "#{financial_year}-#{department_type}-#{employee_reference}"
       departments_hash[key] ||= {
         financial_year: financial_year,
-        department_type: mapped["department_type"],
-        employee_reference: employee.employee_id,
+        department_type: department_type,
+        employee_reference: employee_reference,
         employee_detail_id: employee.id,
-        theme_name: mapped["theme_name"],
+        theme_name: "",
         activities: []
       }
 
       # Only add activity if activity data is present
       if mapped["activity_name"].present?
         departments_hash[key][:activities] << {
-          theme_name: mapped["theme_name"],
+          theme_name: mapped["theme_name"].presence || "",
           activity_name: mapped["activity_name"],
           unit: mapped["unit"],
-          weight: mapped["weight"]
+          annual_target_fy: normalize_import_display_value(
+            mapped["annual_target_fy"],
+            percent_context: mapped["unit"].to_s.strip == "%"
+          ),
+          monthly_targets: months
         }
       end
     end
@@ -767,15 +820,17 @@ class DepartmentsController < ApplicationController
 
         dept_data[:activities].each do |act|
           activity = department.activities.find_or_initialize_by(activity_name: act[:activity_name])
-          activity.assign_attributes(act)
+          activity.assign_attributes(act.except(:monthly_targets))
           activity.save!
 
-          UserDetail.find_or_create_by!(
+          user_detail = UserDetail.find_or_initialize_by(
             department_id: department.id,
             activity_id: activity.id,
             employee_detail_id: dept_data[:employee_detail_id],
             financial_year: dept_data[:financial_year]
           )
+          user_detail.assign_attributes(act[:monthly_targets]) if act[:monthly_targets].present?
+          user_detail.save!
         end
 
         success_count += 1
@@ -847,7 +902,7 @@ class DepartmentsController < ApplicationController
     begin
       ActiveRecord::Base.transaction do
         # Find the employee detail for this user
-        employee_detail = EmployeeDetail.find_by(employee_id: user_id)
+        employee_detail = find_employee_by_reference(user_id)
 
         if employee_detail
           Rails.logger.info "Found employee: #{employee_detail.employee_name}"
@@ -1053,8 +1108,10 @@ class DepartmentsController < ApplicationController
               id: act.id,
               theme_name: act.theme_name,
               activity_name: act.activity_name,
+              key_result_indicator: act.activity_name,
               unit: act.unit,
-              weight: act.weight
+              annual_target_fy: act.annual_target_fy,
+              annual_target_fy_2026_27: act.annual_target_fy_2026_27,
             }
           end
         }
@@ -1062,7 +1119,7 @@ class DepartmentsController < ApplicationController
       employee_details: @employee_details.map do |emp|
         {
           id: emp.id,
-          employee_id: emp.employee_id,
+          employee_id: employee_reference_value(emp),
           employee_name: emp.employee_name,
           employee_code: emp.employee_code,
           department: emp.department
@@ -1077,9 +1134,118 @@ class DepartmentsController < ApplicationController
     @department = Department.find(params[:id])
   end
 
+  def employees_for_department_form
+    EmployeeDetail
+      .where("employee_name IS NOT NULL AND TRIM(employee_name) <> ''")
+      .where("department IS NOT NULL AND TRIM(department) <> ''")
+      .where("(employee_id IS NOT NULL AND TRIM(employee_id) <> '') OR (employee_code IS NOT NULL AND TRIM(employee_code) <> '')")
+      .order(:employee_name)
+  end
+
+  def employee_reference_value(employee)
+    employee.employee_id.presence || employee.employee_code.presence
+  end
+
+  def employee_display_code(employee)
+    employee.employee_code.presence || employee.employee_id.presence
+  end
+
+  def find_employee_by_reference(reference)
+    normalized_reference = reference.to_s.strip
+    return nil if normalized_reference.blank?
+
+    EmployeeDetail.find_by(employee_id: normalized_reference) ||
+      EmployeeDetail.find_by(employee_code: normalized_reference)
+  end
+
+  def find_or_initialize_department_import_employee(mapped)
+    employee_code = mapped["employee_code"].to_s.strip
+    employee_email = mapped["employee_email"].to_s.strip
+    employee_name = mapped["employee_name"].to_s.strip
+    department_type = mapped["department_type"].to_s.strip
+
+    employee = EmployeeDetail.find_by(employee_code: employee_code) if employee_code.present?
+    employee ||= EmployeeDetail.find_by(employee_email: employee_email) if employee_email.present?
+    employee ||= EmployeeDetail.find_by(employee_name: employee_name, department: department_type) if employee_name.present? && department_type.present?
+
+    employee || EmployeeDetail.new(employee_id: employee_code.presence || SecureRandom.uuid)
+  end
+
+  def monthly_target_values_from_mapped_row(mapped)
+    %w[april may june july august september october november december january february march].index_with do |month|
+      normalize_import_target_value(mapped[month])
+    end.compact
+  end
+
+  def normalize_import_target_value(value)
+    cleaned_value = normalize_import_display_value(value)
+    return nil if cleaned_value.blank?
+
+    cleaned_value
+  end
+
+  def import_spreadsheet_row(spreadsheet, row_number)
+    return spreadsheet.row(row_number) unless spreadsheet.respond_to?(:formatted_value)
+
+    spreadsheet.row(row_number).each_with_index.map do |cell_value, index|
+      formatted_value = spreadsheet.formatted_value(row_number, index + 1)
+      normalize_import_display_value(formatted_value.presence || cell_value)
+    end
+  rescue
+    spreadsheet.row(row_number).map { |value| normalize_import_display_value(value) }
+  end
+
+  def normalize_import_display_value(value, percent_context: false)
+    return nil if value.nil?
+
+    cleaned_value = if value.is_a?(Numeric)
+      value.to_f.finite? && value.to_f == value.to_i ? value.to_i.to_s : value.to_s
+    else
+      value.to_s.strip
+    end
+
+    return nil if cleaned_value.blank?
+    return nil if spreadsheet_error_value?(cleaned_value)
+
+    cleaned_value = cleaned_value.sub(/\A(-?\d+)\.0+\z/, "\\1")
+    return "100%" if percent_context && cleaned_value.match?(/\A1(?:\.0+)?\z/)
+
+    cleaned_value
+  end
+
+  def spreadsheet_error_value?(value)
+    SPREADSHEET_ERROR_VALUES.include?(value.to_s.strip.upcase)
+  end
+
+  def annual_target_display_value(activity_or_value, unit = nil)
+    value = if activity_or_value.respond_to?(:annual_target_fy)
+      unit ||= activity_or_value.respond_to?(:unit) ? activity_or_value.unit : nil
+      activity_or_value.annual_target_fy
+    else
+      activity_or_value
+    end
+
+    normalize_import_display_value(value, percent_context: unit.to_s.strip == "%").presence || "-"
+  end
+
   def department_params
     params.require(:department).permit(:department_type, :employee_reference, :theme_name, :financial_year,
-    activities_attributes: [ :id, :theme_name, :activity_name, :unit, :weight, :_destroy ])
+    activities_attributes: [ :id, :theme_name, :activity_name, :unit, :annual_target_fy, :annual_target_fy_2026_27, :_destroy ])
+  end
+
+  def annual_target_value(attributes)
+    return attributes[:annual_target_fy] if attributes.key?(:annual_target_fy)
+    return attributes["annual_target_fy"] if attributes.key?("annual_target_fy")
+    return attributes[:annual_target_fy_2026_27] if attributes.key?(:annual_target_fy_2026_27)
+    return attributes["annual_target_fy_2026_27"] if attributes.key?("annual_target_fy_2026_27")
+
+    nil
+  end
+
+  def annual_target_fy_label(financial_year)
+    year = normalize_financial_year(financial_year) || current_financial_year
+    start_year, end_year = year.split("-", 2)
+    "Annual target FY #{start_year}-#{end_year.to_s.last(2)}"
   end
 
   def set_financial_year_context
@@ -1127,13 +1293,13 @@ class DepartmentsController < ApplicationController
       department = user_detail.department
 
       # Group by employee ONLY - no department grouping
-      key = "#{employee.employee_id}"
+      key = "#{employee_reference_value(employee)}"
 
       activities_hash[key] ||= {
         id: department.id, # Use department.id for Edit functionality
-        employee_id: employee.employee_id,
+        employee_id: employee_reference_value(employee),
         employee_name: employee.employee_name,
-        employee_code: employee.employee_code,
+        employee_code: employee_display_code(employee),
         department: employee.department, # Employee's department
         department_type: department.department_type, # Activity's department
         financial_year: user_detail.financial_year,
@@ -1146,7 +1312,7 @@ class DepartmentsController < ApplicationController
         theme_name: activity.theme_name,
         activity_name: activity.activity_name,
         unit: activity.unit,
-        weight: activity.weight,
+        annual_target_fy: annual_target_display_value(activity),
         department_type: department.department_type
       }
       activities_hash[key][:total_activities] += 1
@@ -1182,13 +1348,13 @@ class DepartmentsController < ApplicationController
         department = user_detail.department
 
         # Group by employee ONLY - no department grouping
-        key = "#{employee.employee_id}"
+        key = "#{employee_reference_value(employee)}"
 
         activities_hash[key] ||= {
           id: department.id, # Use department.id for Edit functionality
-          employee_id: employee.employee_id,
+          employee_id: employee_reference_value(employee),
           employee_name: employee.employee_name,
-          employee_code: employee.employee_code,
+          employee_code: employee_display_code(employee),
           department: employee.department, # Employee's department
           department_type: department.department_type, # Activity's department
           financial_year: user_detail.financial_year,
@@ -1201,7 +1367,7 @@ class DepartmentsController < ApplicationController
           theme_name: activity.theme_name,
           activity_name: activity.activity_name,
           unit: activity.unit,
-          weight: activity.weight,
+          annual_target_fy: annual_target_display_value(activity),
           department_type: department.department_type
         }
         activities_hash[key][:total_activities] += 1

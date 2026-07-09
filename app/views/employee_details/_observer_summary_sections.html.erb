@@ -1,0 +1,150 @@
+<% if @observer_summary_reviews.present? %>
+  <% show_full_observer_details = !@observer_context %>
+  <% month_summary_label = params[:month].present? ? short_month_label(params[:month]) : "Quarter" %>
+
+  <% if show_full_observer_details %>
+    <div class="mt-8 pt-6 border-t border-gray-200">
+      <div class="overflow-x-auto rounded-xl border border-sky-200 shadow-sm">
+      <table class="min-w-full divide-y divide-sky-100 text-sm">
+        <thead class="bg-sky-700">
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Observer</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">OBS Code</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Name</th>
+            <th class="px-4 py-3 text-center text-xs font-semibold text-white uppercase tracking-wider">Status</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider"><%= month_summary_label %> Final Remarks</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-100">
+          <% @observer_summary_reviews.each do |observer_level, summary| %>
+            <%
+              observer_label = observer_column_label(observer_level)
+              review = summary[:review]
+              status = review&.status.presence || "pending"
+              status_config = case status
+                              when "approved"
+                                { color: "bg-green-100 text-green-800", text: "Approved" }
+                              when "returned"
+                                { color: "bg-orange-100 text-orange-800", text: "Returned" }
+                              else
+                                { color: "bg-yellow-100 text-yellow-800", text: "Pending" }
+                              end
+              observer_code = summary[:observer_code].to_s.presence || "-"
+              observer_name = summary[:observer_name].presence || "-"
+              final_remarks = summary[:final_remarks]
+            %>
+            <tr class="hover:bg-sky-50/60">
+              <td class="px-4 py-3 font-semibold text-sky-700 whitespace-nowrap"><%= observer_label %> <%= month_summary_label %> Summary</td>
+              <td class="px-4 py-3 text-gray-800 whitespace-nowrap"><%= observer_code %></td>
+              <td class="px-4 py-3 text-gray-800"><%= observer_name %></td>
+              <td class="px-4 py-3 text-center whitespace-nowrap">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold <%= status_config[:color] %>">
+                  <%= status_config[:text] %>
+                </span>
+              </td>
+              <td class="px-4 py-3 text-gray-700">
+                <%= final_remarks.present? ? final_remarks : content_tag(:span, "-", class: "text-gray-400") %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  <% else %>
+    <%
+      summary_grid_class = case @observer_summary_reviews.size
+                           when 1 then "review-summary-grid--single"
+                           when 2 then "review-summary-grid--two"
+                           when 3 then "review-summary-grid--three"
+                           else "review-summary-grid--four"
+                           end
+    %>
+    <div class="review-summary-grid mt-8 pt-6 border-t border-gray-200 <%= summary_grid_class %>">
+      <% @observer_summary_reviews.each do |observer_level, summary| %>
+        <%
+          observer_label = observer_column_label(observer_level)
+          final_remarks = summary[:final_remarks]
+          activity_remarks = summary[:activity_remarks] || []
+          observer_code = summary[:observer_code].to_s.presence
+          observer_name = summary[:observer_name].to_s.presence
+        %>
+        <div class="review-summary-card bg-gradient-to-r from-sky-50 via-sky-50 to-sky-100 border border-sky-200 rounded-xl p-6 shadow-md">
+          <h3 class="text-xl font-bold text-sky-700 mb-4 flex items-center gap-2">
+            <i class="fas fa-eye text-sky-500"></i>
+            <%= observer_label %> <%= month_summary_label %> Summary
+            <% if observer_code.present? %>
+              - <%= observer_code %><% if observer_name.present? %> | <%= observer_name %><% end %>
+            <% end %>
+          </h3>
+
+          <div class="space-y-3">
+            <h4 class="text-sky-600 font-semibold text-sm"><%= params[:month].present? ? "Month Remarks:" : "Quarter Remarks:" %></h4>
+            <% if final_remarks.present? %>
+              <div class="summary-remarks-box bg-white p-4 rounded border">
+                <p class="text-gray-700 text-sm"><%= final_remarks %></p>
+              </div>
+            <% elsif activity_remarks.any? %>
+              <div class="summary-remarks-box bg-white p-4 rounded border max-h-40 overflow-y-auto">
+                <% activity_remarks.each_with_index do |remark, index| %>
+                  <div class="text-gray-700 text-sm mb-3 pb-3 <%= 'border-b border-gray-100' unless index == activity_remarks.length - 1 %>">
+                    <div class="flex items-start gap-2">
+                      <span class="bg-sky-100 text-sky-600 text-xs px-2 py-1 rounded font-medium flex-shrink-0">
+                        Activity <%= index + 1 %>
+                      </span>
+                      <span class="text-gray-700"><%= remark %></span>
+                    </div>
+                  </div>
+                <% end %>
+              </div>
+            <% else %>
+              <div class="summary-remarks-box bg-white p-4 rounded border">
+                <p class="text-gray-500 text-sm">No remarks for this <%= params[:month].present? ? "month" : "quarter" %></p>
+              </div>
+            <% end %>
+          </div>
+
+          <% if @can_observer_approve_or_return %>
+            <div class="observer-action-area relative mt-6 pt-4 border-t border-sky-200">
+              <div id="observerModal" class="hidden absolute bottom-full left-0 right-0 mb-3 z-20">
+                <div class="bg-white rounded-xl p-6 shadow-xl border border-gray-200 w-full observer-modal-box">
+                  <h2 class="text-xl font-bold mb-4" id="observerFormTitle">Approve with Remarks</h2>
+
+                  <%= form_with url: save_observer_pli_employee_details_path, method: :post, local: true, id: "observerForm" do %>
+                    <input type="hidden" name="employee_detail_id" value="<%= @employee_detail.id %>">
+                    <input type="hidden" name="financial_year" value="<%= @selected_financial_year %>">
+                    <input type="hidden" name="quarter" value="<%= @selected_quarter %>">
+                    <input type="hidden" name="month" value="<%= @selected_month %>">
+                    <input type="hidden" name="observer_level" value="<%= @observer_level %>">
+                    <input type="hidden" name="action_type" id="observerActionType" value="approve">
+
+                    <div class="mb-4">
+                      <label for="observerRemarks" class="block font-semibold mb-1">Remarks</label>
+                      <textarea id="observerRemarks" name="final_remarks" rows="3" maxlength="500" placeholder="Enter your remarks here..." class="w-full border border-gray-300 rounded-md p-2"></textarea>
+                    </div>
+
+                    <div class="flex justify-end gap-2">
+                      <button type="button" id="observerModalCancelBtn" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
+                      <button type="submit" class="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800">Submit</button>
+                    </div>
+                  <% end %>
+                </div>
+              </div>
+
+              <div class="flex flex-col sm:flex-row gap-4 justify-center" id="observerActionButtons">
+                <button type="button" id="observerApproveBtn" class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md transition duration-200">
+                  <i class="fas fa-check-circle mr-1"></i>
+                  Approve <%= month_summary_label %>
+                </button>
+                <button type="button" id="observerReturnBtn" class="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md transition duration-200">
+                  <i class="fas fa-undo mr-1"></i>
+                  Return <%= month_summary_label %>
+                </button>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>

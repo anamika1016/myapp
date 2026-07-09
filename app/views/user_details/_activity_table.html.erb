@@ -1,24 +1,26 @@
 <table class="table-auto w-full border mt-4">
   <thead class="bg-gray-100">
     <tr>
-      <th class="border px-4 py-2">Theme</th>
-      <th class="border px-4 py-2">Activity</th>
-      <th class="border px-4 py-2">Unit</th>
+      <th class="border px-4 py-2">S.No</th>
+      <th class="border px-4 py-2">Key result indicators</th>
+      <th class="border px-4 py-2">Unit of measurement</th>
+      <th class="border px-4 py-2"><%= annual_target_fy_label(@selected_financial_year) %></th>
       <% [:april, :may, :june, :july, :august, :september, :october, :november, :december, :january, :february, :march].each do |month| %>
-        <th class="border px-4 py-2"><%= month.capitalize %></th>
+        <th class="border px-4 py-2"><%= short_month_label(month) %></th>
       <% end %>
     </tr>
   </thead>
   <tbody>
     <% activities.each_with_index do |activity, index| %>
       <tr>
+        <td class="border px-2 py-1 text-center"><%= index + 1 %></td>
         <td class="border px-2 py-1">
-          <%= activity.department.theme_name %>
+          <%= activity.activity_name %>
           <%= hidden_field_tag "user_details[#{index}][activity_id]", activity.id %>
           <%= hidden_field_tag "user_details[#{index}][department_id]", activity.department_id %>
         </td>
-        <td class="border px-2 py-1"><%= activity.activity_name %></td>
         <td class="border px-2 py-1"><%= activity.unit %></td>
+        <td class="border px-2 py-1"><%= annual_target_display(activity) %></td>
         <% [:april, :may, :june, :july, :august, :september, :october, :november, :december, :january, :february, :march].each do |month| %>
           <td class="border px-2 py-1">
             <%= text_field_tag "user_details[#{index}][#{month}]", "", class: "form-control" %>

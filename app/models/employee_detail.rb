@@ -5,6 +5,8 @@ class EmployeeDetail < ApplicationRecord
   has_many :user_details, dependent: :destroy
   has_many :target_submissions, dependent: :destroy
   has_many :sms_logs, dependent: :destroy
+  has_many :quarterly_pli_reviews, dependent: :destroy
+  has_many :observer_pli_reviews, dependent: :destroy
   belongs_to :user, optional: true
   has_many :l1_pulse_assessments, dependent: :destroy
   has_many :user_training_assignments, dependent: :destroy
@@ -30,7 +32,12 @@ class EmployeeDetail < ApplicationRecord
       l1_employer_name
       l2_code
       l2_employer_name
+      obs_code1
+      obs_code2
+      obs_code3
+      obs_code4
       post
+      location
       department
       portal_active
       created_at

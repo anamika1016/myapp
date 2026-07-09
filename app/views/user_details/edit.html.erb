@@ -28,8 +28,8 @@
           <div class="form-row">
             <% group.each do |month| %>
               <div class="form-group">
-                <%= form.label month.capitalize, class: "form-label" %>
-                <%= form.text_field month, class: "form-control", placeholder: "#{month.capitalize} data" %>
+                <%= form.label month, short_month_label(month), class: "form-label" %>
+                <%= form.text_field month, class: "form-control", placeholder: "#{short_month_label(month)} data" %>
               </div>
             <% end %>
           </div>
@@ -112,8 +112,7 @@ body {
   font-size: 0.9rem;
   color: #495057;
   margin-bottom: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+    letter-spacing: 0.5px;
 }
 
 .form-control {
@@ -157,8 +156,7 @@ select.form-control {
   transition: all 0.3s ease;
   text-decoration: none;
   display: inline-block;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+    letter-spacing: 0.5px;
 }
 
 .btn-success {

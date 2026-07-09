@@ -1,0 +1,366 @@
+<div class="main-content sidebar-hidden bg-gray-50 min-h-screen">
+  <div class="min-h-screen pl-64 pr-4 pt-4 pb-12 overflow-x-auto bg-gradient-to-br from-slate-50 via-white to-teal-50/40">
+    <div class="w-full max-w-7xl mx-auto px-4 py-8">
+      <!-- Header -->
+      <div class="bg-white rounded-2xl shadow-lg border border-gray-200 mb-8 px-8 py-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div class="flex items-start gap-4">
+          <div class="w-14 h-14 rounded-xl bg-teal-100 flex items-center justify-center shrink-0">
+            <i class="fas fa-chart-pie text-2xl text-teal-700"></i>
+          </div>
+          <div>
+            <h2 class="text-2xl md:text-3xl font-bold text-gray-900">
+              <%= @employee_detail.employee_name %> - <%= @quarter %> Quarterly PLI
+            </h2>
+            <p class="text-gray-600 mt-1 text-sm md:text-base font-medium">
+              <%= @employee_detail.employee_code %> | <%= @financial_year %> | <%= @quarter_label %>
+            </p>
+          </div>
+        </div>
+        <%= link_to quarterly_pli_employee_details_path(financial_year: @financial_year, quarter: @quarter),
+            class: "inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold border border-gray-300 transition-all duration-200 self-start md:self-center" do %>
+          <i class="fas fa-arrow-left"></i>
+          Back to List
+        <% end %>
+      </div>
+
+      <!-- Month cards -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <% @detail_payload[:months].each do |month| %>
+          <div class="quarterly-pli-month-card">
+            <div class="quarterly-pli-month-card-header"><%= month[:label] %></div>
+            <div class="quarterly-pli-month-card-body">
+              <div class="quarterly-pli-percent-hero">
+                <div class="quarterly-pli-percent-hero-label">Achievement %</div>
+                <div class="quarterly-pli-percent-hero-value"><%= month[:achievement_percentage] || month[:progress] %>%</div>
+              </div>
+              <div class="quarterly-pli-remarks-block l1-remarks">
+                <div class="quarterly-pli-remarks-label l1">
+                  <i class="fas fa-user-tie"></i> L1 Remarks
+                </div>
+                <div class="quarterly-pli-remarks-text">
+                  <% if month[:l1_remarks].present? %>
+                    <% month[:l1_remarks].each do |remark| %>
+                      <div class="mb-1"><%= remark %></div>
+                    <% end %>
+                  <% else %>
+                    <span class="text-gray-400">-</span>
+                  <% end %>
+                </div>
+              </div>
+              <% observer_levels_for_display(@employee_detail).each do |obs_level| %>
+                <% remarks_key = "#{obs_level}_remarks".to_sym %>
+                <% if month[remarks_key].present? %>
+                  <div class="quarterly-pli-remarks-block <%= obs_level %>-remarks">
+                    <div class="quarterly-pli-remarks-label <%= obs_level %>">
+                      <i class="fas fa-eye"></i> <%= observer_column_label(obs_level) %> Remarks
+                    </div>
+                    <div class="quarterly-pli-remarks-text">
+                      <% month[remarks_key].each do |remark| %>
+                        <div class="mb-1"><%= remark %></div>
+                      <% end %>
+                    </div>
+                  </div>
+                <% end %>
+              <% end %>
+              <% if l2_reviewer_assigned?(@employee_detail) && month[:l2_remarks].present? %>
+                <div class="quarterly-pli-remarks-block l2-remarks">
+                  <div class="quarterly-pli-remarks-label l2">
+                    <i class="fas fa-user-shield"></i> L2 Remarks
+                  </div>
+                  <div class="quarterly-pli-remarks-text">
+                    <% month[:l2_remarks].each do |remark| %>
+                      <div class="mb-1"><%= remark %></div>
+                    <% end %>
+                  </div>
+                </div>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+
+
+
+      <!-- Quarter total -->
+      <div class="text-center mb-6">
+        <div class="inline-block bg-white rounded-2xl shadow-md border border-emerald-200 px-10 py-5">
+          <p class="text-xs font-bold tracking-widest text-gray-500 mb-1">Quarter total achievement %</p>
+          <p class="text-4xl font-extrabold text-emerald-700"><%= @detail_payload[:quarter_percentage] %>%</p>
+          <p class="text-xs text-gray-500 mt-2">
+            Average of <%= pluralize(@detail_payload[:quarter_month_count].to_i, "submitted month") %>
+            (<%= @detail_payload[:months].map { |month| month[:label] }.join(", ") %>)
+          </p>
+        </div>
+      </div>
+
+      <% unless @review&.status == "approved" %>
+        <div class="bg-white rounded-2xl shadow-md border border-gray-100 p-8">
+          <p class="text-center text-gray-700 text-sm font-medium mb-5">Review monthly data and take final action</p>
+          <div class="flex flex-col sm:flex-row gap-4 justify-center">
+            <button type="button" id="quarterlyPliApproveBtn" class="quarterly-pli-btn-approve inline-flex items-center justify-center gap-2 px-8 py-3.5 font-semibold rounded-xl shadow-md transition-all duration-200">
+              <i class="fas fa-check-circle"></i>
+              Final Approve
+            </button>
+            <button type="button" id="quarterlyPliReturnBtn" class="quarterly-pli-btn-return inline-flex items-center justify-center gap-2 px-8 py-3.5 font-semibold rounded-xl shadow-md transition-all duration-200">
+              <i class="fas fa-undo"></i>
+              Return
+            </button>
+          </div>
+        </div>
+      <% else %>
+        <div class="quarterly-pli-final-card">
+          <div class="quarterly-pli-final-icon">
+            <i class="fas fa-check-circle"></i>
+          </div>
+          <div>
+            <p class="quarterly-pli-final-title">Final PLI Saved</p>
+            <div class="quarterly-pli-final-meta">
+              <span>Final %: <strong><%= format('%.2f', @review.final_percentage.to_f) %>%</strong></span>
+              <% if @review.final_remarks.present? %>
+                <span>Remarks: <strong><%= @review.final_remarks %></strong></span>
+              <% end %>
+            </div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<!-- Approve / Return Popup Modal -->
+<div id="quarterlyPliModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg relative">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+      <div class="flex items-center gap-3">
+        <div id="quarterlyPliFormIcon" class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
+          <i class="fas fa-check text-green-600"></i>
+        </div>
+        <h4 id="quarterlyPliFormTitle" class="text-xl font-bold text-gray-900">Final Approve with Remarks</h4>
+      </div>
+      <button type="button" id="quarterlyPliModalCloseBtn" class="w-9 h-9 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <div class="p-6">
+      <%= form_with url: save_quarterly_pli_employee_details_path, method: :post, local: true, id: "quarterlyPliForm", class: "space-y-5" do %>
+        <input type="hidden" name="employee_detail_id" value="<%= @employee_detail.id %>">
+        <input type="hidden" name="financial_year" value="<%= @financial_year %>">
+        <input type="hidden" name="quarter" value="<%= @quarter %>">
+        <input type="hidden" name="action_type" id="quarterlyPliActionType" value="approve">
+
+        <div id="quarterlyPliPercentageGroup">
+          <label for="quarterlyPliPercentage" class="block font-semibold text-gray-900 mb-2">
+            <i class="fas fa-percentage text-teal-600 mr-1"></i> Percentage
+          </label>
+          <input type="text" id="quarterlyPliPercentage" name="final_percentage" inputmode="decimal" pattern="^\d+(\.\d+)?%?$" placeholder="Enter final PLI %" autocomplete="off" class="w-full border border-gray-300 rounded-xl p-3 text-lg text-gray-900 focus:border-teal-500 focus:ring-2 focus:ring-teal-100 transition-all" required>
+        </div>
+
+        <div>
+          <label for="quarterlyPliRemarks" class="block font-semibold text-gray-900 mb-2">
+            <i class="fas fa-comment-alt text-teal-600 mr-1"></i> Remarks
+          </label>
+          <textarea id="quarterlyPliRemarks" name="final_remarks" rows="4" maxlength="500" placeholder="Enter your remarks here..." class="w-full border border-gray-300 rounded-xl p-3 text-gray-900 focus:border-teal-500 focus:ring-2 focus:ring-teal-100 transition-all resize-none" required></textarea>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" id="quarterlyPliModalCancelBtn" class="quarterly-pli-modal-cancel px-6 py-2.5 font-semibold rounded-xl transition-all">Cancel</button>
+          <button type="submit" class="quarterly-pli-modal-submit px-8 py-2.5 font-semibold rounded-xl shadow-md transition-all">
+            <i class="fas fa-paper-plane mr-1"></i> Submit
+          </button>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<style>
+  .min-h-screen { padding-left: 16rem; }
+  .sidebar-hidden .min-h-screen { padding-left: 1rem !important; padding-right: 1rem !important; }
+  .sidebar-hidden .max-w-7xl { max-width: 100% !important; width: 100% !important; }
+
+  .quarterly-pli-month-card {
+    border: none; border-radius: 1rem; overflow: hidden; background: #fff;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .quarterly-pli-month-card:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1); }
+  .quarterly-pli-month-card-header {
+    background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+    color: #fff; padding: 1rem 1.25rem; font-weight: 700; font-size: 1.125rem;
+    letter-spacing: 0.05em;
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .quarterly-pli-month-card-header::before {
+    content: ''; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: rgba(255, 255, 255, 0.8);
+  }
+  .quarterly-pli-month-card-body { padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+  .quarterly-pli-percent-hero {
+    text-align: center; padding: 1.25rem;
+    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+    border-radius: 0.75rem; border: 1px solid #a7f3d0;
+  }
+  .quarterly-pli-percent-hero-label {
+    font-size: 0.75rem; font-weight: 600;
+    letter-spacing: 0.08em; color: #059669; margin-bottom: 0.25rem;
+  }
+  .quarterly-pli-percent-hero-value { font-size: 2.25rem; font-weight: 800; color: #047857; line-height: 1; }
+  .quarterly-pli-remarks-block { border-radius: 0.75rem; padding: 1rem; background: #f8fafc; border: 1px solid #e2e8f0; }
+  .quarterly-pli-remarks-block.l1-remarks { border-left: 4px solid #3b82f6; }
+  .quarterly-pli-remarks-block.obs1-remarks { border-left: 4px solid #0284c7; }
+  .quarterly-pli-remarks-block.obs2-remarks { border-left: 4px solid #0369a1; }
+  .quarterly-pli-remarks-block.l2-remarks { border-left: 4px solid #8b5cf6; }
+  .quarterly-pli-remarks-label {
+    font-size: 0.7rem; font-weight: 700;
+    letter-spacing: 0.06em; margin-bottom: 0.5rem;
+    display: flex; align-items: center; gap: 0.375rem;
+  }
+  .quarterly-pli-remarks-label.l1 { color: #2563eb; }
+  .quarterly-pli-remarks-label.obs1 { color: #0284c7; }
+  .quarterly-pli-remarks-label.obs2 { color: #0369a1; }
+  .quarterly-pli-remarks-label.l2 { color: #7c3aed; }
+  .quarterly-pli-remarks-text { font-size: 0.875rem; color: #1f2937; line-height: 1.5; min-height: 2rem; }
+  .quarterly-activity-section + .quarterly-activity-section { border-top: 1px solid #e5e7eb; padding-top: 2rem; }
+  .quarterly-pli-table-remarks {
+    min-width: 190px;
+    max-width: 280px;
+    padding: 0.75rem 1rem;
+    color: #374151;
+    text-align: center;
+    word-break: break-word;
+  }
+  .quarterly-pli-table-remarks--obs { color: #0369a1; background: #f0f9ff; font-weight: 600; }
+  .quarterly-pli-table-remarks--l1 { color: #3730a3; background: #eef2ff; font-weight: 600; }
+  .quarterly-pli-table-remarks--l2 { color: #6d28d9; background: #f5f3ff; font-weight: 600; }
+  .quarterly-pli-btn-approve { background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%); color: #fff; }
+  .quarterly-pli-btn-approve:hover { background: linear-gradient(135deg, #15803d 0%, #16a34a 100%); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(22, 163, 74, 0.35); }
+  .quarterly-pli-btn-return { background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%); color: #fff; }
+  .quarterly-pli-btn-return:hover { background: linear-gradient(135deg, #b91c1c 0%, #dc2626 100%); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(220, 38, 38, 0.35); }
+
+  .quarterly-pli-final-card {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.25rem;
+    width: min(100%, 44rem);
+    margin: 0 auto;
+    padding: 2rem;
+    border: 1px solid #86efac;
+    border-radius: 1.25rem;
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    box-shadow: 0 18px 40px rgba(22, 163, 74, 0.16);
+    text-align: left;
+  }
+  .quarterly-pli-final-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 4rem;
+    height: 4rem;
+    border-radius: 1rem;
+    background: #16a34a;
+    color: #ffffff;
+    font-size: 2rem;
+    flex: 0 0 auto;
+  }
+  .quarterly-pli-final-title {
+    color: #14532d;
+    font-size: 1.75rem;
+    font-weight: 800;
+    line-height: 1.15;
+  }
+  .quarterly-pli-final-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 0.85rem;
+    color: #166534;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  .quarterly-pli-final-meta span {
+    display: inline-flex;
+    padding: 0.55rem 0.8rem;
+    border: 1px solid #bbf7d0;
+    border-radius: 0.75rem;
+    background: rgba(255, 255, 255, 0.72);
+  }
+
+  .quarterly-pli-modal-cancel {
+    background-color: #e5e7eb !important;
+    color: #1f2937 !important;
+    border: 1px solid #9ca3af !important;
+  }
+  .quarterly-pli-modal-cancel:hover {
+    background-color: #d1d5db !important;
+  }
+  .quarterly-pli-modal-submit {
+    background-color: #0d9488 !important;
+    color: #ffffff !important;
+    border: 1px solid #0f766e !important;
+  }
+  .quarterly-pli-modal-submit:hover {
+    background-color: #0f766e !important;
+  }
+</style>
+
+<script>
+(function() {
+function initQuarterlyPliModal() {
+  const modal = document.getElementById('quarterlyPliModal');
+  const closeBtn = document.getElementById('quarterlyPliModalCloseBtn');
+  const cancelBtn = document.getElementById('quarterlyPliModalCancelBtn');
+  const approveBtn = document.getElementById('quarterlyPliApproveBtn');
+  const returnBtn = document.getElementById('quarterlyPliReturnBtn');
+  const formTitle = document.getElementById('quarterlyPliFormTitle');
+  const formIcon = document.getElementById('quarterlyPliFormIcon');
+  const actionTypeInput = document.getElementById('quarterlyPliActionType');
+  const percentageGroup = document.getElementById('quarterlyPliPercentageGroup');
+  const percentageInput = document.getElementById('quarterlyPliPercentage');
+  const remarksInput = document.getElementById('quarterlyPliRemarks');
+
+  if (!modal) return;
+
+  function closeModal() {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    document.body.style.overflow = '';
+    if (remarksInput) remarksInput.value = '';
+    if (percentageInput) percentageInput.value = '';
+  }
+
+  function openModal(actionType) {
+    const isReturn = actionType === 'return';
+    actionTypeInput.value = actionType;
+    formTitle.textContent = isReturn ? 'Return with Remarks' : 'Final Approve with Remarks';
+    formIcon.className = isReturn
+      ? 'w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center'
+      : 'w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center';
+    formIcon.innerHTML = isReturn
+      ? '<i class="fas fa-undo text-red-600"></i>'
+      : '<i class="fas fa-check text-green-600"></i>';
+    if (remarksInput) remarksInput.value = '';
+    if (percentageInput) {
+      percentageInput.value = isReturn ? '' : '<%= j(@detail_payload[:quarter_percentage].to_s) %>';
+      percentageInput.required = !isReturn;
+    }
+    if (percentageGroup) percentageGroup.classList.toggle('hidden', isReturn);
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    document.body.style.overflow = 'hidden';
+    (isReturn ? remarksInput : percentageInput)?.focus();
+  }
+
+  if (approveBtn) approveBtn.onclick = () => openModal('approve');
+  if (returnBtn) returnBtn.onclick = () => openModal('return');
+  if (closeBtn) closeBtn.onclick = closeModal;
+  if (cancelBtn) cancelBtn.onclick = closeModal;
+  modal.onclick = function(event) {
+    if (event.target === modal) closeModal();
+  };
+}
+
+document.addEventListener('DOMContentLoaded', initQuarterlyPliModal);
+document.addEventListener('turbo:load', initQuarterlyPliModal);
+})();
+</script>

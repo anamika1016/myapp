@@ -1,0 +1,210 @@
+<div class="main-content sidebar-hidden bg-gray-50 min-h-screen">
+  <div class="min-h-screen pl-64 pr-4 pt-4 pb-12 overflow-x-auto bg-gradient-to-br from-slate-50 via-white to-sky-50/40">
+    <div class="w-full max-w-7xl mx-auto px-4 py-8">
+      <div class="bg-white rounded-2xl shadow-lg border border-gray-200 mb-8 px-8 py-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div class="flex items-start gap-4">
+          <div class="w-14 h-14 rounded-xl bg-sky-100 flex items-center justify-center shrink-0">
+            <i class="fas fa-eye text-2xl text-sky-700"></i>
+          </div>
+          <div>
+            <h2 class="text-2xl md:text-3xl font-bold text-gray-900">
+              <%= @employee_detail.employee_name %> - <%= @observer_title %>
+            </h2>
+            <p class="text-gray-600 mt-1 text-sm md:text-base font-medium">
+              <%= @employee_detail.employee_code %> | <%= @financial_year %> | <%= @quarter_label %> | <%= @detail_payload[:months].first&.dig(:label) || @month.to_s.upcase %>
+            </p>
+          </div>
+        </div>
+        <% observer_back_path = observer_pli_index_path(@observer_level, financial_year: @financial_year, quarter: @quarter, month: @month) %>
+        <%= link_to observer_back_path,
+            class: "inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold border border-gray-300 transition-all duration-200 self-start md:self-center" do %>
+          <i class="fas fa-arrow-left"></i>
+          Back to List
+        <% end %>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <% @detail_payload[:months].each do |month| %>
+          <div class="observer-month-card">
+            <div class="observer-month-card-header"><%= month[:label] %></div>
+            <div class="observer-month-card-body">
+              <div class="observer-percent-hero">
+                <div class="observer-percent-hero-label">Achievement %</div>
+                <div class="observer-percent-hero-value"><%= month[:achievement_percentage] || month[:progress] %>%</div>
+              </div>
+            </div>
+          </div>
+        <% end %>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+        <div class="observer-summary-card">
+          <p class="observer-summary-label">Calculated %</p>
+          <p class="observer-summary-value text-emerald-700"><%= @detail_payload[:quarter_percentage] %>%</p>
+        </div>
+        <div class="observer-summary-card">
+          <p class="observer-summary-label">Review Month</p>
+          <p class="observer-summary-value text-blue-700"><%= @detail_payload[:months].first&.dig(:label) || @month.to_s.upcase %></p>
+        </div>
+        <div class="observer-summary-card">
+          <p class="observer-summary-label">Observer Step</p>
+          <p class="observer-summary-value text-green-700"><%= observer_level_number(@observer_level) %></p>
+        </div>
+      </div>
+
+      <% unless @observer_review&.status == "approved" %>
+        <div class="bg-white rounded-2xl shadow-md border border-gray-100 p-8">
+          <p class="text-center text-gray-700 text-sm font-medium mb-5">Review monthly data and take observer action</p>
+          <div class="flex flex-col sm:flex-row gap-4 justify-center">
+            <button type="button" id="observerApproveBtn" class="observer-btn-approve inline-flex items-center justify-center gap-2 px-8 py-3.5 font-semibold rounded-xl shadow-md transition-all duration-200">
+              <i class="fas fa-check-circle"></i>
+              Approve
+            </button>
+            <button type="button" id="observerReturnBtn" class="observer-btn-return inline-flex items-center justify-center gap-2 px-8 py-3.5 font-semibold rounded-xl shadow-md transition-all duration-200">
+              <i class="fas fa-undo"></i>
+              Return
+            </button>
+          </div>
+        </div>
+      <% else %>
+        <div class="observer-final-card">
+          <div class="observer-final-icon">
+            <i class="fas fa-check-circle"></i>
+          </div>
+          <div>
+            <p class="observer-final-title"><%= @observer_title %> Approved</p>
+            <div class="observer-final-meta">
+              <% if @observer_review.final_remarks.present? %>
+                <span>Remarks: <strong><%= @observer_review.final_remarks %></strong></span>
+              <% end %>
+            </div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<div id="observerModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg relative">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+      <div class="flex items-center gap-3">
+        <div id="observerFormIcon" class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
+          <i class="fas fa-check text-green-600"></i>
+        </div>
+        <h4 id="observerFormTitle" class="text-xl font-bold text-gray-900">Approve with Remarks</h4>
+      </div>
+      <button type="button" id="observerModalCloseBtn" class="w-9 h-9 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <div class="p-6">
+      <%= form_with url: save_observer_pli_employee_details_path, method: :post, local: true, id: "observerForm", class: "space-y-5" do %>
+        <input type="hidden" name="employee_detail_id" value="<%= @employee_detail.id %>">
+        <input type="hidden" name="financial_year" value="<%= @financial_year %>">
+        <input type="hidden" name="quarter" value="<%= @quarter %>">
+        <input type="hidden" name="month" value="<%= @month %>">
+        <input type="hidden" name="observer_level" value="<%= @observer_level %>">
+        <input type="hidden" name="action_type" id="observerActionType" value="approve">
+
+        <div>
+          <label for="observerRemarks" class="block font-semibold text-gray-900 mb-2">
+            <i class="fas fa-comment-alt text-sky-600 mr-1"></i> Remarks
+          </label>
+          <textarea id="observerRemarks" name="final_remarks" rows="4" maxlength="500" placeholder="Enter your remarks here..." class="w-full border border-gray-300 rounded-xl p-3 text-gray-900 focus:border-sky-500 focus:ring-2 focus:ring-sky-100 transition-all resize-none" required></textarea>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" id="observerModalCancelBtn" class="observer-modal-cancel px-6 py-2.5 font-semibold rounded-xl transition-all">Cancel</button>
+          <button type="submit" class="observer-modal-submit px-8 py-2.5 font-semibold rounded-xl shadow-md transition-all">
+            <i class="fas fa-paper-plane mr-1"></i> Submit
+          </button>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<style>
+  .min-h-screen { padding-left: 16rem; }
+  .sidebar-hidden .min-h-screen { padding-left: 1rem !important; padding-right: 1rem !important; }
+  .sidebar-hidden .max-w-7xl { max-width: 100% !important; width: 100% !important; }
+  .observer-month-card { border: none; border-radius: 1rem; overflow: hidden; background: #fff; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06); }
+  .observer-month-card-header { background: linear-gradient(135deg, #0369a1 0%, #0ea5e9 100%); color: #fff; padding: 1rem 1.25rem; font-weight: 700; font-size: 1.125rem; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.5rem; }
+  .observer-month-card-header::before { content: ''; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: rgba(255, 255, 255, 0.8); }
+  .observer-month-card-body { padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+  .observer-percent-hero { text-align: center; padding: 1.25rem; background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border-radius: 0.75rem; border: 1px solid #a7f3d0; }
+  .observer-percent-hero-label { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; color: #059669; margin-bottom: 0.25rem; }
+  .observer-percent-hero-value { font-size: 2.25rem; font-weight: 800; color: #047857; line-height: 1; }
+  .observer-remarks-block { border-radius: 0.75rem; padding: 1rem; background: #f8fafc; border: 1px solid #e2e8f0; }
+  .observer-remarks-block.l1-remarks { border-left: 4px solid #3b82f6; }
+  .observer-remarks-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.375rem; }
+  .observer-remarks-label.l1 { color: #2563eb; }
+  .observer-remarks-text { font-size: 0.875rem; color: #1f2937; line-height: 1.5; min-height: 2rem; }
+  .observer-summary-card { text-align: center; padding: 1.5rem; border-radius: 1rem; background: #fff; border: 1px solid #dbeafe; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08); }
+  .observer-summary-label { font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; color: #64748b; margin-bottom: 0.5rem; text-transform: uppercase; }
+  .observer-summary-value { font-size: 2.25rem; font-weight: 900; line-height: 1; }
+  .observer-btn-approve { background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%); color: #fff; }
+  .observer-btn-return { background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%); color: #fff; }
+  .observer-final-card { display: flex; align-items: center; justify-content: center; gap: 1.25rem; width: min(100%, 44rem); margin: 0 auto; padding: 2rem; border: 1px solid #86efac; border-radius: 1.25rem; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); box-shadow: 0 18px 40px rgba(22, 163, 74, 0.16); text-align: left; }
+  .observer-final-icon { display: inline-flex; align-items: center; justify-content: center; width: 4rem; height: 4rem; border-radius: 1rem; background: #16a34a; color: #ffffff; font-size: 2rem; flex: 0 0 auto; }
+  .observer-final-title { color: #14532d; font-size: 1.75rem; font-weight: 800; line-height: 1.15; }
+  .observer-final-meta { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.85rem; color: #166534; font-size: 1rem; font-weight: 600; }
+  .observer-final-meta span { display: inline-flex; padding: 0.55rem 0.8rem; border: 1px solid #bbf7d0; border-radius: 0.75rem; background: rgba(255, 255, 255, 0.72); }
+  .observer-modal-cancel { background-color: #e5e7eb !important; color: #1f2937 !important; border: 1px solid #9ca3af !important; }
+  .observer-modal-submit { background-color: #0284c7 !important; color: #ffffff !important; border: 1px solid #0369a1 !important; }
+</style>
+
+<script>
+(function() {
+function initObserverPliModal() {
+  const modal = document.getElementById('observerModal');
+  const closeBtn = document.getElementById('observerModalCloseBtn');
+  const cancelBtn = document.getElementById('observerModalCancelBtn');
+  const approveBtn = document.getElementById('observerApproveBtn');
+  const returnBtn = document.getElementById('observerReturnBtn');
+  const formTitle = document.getElementById('observerFormTitle');
+  const formIcon = document.getElementById('observerFormIcon');
+  const actionTypeInput = document.getElementById('observerActionType');
+  const remarksInput = document.getElementById('observerRemarks');
+
+  if (!modal) return;
+
+  function closeModal() {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    document.body.style.overflow = '';
+    if (remarksInput) remarksInput.value = '';
+  }
+
+  function openModal(actionType) {
+    const isReturn = actionType === 'return';
+    actionTypeInput.value = actionType;
+    formTitle.textContent = isReturn ? 'Return with Remarks' : 'Approve with Remarks';
+    formIcon.className = isReturn
+      ? 'w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center'
+      : 'w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center';
+    formIcon.innerHTML = isReturn
+      ? '<i class="fas fa-undo text-red-600"></i>'
+      : '<i class="fas fa-check text-green-600"></i>';
+    if (remarksInput) remarksInput.value = '';
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    document.body.style.overflow = 'hidden';
+    remarksInput?.focus();
+  }
+
+  if (approveBtn) approveBtn.onclick = () => openModal('approve');
+  if (returnBtn) returnBtn.onclick = () => openModal('return');
+  if (closeBtn) closeBtn.onclick = closeModal;
+  if (cancelBtn) cancelBtn.onclick = closeModal;
+  modal.onclick = function(event) {
+    if (event.target === modal) closeModal();
+  };
+}
+
+document.addEventListener('DOMContentLoaded', initObserverPliModal);
+document.addEventListener('turbo:load', initObserverPliModal);
+})();
+</script>

@@ -1,0 +1,128 @@
+<div class="main-content ml-64 bg-gray-50 min-h-screen">
+  <div class="p-8 space-y-6">
+    <section class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+      <p class="text-xs font-bold uppercase tracking-widest text-green-700 mb-2">Masters</p>
+      <h1 class="text-4xl font-bold text-gray-900">Month Master</h1>
+      <p class="text-gray-600 mt-3">Financial months maintain karna.</p>
+    </section>
+
+    <section class="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+      <h2 class="text-lg font-bold text-gray-900 pb-3 border-b border-gray-200">Fields</h2>
+      <%= form_with model: @month_master, url: month_masters_path, method: :post, local: true, class: "mt-4", html: { id: "monthMasterForm" } do |form| %>
+        <input type="hidden" name="_method" value="patch" id="monthMasterMethod" disabled>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <%= form.label :month_name, "Month Name", class: "block text-sm font-bold text-gray-800 mb-2" %>
+            <%= form.select :month_name,
+                options_for_select(@month_options),
+                { prompt: "Select Month Name" },
+                class: "w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-900" %>
+          </div>
+
+          <div>
+            <%= form.label :financial_year, "Financial Year", class: "block text-sm font-bold text-gray-800 mb-2" %>
+            <%= form.select :financial_year,
+                options_for_select(@financial_years),
+                { prompt: "Select Financial Year" },
+                class: "w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-900" %>
+          </div>
+        </div>
+
+        <div class="mt-5 pt-4 border-t border-gray-200 flex justify-end gap-3">
+          <%= link_to "Clear", month_masters_path, class: "px-4 py-2 rounded-lg border border-gray-300 text-green-700 font-bold hover:bg-gray-50" %>
+          <%= form.submit "Save", id: "monthMasterSubmit", class: "px-5 py-2 rounded-lg bg-green-700 text-white font-bold hover:bg-green-800" %>
+        </div>
+      <% end %>
+    </section>
+
+    <section class="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+      <div class="flex items-center justify-between pb-3 border-b border-gray-200">
+        <h2 class="text-lg font-bold text-gray-900">Saved Records</h2>
+        <span class="text-sm font-bold text-gray-600"><%= @month_masters.size %> records</span>
+      </div>
+
+      <div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+        <%= form_with url: month_masters_path, method: :get, local: true, class: "md:w-80" do |form| %>
+          <%= form.search_field :q, value: params[:q], placeholder: "Search records", class: "w-full rounded-full border border-gray-300 bg-white px-4 py-2 text-sm" %>
+        <% end %>
+
+        <div class="flex gap-3">
+          <%= form_with url: import_month_masters_path, method: :post, local: true, multipart: true, class: "flex gap-2" do |form| %>
+            <%= form.file_field :file, accept: ".xlsx,.xls", class: "w-48 text-sm rounded-lg border border-gray-300 bg-white px-3 py-2" %>
+            <%= form.submit "Upload", class: "px-4 py-2 rounded-lg bg-green-700 text-white font-bold hover:bg-green-800" %>
+          <% end %>
+          <%= link_to "Export", export_month_masters_path(format: :xlsx), class: "px-4 py-2 rounded-lg bg-green-700 text-white font-bold hover:bg-green-800" %>
+        </div>
+      </div>
+
+      <div class="mt-4 overflow-x-auto">
+        <table class="w-full text-left">
+          <thead>
+            <tr class="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500">
+              <th class="px-3 py-3">Month Name</th>
+              <th class="px-3 py-3">Financial Year</th>
+              <th class="px-3 py-3">Saved At</th>
+              <th class="px-3 py-3">Status</th>
+              <th class="px-3 py-3">Action</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200">
+            <% @month_masters.each do |record| %>
+              <tr>
+                <td class="px-3 py-4 text-gray-900"><%= record.month_name %></td>
+                <td class="px-3 py-4 text-gray-900"><%= record.financial_year %></td>
+                <td class="px-3 py-4 text-gray-900"><%= record.created_at.strftime("%d-%m-%Y %I:%M %p") %></td>
+                <td class="px-3 py-4">
+                  <span class="inline-flex rounded-full px-3 py-1 text-xs font-bold <%= record.active? ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700' %>">
+                    <%= record.active? ? "Active" : "Inactive" %>
+                  </span>
+                </td>
+                <td class="px-3 py-4">
+                  <div class="flex flex-wrap gap-2">
+                    <button type="button"
+                            class="edit-month-record px-3 py-1 rounded-lg bg-emerald-50 text-green-700 font-bold hover:bg-emerald-100"
+                            data-url="<%= month_master_path(record) %>"
+                            data-month="<%= record.month_key %>"
+                            data-financial-year="<%= record.financial_year %>">
+                      Edit
+                    </button>
+                    <%= button_to(record.active? ? "Deactivate" : "Activate",
+                        toggle_status_month_master_path(record),
+                        method: :patch,
+                        class: "px-3 py-1 rounded-lg bg-emerald-50 text-green-700 font-bold hover:bg-emerald-100") %>
+                    <%= button_to "Delete",
+                        month_master_path(record),
+                        method: :delete,
+                        data: { confirm: "Delete this month record?" },
+                        class: "px-3 py-1 rounded-lg bg-red-50 text-red-700 font-bold hover:bg-red-100" %>
+                  </div>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("click", function(event) {
+    const button = event.target.closest(".edit-month-record");
+    if (!button) return;
+
+    const form = document.getElementById("monthMasterForm");
+    const methodInput = document.getElementById("monthMasterMethod");
+    const submitButton = document.getElementById("monthMasterSubmit");
+    if (!form || !methodInput) return;
+
+    form.action = button.dataset.url;
+    methodInput.disabled = false;
+    const monthSelect = form.querySelector("[name='month_master[month_name]']");
+    const financialYearSelect = form.querySelector("[name='month_master[financial_year]']");
+    if (monthSelect) monthSelect.value = button.dataset.month;
+    if (financialYearSelect) financialYearSelect.value = button.dataset.financialYear;
+    if (submitButton) submitButton.value = "Update";
+    form.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+</script>

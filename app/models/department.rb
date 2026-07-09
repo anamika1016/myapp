@@ -28,7 +28,7 @@
     return unless employee_reference.present?
 
     # Find the employee
-    employee = EmployeeDetail.find_by(employee_id: employee_reference)
+    employee = find_employee_by_reference(employee_reference)
     return unless employee
 
     year = financial_year.presence || current_financial_year
@@ -58,7 +58,7 @@
     return unless employee_reference.present?
 
     # Find the employee
-    employee = EmployeeDetail.find_by(employee_id: employee_reference)
+    employee = find_employee_by_reference(employee_reference)
     return unless employee
 
     year = financial_year.presence || current_financial_year
@@ -100,28 +100,37 @@
 
   # Get employee name from employee_reference (which stores employee_id)
   def employee_name
-    employee = EmployeeDetail.find_by(employee_id: self.employee_reference)
+    employee = find_employee_by_reference(employee_reference)
     employee&.employee_name || "N/A"
   end
 
   # Get employee details
   def employee_detail
-    EmployeeDetail.find_by(employee_id: self.employee_reference)
+    find_employee_by_reference(employee_reference)
   end
 
   # Get employee code
   def employee_code
-    employee = EmployeeDetail.find_by(employee_id: self.employee_reference)
+    employee = find_employee_by_reference(employee_reference)
     employee&.employee_code || "N/A"
   end
 
   # Get full employee display name with code
   def employee_display_name
-    employee = EmployeeDetail.find_by(employee_id: self.employee_reference)
+    employee = find_employee_by_reference(employee_reference)
     if employee
-      "#{employee.employee_name} (#{employee.employee_code})"
+      display_code = employee.employee_code.presence || employee.employee_id.presence
+      "#{employee.employee_name} (#{display_code})"
     else
       "N/A"
     end
+  end
+
+  def find_employee_by_reference(reference)
+    normalized_reference = reference.to_s.strip
+    return nil if normalized_reference.blank?
+
+    EmployeeDetail.find_by(employee_id: normalized_reference) ||
+      EmployeeDetail.find_by(employee_code: normalized_reference)
   end
   end

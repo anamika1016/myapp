@@ -57,6 +57,17 @@ Rails.application.routes.draw do
     end
   end
 
+  resources :month_masters, except: [ :show ] do
+    member do
+      patch :toggle_status
+    end
+
+    collection do
+      post :import
+      get :export
+    end
+  end
+
   resources :departments do
     member do
       get :edit_data
@@ -90,8 +101,17 @@ Rails.application.routes.draw do
       patch :bulk_update_portal_status
       get "l1"
       get "l2"  # ➤ this is your sidebar L1 view
+      get :quarterly_pli
+      post :save_quarterly_pli
+      get :observer_1
+      get :observer_2
+      get :observer_3
+      get :observer_4
+      post :save_observer_pli
     end
      member do
+      get :quarterly_pli_detail
+      get :observer_pli_detail
       patch :approve
       patch :return
       patch :l2_approve  # L2 approve

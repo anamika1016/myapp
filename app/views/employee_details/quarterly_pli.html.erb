@@ -1,0 +1,202 @@
+<div class="main-content sidebar-hidden bg-gray-50 min-h-screen">
+  <div class="min-h-screen pl-64 pr-4 pt-4 pb-12 overflow-x-auto bg-gradient-to-br from-gray-50 to-gray-100">
+    <div class="w-full max-w-7xl mx-auto bg-white p-8 rounded-xl shadow-xl border border-gray-200">
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-8 pb-4 border-b-2 border-gray-200">
+        <div class="flex items-center">
+          <i class="fas fa-chart-line text-2xl text-teal-600 mr-3"></i>
+          <h2 class="text-3xl font-bold text-gray-800">Quarterly PLI %</h2>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <i class="fas fa-search text-gray-400"></i>
+            </div>
+            <input type="text"
+                   id="quarterlyPliSearch"
+                   placeholder="Search employees..."
+                   class="block w-full sm:w-64 pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all duration-200">
+          </div>
+
+          <%= form_with url: quarterly_pli_employee_details_path, method: :get, local: true, class: "flex flex-col sm:flex-row gap-3", data: { turbo: false } do %>
+            <%= select_tag :quarter,
+                options_for_select([["All Quarters", ""]] + @quarter_options, @selected_quarterly_pli_quarter),
+                class: "w-full sm:w-48 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500",
+                onchange: "this.form.submit()" %>
+            <%= select_tag :financial_year,
+                options_for_select(@financial_year_options, @selected_financial_year),
+                class: "w-full sm:w-52 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500",
+                onchange: "this.form.submit()" %>
+          <% end %>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto bg-white rounded-lg shadow-sm border border-gray-200">
+        <table id="quarterlyPliTable" class="min-w-full divide-y divide-gray-300 text-sm">
+          <thead class="bg-gradient-to-r from-gray-800 to-gray-700">
+            <tr>
+              <th class="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider border-r border-gray-600">Employee Code</th>
+              <th class="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider border-r border-gray-600">Name</th>
+              <th class="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider border-r border-gray-600">Department</th>
+              <th class="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider border-r border-gray-600">Financial Year</th>
+              <th class="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider border-r border-gray-600">Quarter</th>
+              <th class="px-6 py-4 text-center text-xs font-semibold text-white uppercase tracking-wider border-r border-gray-600">Calculated %</th>
+              <th class="px-6 py-4 text-center text-xs font-semibold text-white uppercase tracking-wider border-r border-gray-600">Final PLI %</th>
+              <th class="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider border-r border-gray-600">Status</th>
+              <th class="px-6 py-4 text-center text-xs font-semibold text-white uppercase tracking-wider">Action</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <% @quarterly_pli_rows.each_with_index do |row, index| %>
+              <% employee = row[:employee] %>
+              <% review = row[:review] %>
+              <tr class="<%= index.even? ? 'bg-gray-50' : 'bg-white' %> hover:bg-teal-50 transition-colors duration-200 quarterly-pli-row">
+                <td class="px-6 py-4 text-sm text-gray-700 border-r border-gray-200"><%= employee.employee_code %></td>
+                <td class="px-6 py-4 text-sm font-medium text-gray-900 border-r border-gray-200"><%= employee.employee_name %></td>
+                <td class="px-6 py-4 text-sm text-gray-700 border-r border-gray-200"><%= employee.department.presence || "N/A" %></td>
+                <td class="px-6 py-4 text-sm text-gray-700 border-r border-gray-200"><%= row[:financial_year] %></td>
+                <td class="px-6 py-4 text-sm text-gray-700 border-r border-gray-200">
+                  <span class="font-semibold text-teal-700"><%= row[:quarter_label] %></span>
+                </td>
+                <td class="px-6 py-4 text-sm text-center border-r border-gray-200">
+                  <span class="inline-flex items-center px-3 py-1 rounded bg-emerald-50 text-emerald-700 font-semibold"><%= row[:calculated_percentage] %>%</span>
+                  <div class="mt-1 text-xs text-gray-500">
+                    <%= pluralize(row.dig(:detail_payload, :quarter_month_count).to_i, "month") %>
+                  </div>
+                </td>
+                <td class="px-6 py-4 text-sm text-center border-r border-gray-200">
+                  <% if review.present? %>
+                    <span class="inline-flex items-center px-3 py-1 rounded bg-blue-50 text-blue-700 font-semibold"><%= format('%.2f', review.final_percentage.to_f) %>%</span>
+                  <% else %>
+                    <span class="text-gray-400">-</span>
+                  <% end %>
+                </td>
+                <td class="px-6 py-4 text-sm border-r border-gray-200">
+                  <% if review&.status == "returned" %>
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border bg-orange-100 text-orange-800 border-orange-300">
+                      <i class="fas fa-undo mr-1"></i>
+                      Returned
+                    </span>
+                  <% elsif review.present? %>
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border bg-green-100 text-green-800 border-green-300">
+                      <i class="fas fa-check-circle mr-1"></i>
+                      Final Saved
+                    </span>
+                  <% else %>
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border bg-yellow-100 text-yellow-800 border-yellow-300">
+                      <i class="fas fa-clock mr-1"></i>
+                      Pending Final PLI
+                    </span>
+                  <% end %>
+                </td>
+                <td class="px-6 py-4 text-sm text-center">
+                  <%= link_to quarterly_pli_detail_employee_detail_path(employee, financial_year: row[:financial_year], quarter: row[:quarter]),
+                      class: "review-eye-button",
+                      title: "View quarter details" do %>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+                      <circle cx="12" cy="12" r="2.5" />
+                    </svg>
+                  <% end %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+
+        <% if @quarterly_pli_rows.empty? %>
+          <div class="text-center py-12 text-gray-500">
+            <i class="fas fa-inbox text-4xl mb-4"></i>
+            <h3 class="text-lg font-semibold mb-2">No Completed Quarter Found</h3>
+            <p class="text-sm">Records appear here after each month in the quarter has approved submitted achievements (L2 approval when L2 is assigned, otherwise L1 approval).</p>
+          </div>
+        <% end %>
+      </div>
+
+      <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+          <div class="flex items-center">
+            <i class="fas fa-layer-group text-blue-600 mr-3"></i>
+            <div>
+              <p class="text-sm font-medium text-blue-800">Completed Quarters</p>
+              <p class="text-2xl font-bold text-blue-900"><%= @quarterly_pli_rows.size %></p>
+            </div>
+          </div>
+        </div>
+        <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+          <div class="flex items-center">
+            <i class="fas fa-clock text-yellow-600 mr-3"></i>
+            <div>
+              <p class="text-sm font-medium text-yellow-800">Pending Final PLI</p>
+              <p class="text-2xl font-bold text-yellow-900"><%= @quarterly_pli_rows.count { |row| row[:review].blank? } %></p>
+            </div>
+          </div>
+        </div>
+        <div class="bg-green-50 p-4 rounded-lg border border-green-200">
+          <div class="flex items-center">
+            <i class="fas fa-check-circle text-green-600 mr-3"></i>
+            <div>
+              <p class="text-sm font-medium text-green-800">Final Saved</p>
+              <p class="text-2xl font-bold text-green-900"><%= @quarterly_pli_rows.count { |row| row[:review]&.status == "approved" } %></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .min-h-screen {
+    padding-left: 16rem;
+  }
+
+  .sidebar-hidden .min-h-screen {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  .sidebar-hidden .max-w-7xl {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  .review-eye-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9999px;
+    border: 1px solid #7dd3fc;
+    background: #e0f2fe;
+    color: #0369a1;
+    box-shadow: 0 2px 8px rgba(3, 105, 161, 0.18);
+    transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    cursor: pointer;
+  }
+
+  .review-eye-button:hover {
+    background: #bae6fd;
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(3, 105, 161, 0.24);
+  }
+
+  .review-eye-button svg {
+    width: 1rem;
+    height: 1rem;
+  }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const searchInput = document.getElementById('quarterlyPliSearch');
+
+  searchInput?.addEventListener('input', function() {
+    const term = this.value.toLowerCase().trim();
+    document.querySelectorAll('.quarterly-pli-row').forEach((row) => {
+      row.style.display = row.textContent.toLowerCase().includes(term) ? '' : 'none';
+    });
+  });
+});
+</script>

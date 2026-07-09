@@ -23,44 +23,37 @@
             <table class="table table-bordered table-sm">
               <thead class="table-dark">
                 <tr>
+                  <th>S.No</th>
                   <th>Department</th>
-                  <th>Activity</th>
-                  <th>Theme</th>
-                  <th>Unit</th>
-                  <th>April</th>
-                  <th>May</th>
-                  <th>June</th>
-                  <th>July</th>
-                  <th>August</th>
-                  <th>September</th>
-                  <th>October</th>
-                  <th>November</th>
-                  <th>December</th>
-                  <th>January</th>
-                  <th>February</th>
-                  <th>March</th>
+                  <th>Key result indicators</th>
+                  <th>Unit of measurement</th>
+                  <th><%= annual_target_fy_label(@selected_financial_year) %></th>
+                  <th>APR</th>
+                  <th>MAY</th>
+                  <th>JUN</th>
+                  <th>JUL</th>
+                  <th>AUG</th>
+                  <th>SEP</th>
+                  <th>OCT</th>
+                  <th>NOV</th>
+                  <th>DEC</th>
+                  <th>JAN</th>
+                  <th>FEB</th>
+                  <th>MAR</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                <% @user_details.each do |detail| %>
+                <% @user_details.each_with_index do |detail, detail_index| %>
                   <tr>
+                    <td><%= detail_index + 1 %></td>
                     <td><%= detail.department&.department_type %></td>
                     <td><%= detail.activity&.activity_name %></td>
-                    <td><%= detail.activity&.theme_name.presence || 'No Theme' %></td>
                     <td><%= detail.activity&.unit %></td>
-                    <td><%= detail.april.presence || '-' %></td>
-                    <td><%= detail.may.presence || '-' %></td>
-                    <td><%= detail.june.presence || '-' %></td>
-                    <td><%= detail.july.presence || '-' %></td>
-                    <td><%= detail.august.presence || '-' %></td>
-                    <td><%= detail.september.presence || '-' %></td>
-                    <td><%= detail.october.presence || '-' %></td>
-                    <td><%= detail.november.presence || '-' %></td>
-                    <td><%= detail.december.presence || '-' %></td>
-                    <td><%= detail.january.presence || '-' %></td>
-                    <td><%= detail.february.presence || '-' %></td>
-                    <td><%= detail.march.presence || '-' %></td>
+                    <td><%= annual_target_display(detail.activity) %></td>
+                    <% %i[april may june july august september october november december january february march].each do |month| %>
+                      <td><%= target_display_value(detail.public_send(month)) %></td>
+                    <% end %>
                     <td>
                       <%= link_to "Edit", edit_user_detail_path(detail), class: "btn btn-sm btn-outline-secondary me-1" %>
                       <%= link_to "Delete", user_detail_path(detail), method: :delete, data: { confirm: "Are you sure?" }, class: "btn btn-sm btn-outline-danger" %>

@@ -16,20 +16,19 @@
                 <th>Department</th>
                 <th>Employee Name</th>
                 <th>Activity</th>
-                <th>Theme</th>
-                <th>Unit</th>
-                <th>April</th>
-                <th>May</th>
-                <th>June</th>
-                <th>July</th>
-                <th>August</th>
-                <th>September</th>
-                <th>October</th>
-                <th>November</th>
-                <th>December</th>
-                <th>January</th>
-                <th>February</th>
-                <th>March</th>
+                <th>Unit of Measurement</th>
+                <th>APR</th>
+                <th>MAY</th>
+                <th>JUN</th>
+                <th>JUL</th>
+                <th>AUG</th>
+                <th>SEP</th>
+                <th>OCT</th>
+                <th>NOV</th>
+                <th>DEC</th>
+                <th>JAN</th>
+                <th>FEB</th>
+                <th>MAR</th>
               </tr>
             </thead>
             <tbody>
@@ -38,7 +37,6 @@
                   <td><%= detail.department.department_type %></td>
                   <td><%= detail.employee_detail&.employee_name || 'N/A' %></td>
                   <td><%= detail.activity.activity_name %></td>
-                  <td><%= detail.department.theme_name.presence || 'No Theme' %></td>
                   <td><%= detail.activity.unit %></td>
                   <td><%= detail.april.presence || '-' %></td>
                   <td><%= detail.may.presence || '-' %></td>

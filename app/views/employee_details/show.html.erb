@@ -14,21 +14,60 @@
 <div class="main-content bg-gray-50 min-h-screen">
 <div class="p-8 bg-white rounded-xl shadow-lg border border-gray-200 mx-4">
   <div class="border-b border-gray-200 pb-6 mb-8">
-    <h2 class="text-3xl font-bold text-gray-800 flex items-center">
-      <i class="fas fa-user-circle mr-3 text-gray-600"></i>
-      Employee Detail
-    </h2>
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <h2 class="text-3xl font-bold text-gray-800 flex items-center">
+        <i class="fas fa-user-circle mr-3 text-gray-600"></i>
+        Employee Detail
+      </h2>
+      <% if @observer_context %>
+        <% observer_back_path = observer_pli_index_path(@observer_level, financial_year: @selected_financial_year, quarter: @selected_quarter, month: @selected_month) %>
+        <%= link_to observer_back_path,
+            class: "inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold border border-gray-300 transition-all duration-200 self-start md:self-center" do %>
+          <i class="fas fa-arrow-left"></i>
+          Back to <%= @observer_title %>
+        <% end %>
+      <% end %>
+    </div>
   </div>
 
   <!-- Status Message Container -->
   <div id="statusMessage" class="hidden mb-4 p-4 rounded-lg"></div>
 
-  <% if @user_details.any? && @user_details.any? { |detail| detail.achievements.any?(&:achievement?) } %>
+  <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Employee Code</p>
+      <p class="text-sm font-semibold text-gray-900"><%= @employee_detail.employee_code.presence || "N/A" %></p>
+    </div>
+    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Employee Name</p>
+      <p class="text-sm font-semibold text-gray-900"><%= @employee_detail.employee_name.presence || "N/A" %></p>
+    </div>
+    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Department</p>
+      <p class="text-sm font-semibold text-gray-900"><%= @employee_detail.department.presence || "N/A" %></p>
+    </div>
+    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Post</p>
+      <p class="text-sm font-semibold text-gray-900"><%= @employee_detail.post.presence || "N/A" %></p>
+    </div>
+    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Location</p>
+      <p class="text-sm font-semibold text-gray-900"><%= @employee_detail.location.presence || "N/A" %></p>
+    </div>
+    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Financial Year</p>
+      <p class="text-sm font-semibold text-gray-900"><%= @selected_financial_year.presence || "All" %></p>
+    </div>
+  </div>
+
+  <% if @user_details.any? %>
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm mt-8">
       <div class="bg-gray-100 px-6 py-4 border-b border-gray-200 rounded-t-xl">
         <h2 class="text-2xl font-bold text-gray-800 flex items-center">
           <i class="fas fa-trophy mr-3 text-gray-600"></i>
-          <% if params[:quarter].present? %>
+          <% if params[:month].present? %>
+            <%= short_month_label(params[:month]) %> Achievement Details
+          <% elsif params[:quarter].present? %>
             Quarter Achievement Details
           <% else %>
             Submitted Achievements
@@ -40,75 +79,111 @@
         <div class="table-wrapper overflow-auto bg-white rounded-lg border border-gray-200">
           <%
             # Define months to display based on quarter or all months if no quarter is specified
-            display_months = if params[:quarter].present?
+            display_months = if params[:month].present?
+                              [[params[:month].to_s.downcase.to_sym, short_month_label(params[:month])]]
+                            elsif params[:quarter].present?
                               case params[:quarter]
                               when 'Q1'
-                                [[:april, 'Apr'], [:may, 'May'], [:june, 'Jun']]
+                                [[:april, 'APR'], [:may, 'MAY'], [:june, 'JUN']]
                               when 'Q2'
-                                [[:july, 'Jul'], [:august, 'Aug'], [:september, 'Sep']]
+                                [[:july, 'JUL'], [:august, 'AUG'], [:september, 'SEP']]
                               when 'Q3'
-                                [[:october, 'Oct'], [:november, 'Nov'], [:december, 'Dec']]
+                                [[:october, 'OCT'], [:november, 'NOV'], [:december, 'DEC']]
                               when 'Q4'
-                                [[:january, 'Jan'], [:february, 'Feb'], [:march, 'Mar']]
+                                [[:january, 'JAN'], [:february, 'FEB'], [:march, 'MAR']]
                               else
                                 []
                               end
                             else
                               # Fallback to a default or all months if no quarter is specified
-                              [[:april, 'Apr'], [:may, 'May'], [:june, 'Jun']] # Defaulting to Q2 for example
+                              [[:april, 'APR'], [:may, 'MAY'], [:june, 'JUN']] # Defaulting to Q1 for example
                             end
+            monthly_summary_totals = display_months.each_with_object({}) do |(month_symbol, _), totals|
+              totals[month_symbol] = { progress_sum: 0.0, progress_count: 0 }
+            end
+            target_present_for_display = lambda do |detail, month_symbol|
+              target_value = detail.public_send(month_symbol)
+              target_text = target_value.to_s.delete(",").strip
+              target_is_numeric = target_text.match?(/\A-?\d+(?:\.\d+)?\z/)
+              target_value.present? && (!target_is_numeric || target_text.to_f.positive?)
+            end
           %>
           <table class="table table-hover w-full min-w-full">
             <thead class="bg-gray-800">
               <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Department</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Employee Name</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Activity</th>
-                <th class="px-4 py-3 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Unit</th>
+                <th class="serial-column sticky-col px-4 py-3 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">S.No</th>
+                <th class="kri-column sticky-col px-4 py-3 text-left text-xs font-medium text-white tracking-wider border-r border-gray-600">Key result indicators</th>
+                <th class="unit-column sticky-col px-4 py-3 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Unit of Measurement</th>
+                <th class="annual-target-column sticky-col px-4 py-3 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600"><%= annual_target_fy_label(@selected_financial_year) %></th>
 
                 <!-- DYNAMIC MONTH COLUMNS -->
                 <% display_months.each do |month_symbol, month_name| %>
-                  <th class="px-4 py-3 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 bg-gray-700"><%= month_name %> Target</th>
-                  <th class="px-4 py-3 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 bg-gray-700"><%= month_name %> Achievement</th>
-                  <th class="px-4 py-3 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 bg-gray-700"><%= month_name %> Remarks</th>
+                  <th class="month-target-column px-4 py-3 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 bg-gray-700"><%= month_name %> Target</th>
+                  <th class="month-achievement-column px-4 py-3 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 bg-gray-700"><%= month_name %> Achievement</th>
+                  <th class="month-progress-column px-4 py-3 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">% Progress</th>
+                  <th class="remarks-header px-4 py-3 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700"><%= employee_remarks_column_label %></th>
+                  <% observer_levels_for_display(@employee_detail).each do |obs_level| %>
+                    <th class="observer-remarks-column manager-remarks-header px-4 py-3 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700"><%= manager_remarks_column_label(observer_column_label(obs_level)) %></th>
+                  <% end %>
+                  <% unless @observer_context %>
+                    <th class="l1-remarks-column manager-remarks-header px-4 py-3 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700"><%= manager_remarks_column_label("L1") %></th>
+                  <% end %>
+                  <% if l2_reviewer_assigned?(@employee_detail) && !@observer_context %>
+                    <th class="l2-remarks-column manager-remarks-header px-4 py-3 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700"><%= manager_remarks_column_label("L2") %></th>
+                  <% end %>
                 <% end %>
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-              <% @user_details.each_with_index do |detail, detail_index| %>
+              <% visible_detail_index = 0 %>
+              <% @user_details.each do |detail| %>
                 <% 
                   existing_achievements = detail.achievements.index_by(&:month)
-                  # Only render the row if there is at least one achievement in the selected quarter for this activity
-                  has_quarterly_data = display_months.any? do |month_symbol, _|
-                    existing_achievements[month_symbol.to_s]&.achievement.present? || detail.send(month_symbol).present?
-                  end
+                  has_quarterly_data = detail.activity.present? && display_months.any? { |month_symbol, _| target_present_for_display.call(detail, month_symbol) }
                 %>
                 <% if has_quarterly_data %>
-                  <tr class="<%= detail_index.even? ? 'bg-gray-50' : 'bg-white' %> hover:bg-gray-100 transition-colors duration-200">
-                    <!-- Static Columns -->
-                    <td class="px-4 py-3 text-sm text-gray-800 font-medium border-r border-gray-200">
-                      <%= detail.department&.department_type || 'N/A' %>
+                  <% visible_detail_index += 1 %>
+                  <tr class="<%= visible_detail_index.odd? ? 'bg-gray-50' : 'bg-white' %> hover:bg-gray-100 transition-colors duration-200">
+                    <td class="serial-cell sticky-col px-4 py-3 text-sm text-gray-800 border-r border-gray-200 text-center">
+                      <%= visible_detail_index %>
                     </td>
-                    <td class="px-4 py-3 text-sm text-gray-800 font-medium border-r border-gray-200">
-                      <%= detail.employee_detail&.employee_name || 'N/A' %>
+                    <td class="kri-cell sticky-col px-4 py-3 text-sm text-gray-800 border-r border-gray-200">
+                      <div class="kri-cell-inner">
+                        <span class="activity-name"><%= detail.activity&.activity_name || 'N/A' %></span>
+                      </div>
                     </td>
-                    <td class="px-4 py-3 text-sm text-gray-800 border-r border-gray-200">
-                      <%= detail.activity&.activity_name || 'N/A' %>
-                    </td>
-                    <td class="px-4 py-3 text-sm text-gray-800 border-r border-gray-200 text-center">
+                    <td class="unit-cell sticky-col px-4 py-3 text-sm text-gray-800 border-r border-gray-200 text-center">
                       <%= detail.activity&.unit || '' %>
+                    </td>
+                    <td class="annual-target-cell sticky-col px-4 py-3 text-sm text-gray-800 border-r border-gray-200 text-center">
+                      <%= annual_target_display(detail.activity) %>
                     </td>
 
                     <!-- Dynamic Month Data Columns -->
                     <% display_months.each do |month_symbol, month_name| %>
                       <%
                         target_value = detail.send(month_symbol)
+                        target_text = target_value.to_s.delete(",").strip
+                        target_is_numeric = target_text.match?(/\A-?\d+(?:\.\d+)?\z/)
+                        has_target = target_value.present? && (!target_is_numeric || target_text.to_f.positive?)
                         achievement_record = existing_achievements[month_symbol.to_s]
                         achievement_value = achievement_record&.achievement
                         employee_remarks = achievement_record&.employee_remarks
+                        l1_manager_remarks = achievement_record&.achievement_remark&.reporting_manager_remarks
+                        obs_remarks_by_level = ApplicationHelper::OBSERVER_LEVELS.index_with do |obs_level|
+                          achievement_record&.achievement_remark&.public_send("#{obs_level}_remarks")
+                        end
+                        l2_manager_remarks = achievement_record&.achievement_remark&.l2_remarks
+                        target_number = target_is_numeric ? target_text.to_f : 0.0
+                        achievement_number = achievement_value.to_s.delete(",").to_f
+                        progress_percentage = has_target && target_number.positive? && achievement_value.present? ? (((achievement_number / target_number) * 100.0 * 100).floor / 100.0) : nil
+                        if has_target && target_number.positive?
+                          monthly_summary_totals[month_symbol][:progress_sum] += (progress_percentage || 0.0)
+                          monthly_summary_totals[month_symbol][:progress_count] += 1
+                        end
                       %>
                       <!-- Target -->
-                      <td class="px-4 py-3 text-sm text-gray-800 text-center border-r border-gray-200 bg-gray-50">
+                      <td class="month-target-cell px-4 py-3 text-sm text-gray-800 text-center border-r border-gray-200 bg-gray-50">
                         <span class="<%= target_value.presence ? 'text-gray-800 font-medium' : 'text-gray-400' %>">
                           <%= target_value.presence || '-' %>
                         </span>
@@ -120,20 +195,119 @@
                           <%= achievement_value.presence || '-' %>
                         </span>
                       </td>
+
+                      <td class="px-4 py-3 text-sm text-center border-r border-gray-200 progress-cell">
+                        <span class="<%= progress_percentage ? 'text-emerald-700 font-semibold bg-emerald-50 px-2 py-1 rounded' : 'text-gray-400' %>">
+                          <%= progress_percentage ? "#{format('%.2f', progress_percentage)}%" : '-' %>
+                        </span>
+                      </td>
                       
                       <!-- Remarks -->
                       <td class="px-4 py-3 text-sm text-center border-r border-gray-200 remarks-cell">
                         <% if employee_remarks.present? %>
-                          <div class="text-blue-700 font-medium bg-blue-50 px-2 py-1 rounded text-xs break-words max-w-full overflow-hidden" style="word-wrap: break-word; word-break: break-word; hyphens: auto; max-width: 300px;">
+                          <div class="text-blue-700 text-xs break-words remarks-text leading-snug">
                             <%= employee_remarks %>
                           </div>
                         <% else %>
                           <span class="text-gray-400 text-xs">-</span>
                         <% end %>
                       </td>
+
+                      <% observer_levels_for_display(@employee_detail).each do |obs_level| %>
+                        <% obs_remarks = obs_remarks_by_level[obs_level] %>
+                        <% obs_assigned = observer_assigned_for_display?(@employee_detail, obs_level) %>
+                        <td class="px-4 py-3 text-sm text-center border-r border-gray-200 observer-remarks-cell">
+                          <% if @observer_context && @observer_level == obs_level %>
+                            <% if @can_observer_approve_or_return %>
+                              <textarea
+                                form="observerForm"
+                                class="observer-remarks-input w-full rounded border border-gray-300 p-2 text-xs focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+                                rows="2"
+                                maxlength="500"
+                                name="observer_remarks[<%= detail.id %>][<%= month_symbol %>]"
+                                placeholder="<%= observer_column_label(obs_level) %> remarks"><%= obs_remarks %></textarea>
+                            <% elsif obs_remarks.present? %>
+                              <div class="text-sky-700 font-medium bg-sky-50 px-2 py-1 rounded text-xs break-words max-w-full overflow-hidden" style="word-wrap: break-word; word-break: break-word; hyphens: auto; max-width: 300px;">
+                                <%= obs_remarks %>
+                              </div>
+                            <% else %>
+                              <span class="text-gray-400 text-xs">-</span>
+                            <% end %>
+                          <% elsif !@observer_context && obs_assigned && obs_remarks.present? %>
+                            <div class="text-sky-700 text-xs break-words max-w-[110px] mx-auto leading-snug">
+                              <%= obs_remarks %>
+                            </div>
+                          <% else %>
+                            <span class="text-gray-400 text-xs">-</span>
+                          <% end %>
+                        </td>
+                      <% end %>
+
+                      <% unless @observer_context %>
+                      <td class="l1-remarks-cell px-4 py-3 text-sm text-center border-r border-gray-200 reporting-manager-remarks-cell">
+                        <% if @can_approve_or_return && (achievement_record.blank? || (achievement_record.status.presence || "pending") == "pending") %>
+                          <textarea
+                            class="l1-reporting-manager-remarks-input w-full min-w-[220px] rounded border border-gray-300 p-2 text-xs focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                            rows="2"
+                            maxlength="500"
+                            data-user-detail-id="<%= detail.id %>"
+                            data-month="<%= month_symbol %>"
+                            placeholder="L1 remarks"><%= l1_manager_remarks %></textarea>
+                        <% elsif l1_manager_remarks.present? %>
+                          <div class="text-indigo-700 font-medium bg-indigo-50 px-2 py-1 rounded text-xs break-words max-w-full overflow-hidden" style="word-wrap: break-word; word-break: break-word; hyphens: auto; max-width: 300px;">
+                            <%= l1_manager_remarks %>
+                          </div>
+                        <% else %>
+                          <span class="text-gray-400 text-xs">-</span>
+                        <% end %>
+                      </td>
+                      <% end %>
+
+                      <% if l2_reviewer_assigned?(@employee_detail) && !@observer_context %>
+                        <td class="px-4 py-3 text-sm text-center border-r border-gray-200 reporting-manager-remarks-cell">
+                          <% if l2_manager_remarks.present? %>
+                            <div class="text-indigo-700 font-medium bg-indigo-50 px-2 py-1 rounded text-xs break-words max-w-full overflow-hidden" style="word-wrap: break-word; word-break: break-word; hyphens: auto; max-width: 300px;">
+                              <%= l2_manager_remarks %>
+                            </div>
+                          <% else %>
+                            <span class="text-gray-400 text-xs">-</span>
+                          <% end %>
+                        </td>
+                      <% end %>
+
                     <% end %>
                   </tr>
                 <% end %>
+              <% end %>
+              <% if visible_detail_index.positive? %>
+                <tr class="monthly-summary-footer bg-gray-100">
+                  <td colspan="4" class="sticky-col summary-sticky-footer px-4 py-3 text-right text-sm font-bold text-gray-800 border-r border-gray-200">Total</td>
+                  <% display_months.each do |month_symbol, month_name| %>
+                    <%
+                      month_total = monthly_summary_totals[month_symbol]
+                      progress_total = if month_total[:progress_count].positive?
+                        (((month_total[:progress_sum] / month_total[:progress_count]) * 100).floor / 100.0)
+                      end
+                    %>
+                    <td class="monthly-summary-target px-4 py-3 text-center text-sm font-bold border-r border-gray-200"></td>
+                    <td class="monthly-summary-achievement px-4 py-3 text-center text-sm font-bold border-r border-gray-200"></td>
+                    <td class="monthly-summary-total px-4 py-3 text-center text-sm font-bold border-r border-gray-200" data-summary-month="<%= month_symbol %>">
+                      <span class="<%= progress_total ? 'summary-total-progress-value text-emerald-900 font-bold bg-emerald-100 px-2 py-1 rounded' : 'summary-total-progress-value text-gray-400' %>">
+                        <%= progress_total ? "#{format('%.2f', progress_total)}%" : '-' %>
+                      </span>
+                    </td>
+                    <td class="monthly-summary-remarks px-4 py-3 text-center text-sm font-bold border-r border-gray-200"></td>
+                    <% observer_levels_for_display(@employee_detail).each do |obs_level| %>
+                      <td class="monthly-summary-observer px-4 py-3 text-center text-sm font-bold border-r border-gray-200"></td>
+                    <% end %>
+                    <% unless @observer_context %>
+                      <td class="monthly-summary-l1 px-4 py-3 text-center text-sm font-bold border-r border-gray-200"></td>
+                    <% end %>
+                    <% if l2_reviewer_assigned?(@employee_detail) && !@observer_context %>
+                      <td class="monthly-summary-l2 px-4 py-3 text-center text-sm font-bold border-r border-gray-200"></td>
+                    <% end %>
+                  <% end %>
+                </tr>
               <% end %>
             </tbody>
           </table>
@@ -142,10 +316,24 @@
     </div>
   <% end %>
 
+<%
+  review_progress_percentage = nil
+  if defined?(monthly_summary_totals) && monthly_summary_totals.present?
+    review_progress_sum = monthly_summary_totals.values.sum { |total| total[:progress_sum].to_f }
+    review_progress_count = monthly_summary_totals.values.sum { |total| total[:progress_count].to_i }
+    if review_progress_count.positive?
+      review_progress_percentage = ((review_progress_sum / review_progress_count) * 100).floor / 100.0
+    end
+  end
+%>
+
 <!-- FIXED: Single Overall Status Display for Quarter -->
 <% if params[:quarter].present? %>
   <%
-    quarter_months = case params[:quarter]
+    quarter_months = if params[:month].present?
+                   [params[:month].to_s.downcase]
+                   else
+                   case params[:quarter]
                    when 'Q1'
                      ['april', 'may', 'june']
                    when 'Q2'
@@ -156,6 +344,7 @@
                      ['january', 'february', 'march']
                    else
                      []
+                   end
                    end
 
     # Calculate quarterly data - collect all statuses for the quarter
@@ -268,12 +457,19 @@
     quarter_remarks_l2_array = quarter_remarks_l2.to_a
   %>
 
+  <%= render "observer_summary_sections" %>
+
   <!-- SINGLE OVERALL STATUS DISPLAY -->
-  <% if quarterly_statuses.any? %>
-    <div class="mt-8 pt-6 border-t border-gray-200" id="quarterStatusSection">
+  <% if quarterly_statuses.any? && !@observer_context %>
+    <div class="mt-6 pt-6 border-t border-gray-200" id="quarterStatusSection">
       <div class="text-center mb-6">
         <h3 class="text-xl font-bold text-gray-800 mb-4">
-           Quarter Overall Status
+           <%= params[:month].present? ? "#{short_month_label(params[:month])} Overall Status" : "Quarter Overall Status" %>
+           <% unless @observer_context %>
+           <span class="block mt-2 text-sm font-semibold text-gray-600">
+             L1: <%= @employee_detail.l1_employer_name.presence || "N/A" %><% if l2_reviewer_assigned?(@employee_detail) %> | L2: <%= @employee_detail.l2_employer_name.presence || "N/A" %><% end %>
+           </span>
+           <% end %>
         </h3>
         <span class="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium border <%= status_config[:color] %>" id="quarterStatusBadge">
           <i class="<%= status_config[:icon] %> mr-2"></i>
@@ -293,47 +489,59 @@
         all_quarter_achievements.concat(quarter_achievements)
       end
 
-      # SINGLE L1 calculation for quarter - include achievements with or without remarks
+      # Show summary values from latest approve/return action (not activity-wise aggregation)
+      latest_l1_remark_record = all_quarter_achievements
+                                .filter_map(&:achievement_remark)
+                                .select { |remark| remark.l1_remarks.present? || remark.l1_percentage.present? }
+                                .max_by(&:updated_at)
+      latest_l2_remark_record = all_quarter_achievements
+                                .filter_map(&:achievement_remark)
+                                .select { |remark| remark.l2_remarks.present? || remark.l2_percentage.present? }
+                                .max_by(&:updated_at)
+
       l1_percentages = all_quarter_achievements.filter_map { |a| a.achievement_remark&.l1_percentage&.to_f }
-      final_l1_average = l1_percentages.any? ? (l1_percentages.sum / l1_percentages.size).round(1) : 0.0
-
-      # SINGLE L2 calculation for quarter - include achievements with or without remarks
       l2_percentages = all_quarter_achievements.filter_map { |a| a.achievement_remark&.l2_percentage&.to_f }
-      final_l2_average = l2_percentages.any? ? (l2_percentages.sum / l2_percentages.size).round(1) : 0.0
+      saved_l1_average = l1_percentages.any? ? (l1_percentages.sum / l1_percentages.size).round(1) : 0.0
+      saved_l2_average = l2_percentages.any? ? (l2_percentages.sum / l2_percentages.size).round(1) : 0.0
 
-      # UNIQUE remarks collection (no duplicates) - include achievements with or without remarks
-      unique_l1_remarks = all_quarter_achievements.filter_map { |a| a.achievement_remark&.l1_remarks }.uniq.compact
-      unique_l2_remarks = all_quarter_achievements.filter_map { |a| a.achievement_remark&.l2_remarks }.uniq.compact
+      final_l1_average = review_progress_percentage || latest_l1_remark_record&.l1_percentage.presence&.to_f || saved_l1_average
+      final_l2_average = review_progress_percentage || latest_l2_remark_record&.l2_percentage.presence&.to_f || saved_l2_average
+      final_l1_average_display = format('%.2f', final_l1_average.to_f)
+      final_l2_average_display = format('%.2f', final_l2_average.to_f)
+
+      unique_l1_remarks = latest_l1_remark_record&.l1_remarks.present? ? [ latest_l1_remark_record.l1_remarks ] : []
+      unique_l2_remarks = latest_l2_remark_record&.l2_remarks.present? ? [ latest_l2_remark_record.l2_remarks ] : []
     %>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+    <div id="employeeSummarySections" class="review-summary-grid mt-6 <%= @observer_context ? 'review-summary-grid--single' : (l2_reviewer_assigned?(@employee_detail) ? 'review-summary-grid--two' : 'review-summary-grid--single') %>">
 
+      <% unless @observer_context %>
       <!-- L1 Quarterly Summary - SINGLE DISPLAY -->
-      <div class="bg-gradient-to-r from-blue-50 via-blue-50 to-blue-100 border border-blue-200 rounded-xl p-6 shadow-md">
+      <div id="l1-summary-section" class="review-summary-card bg-gradient-to-r from-blue-50 via-blue-50 to-blue-100 border border-blue-200 rounded-xl p-6 shadow-md">
         <h3 class="text-xl font-bold text-blue-700 mb-6 flex items-center gap-2">
           <i class="fas fa-user-check text-blue-500"></i>
-          L1 Quarter Summary
+          <%= params[:month].present? ? "L1 #{short_month_label(params[:month])} Summary" : "L1 Quarter Summary" %> - <%= @employee_detail.l1_employer_name.presence || "N/A" %>
         </h3>
 
         <!-- SINGLE Quarter Average Percentage -->
         <div class="mb-6 text-center">
-          <div class="bg-blue-200 p-4 rounded-lg inline-block">
-            <p class="text-blue-600 font-semibold text-sm mb-1">Quarter Average Percentage</p>
-            <p class="text-3xl font-bold text-blue-800"><%= final_l1_average %>%</p>
+          <div class="summary-percent-box bg-blue-200 p-4 rounded-lg inline-block">
+            <p class="text-blue-600 font-semibold text-sm mb-1"><%= params[:month].present? ? "Month Average Percentage" : "Quarter Average Percentage" %></p>
+            <p class="text-3xl font-bold text-blue-800"><%= final_l1_average_display %>%</p>
           </div>
         </div>
 
         <!-- UNIQUE L1 Remarks - NO DUPLICATES -->
           <div class="space-y-3">
             <div class="flex items-center justify-between">
-              <h4 class="text-blue-600 font-semibold text-sm">Quarter Remarks:</h4>
+              <h4 class="text-blue-600 font-semibold text-sm"><%= params[:month].present? ? "Month Remarks:" : "Quarter Remarks:" %></h4>
             </div>
           
           <!-- L1 Display Section -->
           <div id="l1-display-section">
             <% if unique_l1_remarks.any? %>
               <div class="stealth-edit-wrap">
-                <div class="bg-white p-4 rounded border max-h-40 overflow-y-auto" id="l1-remarks-display">
+                <div class="summary-remarks-box bg-white p-4 rounded border max-h-40 overflow-y-auto" id="l1-remarks-display">
                   <% unique_l1_remarks.each_with_index do |remark, index| %>
                     <div class="text-gray-700 text-sm mb-3 pb-3 <%= 'border-b border-gray-100' unless index == unique_l1_remarks.length - 1 %>">
                       <div class="flex items-start gap-2">
@@ -351,8 +559,8 @@
               </div>
             <% else %>
               <div class="stealth-edit-wrap">
-                <div class="bg-white p-4 rounded border" id="l1-remarks-container">
-                  <p class="text-gray-500 text-sm">No remarks for this quarter</p>
+                <div class="summary-remarks-box bg-white p-4 rounded border" id="l1-remarks-container">
+                  <p class="text-gray-500 text-sm">No remarks for this <%= params[:month].present? ? "month" : "quarter" %></p>
                 </div>
                 <% if current_user.hod? %>
                   <button type="button" onclick="editL1Remarks()" class="stealth-edit-point stealth-edit-point-blue" aria-label="Edit L1 quarter remarks"></button>
@@ -372,7 +580,7 @@
                 </div>
                 <div class="mb-4">
                   <label for="l1_edit_remarks" class="block text-sm font-medium text-gray-700 mb-1">L1 Remarks:</label>
-                  <textarea id="l1_edit_remarks" name="l1_remarks" rows="3" 
+                  <textarea id="l1_edit_remarks" name="l1_remarks" rows="3" maxlength="500" 
                             class="w-full border border-gray-300 rounded-md p-2"><%= unique_l1_remarks.join('; ') %></textarea>
                 </div>
                 <div class="flex justify-end gap-2">
@@ -384,33 +592,35 @@
           <% end %>
         </div>
       </div>
+      <% end %>
 
+      <% if l2_reviewer_assigned?(@employee_detail) && !@observer_context %>
       <!-- L2 Quarterly Summary - SINGLE DISPLAY -->
-      <div class="bg-gradient-to-r from-green-50 via-green-50 to-green-100 border border-green-200 rounded-xl p-6 shadow-md">
+      <div id="l2-summary-section" class="review-summary-card bg-gradient-to-r from-green-50 via-green-50 to-green-100 border border-green-200 rounded-xl p-6 shadow-md">
         <h3 class="text-xl font-bold text-green-700 mb-6 flex items-center gap-2">
           <i class="fas fa-user-shield text-green-500"></i>
-          L2 Quarter Summary
+          <%= params[:month].present? ? "L2 #{short_month_label(params[:month])} Summary" : "L2 Quarter Summary" %> - <%= @employee_detail.l2_employer_name.presence || "N/A" %>
         </h3>
 
         <!-- SINGLE Quarter Average Percentage -->
         <div class="mb-6 text-center">
-          <div class="bg-green-200 p-4 rounded-lg inline-block">
-            <p class="text-green-600 font-semibold text-sm mb-1">Quarter Average Percentage</p>
-            <p class="text-3xl font-bold text-green-800"><%= final_l2_average %>%</p>
+          <div class="summary-percent-box bg-green-200 p-4 rounded-lg inline-block">
+            <p class="text-green-600 font-semibold text-sm mb-1"><%= params[:month].present? ? "Month Average Percentage" : "Quarter Average Percentage" %></p>
+            <p class="text-3xl font-bold text-green-800"><%= final_l2_average_display %>%</p>
           </div>
         </div>
 
         <!-- UNIQUE L2 Remarks - NO DUPLICATES -->
         <div class="space-y-3">
           <div class="flex items-center justify-between">
-            <h4 class="text-green-600 font-semibold text-sm">Quarter Remarks:</h4>
+            <h4 class="text-green-600 font-semibold text-sm"><%= params[:month].present? ? "Month Remarks:" : "Quarter Remarks:" %></h4>
           </div>
           
           <!-- L2 Display Section -->
           <div id="l2-display-section">
             <% if unique_l2_remarks.any? %>
               <div class="stealth-edit-wrap">
-                <div class="bg-white p-4 rounded border max-h-40 overflow-y-auto" id="l2-remarks-display">
+                <div class="summary-remarks-box bg-white p-4 rounded border max-h-40 overflow-y-auto" id="l2-remarks-display">
                   <% unique_l2_remarks.each_with_index do |remark, index| %>
                     <div class="text-gray-700 text-sm mb-3 pb-3 <%= 'border-b border-gray-100' unless index == unique_l2_remarks.length - 1 %>">
                       <div class="flex items-start gap-2">
@@ -428,8 +638,8 @@
               </div>
             <% else %>
               <div class="stealth-edit-wrap">
-                <div class="bg-white p-4 rounded border" id="l2-remarks-container">
-                  <p class="text-gray-500 text-sm">No remarks for this quarter</p>
+                <div class="summary-remarks-box bg-white p-4 rounded border" id="l2-remarks-container">
+                  <p class="text-gray-500 text-sm">No remarks for this <%= params[:month].present? ? "month" : "quarter" %></p>
                 </div>
                 <% if current_user.hod? %>
                   <button type="button" onclick="editL2Remarks()" class="stealth-edit-point stealth-edit-point-green" aria-label="Edit L2 quarter remarks"></button>
@@ -449,7 +659,7 @@
                 </div>
                 <div class="mb-4">
                   <label for="l2_edit_remarks" class="block text-sm font-medium text-gray-700 mb-1">L2 Remarks:</label>
-                  <textarea id="l2_edit_remarks" name="l2_remarks" rows="3" 
+                  <textarea id="l2_edit_remarks" name="l2_remarks" rows="3" maxlength="500" 
                             class="w-full border border-gray-300 rounded-md p-2"><%= unique_l2_remarks.join('; ') %></textarea>
                 </div>
                 <div class="flex justify-end gap-2">
@@ -461,13 +671,14 @@
           <% end %>
         </div>
       </div>
+      <% end %>
 
     </div>
   <% end %>
 <% end %>
 
   <!-- FIXED: Quarterly Approval/Return Process -->
-<% if @can_approve_or_return && @user_details.any? { |detail| detail.achievements.any?(&:achievement?) } && params[:quarter].present? %>
+<% if @can_approve_or_return && @user_details.any? && params[:quarter].present? %>
   <%
     # Use the already calculated overall_quarter_status to determine button visibility
     can_take_action = false
@@ -483,27 +694,20 @@
     <div class="mt-8 pt-6 border-t border-gray-200">
       <div class="flex flex-col sm:flex-row gap-4 justify-center" id="actionButtons">
         <button onclick="openModal('approve')" class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md transition duration-200">
-          Approve Quarter
+          Approve <%= params[:month].present? ? short_month_label(params[:month]) : "Quarter" %>
         </button>
         <button onclick="openModal('reject')" class="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md transition duration-200">
-          Return  Quarter
+          Return <%= params[:month].present? ? short_month_label(params[:month]) : "Quarter" %>
         </button>
       </div>
     </div>
   <% end %>
 
-<% elsif @can_approve_or_return && @user_details.any? { |detail| detail.achievements.any?(&:achievement?) } %>
+<% elsif @can_approve_or_return && @user_details.any? %>
   <%
-    # For bulk actions, check if any achievement is still pending only
-    can_take_bulk_action = false
-    @user_details.each do |detail|
-      detail.achievements.each do |achievement|
-        if (achievement.status || "pending") == 'pending'
-          can_take_bulk_action = true
-          break
-        end
-      end
-      break if can_take_bulk_action
+    # Submitted KRA rows that are still pending can be reviewed.
+    can_take_bulk_action = @user_details.any? do |detail|
+      detail.achievements.any? { |achievement| (achievement.status || "pending") == 'pending' }
     end
   %>
 
@@ -519,6 +723,10 @@
       </div>
     </div>
   <% end %>
+<% end %>
+
+<% if @observer_context %>
+  <%= render "observer_review_panel" %>
 <% end %>
 
 <!-- FIXED Modal with Correct Positioning - Modal will show OVER Quarter Overall Status -->
@@ -537,11 +745,11 @@
     <form id="modalForm" onsubmit="submitDecision(event)">
       <div class="mb-4">
         <label for="remarks" class="block font-semibold mb-1">Remarks</label>
-        <textarea id="remarks" name="remarks" rows="3" class="w-full border border-gray-300 rounded-md p-2" required></textarea>
+        <textarea id="remarks" name="remarks" rows="3" maxlength="500" class="w-full border border-gray-300 rounded-md p-2" required></textarea>
       </div>
       <div class="mb-4">
         <label for="percentage" class="block font-semibold mb-1">Percentage</label>
-        <input type="number" id="percentage" name="percentage" step="0.1" min="0" max="100" class="w-full border border-gray-300 rounded-md p-2" required>
+        <input type="number" id="percentage" name="percentage" step="0.01" min="0" max="100" class="w-full border border-gray-300 rounded-md p-2 bg-gray-100 cursor-not-allowed" readonly required>
       </div>
 
       <% if params[:user_detail_id].present? %>
@@ -549,6 +757,10 @@
       <% end %>
       <% if params[:quarter].present? %>
         <input type="hidden" name="selected_quarter" value="<%= params[:quarter] %>">
+      <% end %>
+      <input type="hidden" name="selected_financial_year" value="<%= @selected_financial_year %>">
+      <% if params[:month].present? %>
+        <input type="hidden" name="selected_month" value="<%= params[:month] %>">
       <% end %>
 
       <div class="flex justify-end gap-2">
@@ -567,6 +779,31 @@
       currentActionType: '',
       currentActionUrl: ''
     };
+  }
+
+  function parseReviewNumber(value) {
+    const normalizedValue = String(value || '').replace(/,/g, '').replace(/[^0-9.-]/g, '');
+    const number = parseFloat(normalizedValue);
+    return Number.isFinite(number) ? number : null;
+  }
+
+  function calculateReviewProgress() {
+    let progressTotal = 0;
+    let progressCount = 0;
+
+    document.querySelectorAll('.month-target-cell').forEach((targetCell) => {
+      const achievementCell = targetCell.nextElementSibling;
+      const targetValue = parseReviewNumber(targetCell.textContent);
+      const achievementValue = parseReviewNumber(achievementCell?.textContent);
+
+      if (targetValue !== null && targetValue > 0) {
+        progressTotal += achievementValue !== null ? Math.floor(((achievementValue / targetValue) * 100) * 100) / 100 : 0;
+        progressCount += 1;
+      }
+    });
+
+    if (progressCount <= 0) return '';
+    return (Math.floor((progressTotal / progressCount) * 100) / 100).toFixed(2);
   }
 
   function openModal(actionType) {
@@ -628,7 +865,9 @@
     const percentageField = document.getElementById('percentage');
     
     if (remarksField) remarksField.value = '';
-    if (percentageField) percentageField.value = '';
+    if (percentageField) {
+      percentageField.value = '<%= review_progress_percentage.present? ? format("%.2f", review_progress_percentage) : "" %>' || calculateReviewProgress();
+    }
     
     console.log('Modal should now be visible');
     console.log('Modal classes:', modal.className);
@@ -704,6 +943,10 @@
     statusBadge.innerHTML = `<i class="${statusConfig.icon} mr-2"></i>${statusConfig.text}`;
   }
 
+  function removeSidebarPendingDot() {
+    document.querySelectorAll('.sidebar-pending-dot').forEach((dot) => dot.remove());
+  }
+
   function hideActionButtons() {
     const actionButtons = document.getElementById('actionButtons');
     if (actionButtons) {
@@ -714,7 +957,7 @@
       if (!existingMessage) {
         const processedMessage = document.createElement('div');
         processedMessage.className = 'mt-8 pt-6 border-t border-gray-200 text-center text-gray-600 font-medium';
-        processedMessage.textContent = 'This Quarter has been processed and cannot be modified.';
+        processedMessage.textContent = 'This <%= params[:month].present? ? "month" : "quarter" %> has been processed and cannot be modified.';
         actionButtons.parentNode.appendChild(processedMessage);
       }
     }
@@ -726,6 +969,14 @@
     const modalLoading = document.getElementById('modalLoading');
     const form = document.getElementById('modalForm');
     const formData = new FormData(form);
+
+    document.querySelectorAll('.l1-reporting-manager-remarks-input').forEach((input) => {
+      const userDetailId = input.dataset.userDetailId;
+      const month = input.dataset.month;
+      if (userDetailId && month) {
+        formData.append(`manager_remarks[${userDetailId}][${month}]`, input.value || '');
+      }
+    });
     
     // Add action_type to indicate this is an AJAX request
     formData.append('action_type', window.l1ModalData.currentActionType);
@@ -747,6 +998,7 @@
       body: formData,
       headers: {
         'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json',
         'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
       }
     })
@@ -792,12 +1044,13 @@
         // Show success message
         showStatusMessage(data.message, true);
         
-        // Update UI with real data from server if provided
-        if (data.updated_status) {
-          updateStatusBadge(data.updated_status);
-          hideActionButtons();
-          updateQuarterStatus(data.updated_status);
-        }
+        // Update status badge immediately without requiring page refresh
+        const resolvedStatus = data.updated_status ||
+          (window.l1ModalData.currentActionType === 'approve' ? 'l1_approved' : 'l1_returned');
+        updateStatusBadge(resolvedStatus);
+        hideActionButtons();
+        updateQuarterStatus(resolvedStatus);
+        removeSidebarPendingDot();
         
         // Update ONLY L1 summary immediately with form values (DO NOT update L2)
         const percentage = document.getElementById('percentage').value;
@@ -871,11 +1124,14 @@
   });
 
   // Close modal when clicking outside
-  document.getElementById('decisionModal').addEventListener('click', function(e) {
-    if (e.target === this) {
-      closeModal();
-    }
-  });
+  const decisionModalEl = document.getElementById('decisionModal');
+  if (decisionModalEl) {
+    decisionModalEl.addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeModal();
+      }
+    });
+  }
 
   // Close modal with Escape key
   document.addEventListener('keydown', function(e) {
@@ -887,25 +1143,11 @@
   // Function to update L1 summary section immediately
   function updateL1Summary(percentage, remarks) {
     console.log('Updating L1 Summary with:', { percentage, remarks });
-    
-    // Find the L1 Quarter Summary section by looking for the heading text
-    const l1Heading = Array.from(document.querySelectorAll('h3')).find(h3 => h3.textContent.includes('L1 Quarter Summary'));
-    if (!l1Heading) {
-      console.log('L1 heading not found');
-      return;
-    }
-    
-    let l1SummarySection = l1Heading.closest('.bg-gradient-to-r.from-blue-50');
+
+    const l1SummarySection = document.getElementById('l1-summary-section');
     if (!l1SummarySection) {
-      l1SummarySection = l1Heading.closest('.bg-gradient-to-r');
-      if (!l1SummarySection) {
-        // Try finding by parent div
-        l1SummarySection = l1Heading.parentElement;
-        if (!l1SummarySection) {
-          console.log('L1 summary section not found');
-          return;
-        }
-      }
+      console.log('L1 summary section not found');
+      return;
     }
     
     // Update L1 percentage display - find the percentage text element
@@ -915,11 +1157,8 @@
       console.log('Updated L1 percentage display to:', percentage + '%');
     }
     
-    // Update L1 remarks display - find the remarks container by ID first, then by class
-    let l1RemarksContainer = document.getElementById('l1-remarks-container');
-    if (!l1RemarksContainer) {
-      l1RemarksContainer = l1SummarySection.querySelector('.bg-white.p-4.rounded.border');
-    }
+    // Update L1 remarks display - find the remarks container within L1 summary
+    let l1RemarksContainer = l1SummarySection.querySelector('#l1-remarks-display, #l1-remarks-container');
     
     if (l1RemarksContainer) {
       if (remarks && remarks.trim() !== '') {
@@ -962,117 +1201,24 @@
   
   // Function to ensure summary sections are always visible
   function showSummarySections() {
-    let summarySections = document.querySelectorAll('.grid.grid-cols-1.lg\\:grid-cols-2.gap-6.mt-6');
-    
-    // If no summary sections found, try to create them dynamically
-    if (summarySections.length === 0) {
-      createSummarySections();
-      // Re-query after creation
-      summarySections = document.querySelectorAll('.grid.grid-cols-1.lg\\:grid-cols-2.gap-6.mt-6');
+    const summarySection = document.getElementById('employeeSummarySections');
+    if (summarySection) {
+      summarySection.style.display = 'grid';
+      summarySection.style.visibility = 'visible';
+      summarySection.style.opacity = '1';
     }
-    summarySections.forEach((section, index) => {
-      if (section.style.display === 'none') {
-        section.style.display = 'grid';
-      }
-    });
-    
-    // Also ensure the quarter status section is visible
-    const statusSection = document.querySelector('.mt-8.pt-6.border-t.border-gray-200');
+
+    const statusSection = document.getElementById('quarterStatusSection');
     if (statusSection) {
       statusSection.style.display = 'block';
     }
-    
-    // Force visibility of all summary elements
-    const allSummaryElements = document.querySelectorAll('.bg-gradient-to-r, .bg-blue-50, .bg-green-50');
-    allSummaryElements.forEach((element, index) => {
-      element.style.display = 'block';
-      element.style.visibility = 'visible';
-      element.style.opacity = '1';
-    });
-    
-    // Also check for any hidden elements with specific classes
-    const hiddenElements = document.querySelectorAll('[style*="display: none"], [style*="visibility: hidden"]');
-    hiddenElements.forEach((element, index) => {
-      if (element.classList.contains('bg-gradient-to-r') || 
-          element.classList.contains('bg-blue-50') || 
-          element.classList.contains('bg-green-50') ||
-          element.classList.contains('grid')) {
-        element.style.display = 'block';
-        element.style.visibility = 'visible';
-        element.style.opacity = '1';
-      }
-    });
-  }
-  
-  // Function to create summary sections if they don't exist
-  function createSummarySections() {
-    // Find the table or main content area to insert after
-    const tableSection = document.querySelector('.table-wrapper');
-    if (!tableSection) {
-      return;
-    }
-    
-    // Create the summary sections container
-    const summaryContainer = document.createElement('div');
-    summaryContainer.className = 'grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6';
-    summaryContainer.innerHTML = `
-      <!-- L1 Quarterly Summary -->
-      <div class="bg-gradient-to-r from-blue-50 via-blue-50 to-blue-100 border border-blue-200 rounded-xl p-6 shadow-md">
-        <h3 class="text-xl font-bold text-blue-700 mb-6 flex items-center gap-2">
-          <i class="fas fa-user-check text-blue-500"></i>
-          L1 Quarter Summary
-        </h3>
-        <div class="mb-6 text-center">
-          <div class="bg-blue-200 p-4 rounded-lg inline-block">
-            <p class="text-blue-600 font-semibold text-sm mb-1">Quarter Average Percentage</p>
-            <p class="text-3xl font-bold text-blue-800">0.0%</p>
-          </div>
-        </div>
-        <div class="space-y-3">
-          <h4 class="text-blue-600 font-semibold text-sm">Quarter Remarks:</h4>
-          <div class="bg-white p-4 rounded border" id="l1-remarks-container">
-            <p class="text-gray-500 text-sm">No remarks for this quarter</p>
-          </div>
-        </div>
-      </div>
-      
-      <!-- L2 Quarterly Summary -->
-      <div class="bg-gradient-to-r from-green-50 via-green-50 to-green-100 border border-green-200 rounded-xl p-6 shadow-md">
-        <h3 class="text-xl font-bold text-green-700 mb-6 flex items-center gap-2">
-          <i class="fas fa-user-shield text-green-500"></i>
-          L2 Quarter Summary
-        </h3>
-        <div class="mb-6 text-center">
-          <div class="bg-green-200 p-4 rounded-lg inline-block">
-            <p class="text-green-600 font-semibold text-sm mb-1">Quarter Average Percentage</p>
-            <p class="text-3xl font-bold text-green-800">0.0%</p>
-          </div>
-        </div>
-        <div class="space-y-3">
-          <h4 class="text-green-600 font-semibold text-sm">Quarter Remarks:</h4>
-          <div class="bg-white p-4 rounded border" id="l2-remarks-container">
-            <p class="text-gray-500 text-sm">No remarks for this quarter</p>
-          </div>
-        </div>
-      </div>
-    `;
-    
-    // Insert after the table section
-    tableSection.parentNode.insertBefore(summaryContainer, tableSection.nextSibling);
   }
   
   // Function to update L2 summary section immediately (if needed)
   function updateL2Summary(percentage, remarks) {
     console.log('Updating L2 Summary with:', { percentage, remarks });
-    
-    // Find the L2 Quarter Summary section by looking for the heading text
-    const l2Heading = Array.from(document.querySelectorAll('h3')).find(h3 => h3.textContent.includes('L2 Quarter Summary'));
-    if (!l2Heading) {
-      console.log('L2 heading not found');
-      return;
-    }
-    
-    const l2SummarySection = l2Heading.closest('.bg-gradient-to-r.from-green-50');
+
+    const l2SummarySection = document.getElementById('l2-summary-section');
     if (!l2SummarySection) {
       console.log('L2 summary section not found');
       return;
@@ -1085,11 +1231,8 @@
       console.log('Updated L2 percentage display to:', percentage + '%');
     }
     
-    // Update L2 remarks display - find the remarks container by ID first, then by class
-    let l2RemarksContainer = document.getElementById('l2-remarks-container');
-    if (!l2RemarksContainer) {
-      l2RemarksContainer = l2SummarySection.querySelector('.bg-white.p-4.rounded.border');
-    }
+    // Update L2 remarks display - find the remarks container within L2 summary
+    let l2RemarksContainer = l2SummarySection.querySelector('#l2-remarks-display, #l2-remarks-container');
     
     if (l2RemarksContainer) {
       if (remarks && remarks.trim() !== '') {
@@ -1111,9 +1254,6 @@
   // L1 Edit Functions
   function editL1Remarks() {
     console.log('editL1Remarks called');
-    if (!confirm('System notice: Protected area detected. Press OK to continue.')) {
-      return;
-    }
 
     // Hide the display section
     const displaySection = document.getElementById('l1-display-section');
@@ -1151,6 +1291,8 @@
     const formData = new FormData(event.target);
     formData.append('action_type', 'edit_l1');
     formData.append('selected_quarter', '<%= params[:quarter] %>');
+    formData.append('selected_month', '<%= params[:month] %>');
+    formData.append('selected_financial_year', '<%= @selected_financial_year %>');
     
     fetch('<%= edit_l1_employee_detail_path(@employee_detail) %>', {
       method: 'PATCH',
@@ -1180,9 +1322,6 @@
   // L2 Edit Functions
   function editL2Remarks() {
     console.log('editL2Remarks called');
-    if (!confirm('System notice: Protected area detected. Press OK to continue.')) {
-      return;
-    }
 
     // Hide the display section
     const displaySection = document.getElementById('l2-display-section');
@@ -1220,6 +1359,8 @@
     const formData = new FormData(event.target);
     formData.append('action_type', 'edit_l2');
     formData.append('selected_quarter', '<%= params[:quarter] %>');
+    formData.append('selected_month', '<%= params[:month] %>');
+    formData.append('selected_financial_year', '<%= @selected_financial_year %>');
     
     fetch('<%= edit_l2_employee_detail_path(@employee_detail) %>', {
       method: 'PATCH',
@@ -1256,23 +1397,109 @@
 }
 
 /* Ensure summary sections are always visible */
-.grid.grid-cols-1.lg\\:grid-cols-2.gap-6.mt-6,
-.bg-gradient-to-r.from-blue-50,
-.bg-gradient-to-r.from-green-50,
+#employeeSummarySections, .review-summary-grid {
+  display: grid !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.review-summary-grid {
+  width: 100%;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 1.5rem;
+  align-items: stretch;
+}
+
+.review-summary-grid--single {
+  max-width: 520px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.review-summary-grid--two,
+.review-summary-grid--three,
+.review-summary-grid--four {
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+@media (min-width: 1024px) {
+  .review-summary-grid--two {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .review-summary-grid--three {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .review-summary-grid--four {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (min-width: 1280px) {
+  .review-summary-grid--four {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
+.review-summary-card {
+  width: 100%;
+  min-width: 0;
+  min-height: 245px;
+  display: flex !important;
+  flex-direction: column;
+}
+
+.monthly-summary-footer td {
+  background: #f3f4f6;
+  border-top: 2px solid #d1d5db;
+}
+
+.monthly-summary-footer .monthly-summary-label,
+.monthly-summary-footer .monthly-summary-target,
+.monthly-summary-footer .monthly-summary-achievement,
+.monthly-summary-footer .monthly-summary-remarks,
+.monthly-summary-footer .monthly-summary-observer,
+.monthly-summary-footer .monthly-summary-l1,
+.monthly-summary-footer .monthly-summary-l2,
+.monthly-summary-footer .monthly-summary-total {
+  vertical-align: middle;
+}
+
+.review-summary-card h3 {
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.review-summary-card .space-y-3 {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.summary-percent-box {
+  min-width: min(100%, 260px);
+}
+
+.summary-remarks-box {
+  width: 100%;
+  min-height: 42px;
+}
+
+#l1-summary-section,
+#l2-summary-section,
 .mt-8.pt-6.border-t.border-gray-200 {
   display: block !important;
   visibility: visible !important;
   opacity: 1 !important;
 }
 
-/* Force grid display for summary sections */
-.grid.grid-cols-1.lg\\:grid-cols-2.gap-6.mt-6 {
-  display: grid !important;
-}
-
-/* Ensure quarter summary boxes are always visible */
-.bg-gradient-to-r.from-blue-50,
-.bg-gradient-to-r.from-green-50 {
+#quarterStatusSection {
   display: block !important;
   visibility: visible !important;
   opacity: 1 !important;
@@ -1292,32 +1519,217 @@
 }
 
 .table {
-  min-width: 900px;
+  min-width: 980px;
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  table-layout: auto;
+  table-layout: fixed;
 }
 
 .table th, .table td {
-  padding: 8px 12px;
+  padding: 8px 10px;
   text-align: center;
   border-right: 1px solid #e5e7eb;
-  white-space: nowrap;
-  vertical-align: middle;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  vertical-align: top;
+  line-height: 1.35;
+}
+
+.sticky-col {
+  position: sticky;
+  z-index: 2;
+  background-color: inherit;
+  box-shadow: 2px 0 4px rgba(15, 23, 42, 0.06);
+}
+
+.table thead .sticky-col {
+  z-index: 4;
+  background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+}
+
+.table tbody tr.bg-gray-50 > .sticky-col,
+.table tbody tr:nth-child(odd) > .sticky-col {
+  background-color: #f9fafb;
+}
+
+.table tbody tr.bg-white > .sticky-col,
+.table tbody tr:nth-child(even) > .sticky-col {
+  background-color: #ffffff;
+}
+
+.summary-sticky-footer {
+  background-color: #f3f4f6 !important;
+}
+
+.serial-column,
+.serial-cell {
+  left: 0;
+  width: 2.75rem;
+  min-width: 2.75rem;
+  max-width: 2.75rem;
+  padding-left: 0.35rem;
+  padding-right: 0.35rem;
+}
+
+.kri-column,
+.kri-cell {
+  left: 2.75rem;
+  width: 11rem;
+  min-width: 11rem;
+  max-width: 11rem;
+  white-space: normal !important;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.kri-cell-inner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+.activity-name {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.pending-dot,
+.sidebar-pending-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background-color: #ef4444;
+  flex-shrink: 0;
+  margin-top: 0.35rem;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.18);
+}
+
+.unit-column,
+.unit-cell {
+  left: 13.75rem;
+  width: 5rem;
+  min-width: 5rem;
+  max-width: 5rem;
+  white-space: normal !important;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+}
+
+.annual-target-column,
+.annual-target-cell {
+  left: 18.75rem;
+  width: 6.5rem;
+  min-width: 6.5rem;
+  max-width: 6.5rem;
+  white-space: normal !important;
+  line-height: 1.2;
+}
+
+.month-target-column,
+.month-target-cell {
+  width: 5rem;
+  min-width: 5rem;
+  max-width: 5rem;
+  white-space: normal !important;
+}
+
+.month-achievement-column,
+.achievement-cell {
+  width: 6.5rem;
+  min-width: 6.5rem;
+  max-width: 6.5rem;
+  white-space: normal !important;
+}
+
+.month-progress-column,
+.progress-cell,
+.monthly-summary-total {
+  width: 4.5rem;
+  min-width: 4.5rem;
+  max-width: 4.5rem;
+  white-space: normal !important;
+  line-height: 1.2;
+  font-size: 0.7rem;
+  padding-left: 0.3rem;
+  padding-right: 0.3rem;
+}
+
+.table th.month-progress-column {
+  letter-spacing: 0.02em;
+  text-transform: none;
 }
 
 /* Allow text wrapping for remarks cells */
 .remarks-cell {
   white-space: normal;
   word-wrap: break-word;
+  width: 5rem;
+  min-width: 5rem;
+  max-width: 5rem;
+  overflow: hidden;
+}
+
+.remarks-text {
+  max-width: 100%;
+  margin: 0 auto;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.remarks-header,
+.manager-remarks-header {
+  white-space: normal !important;
+  line-height: 1.25;
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  padding-left: 0.35rem;
+  padding-right: 0.35rem;
+}
+
+.remarks-header,
+.monthly-summary-remarks {
+  width: 5rem;
+  min-width: 5rem;
+  max-width: 5rem;
+}
+
+.l1-remarks-column,
+.l1-remarks-cell,
+.monthly-summary-l1,
+.l2-remarks-column {
+  width: 8.5rem;
+  min-width: 8.5rem;
+  max-width: 8.5rem;
+  white-space: normal !important;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+.observer-remarks-column,
+.observer-remarks-cell,
+.monthly-summary-observer {
+  width: 7rem;
+  min-width: 7rem;
+  max-width: 7rem;
+  white-space: normal !important;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
 }
 
 .table th {
   background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
   color: white;
   font-weight: 600;
-  text-transform: uppercase;
   font-size: 0.75rem;
   letter-spacing: 0.05em;
 }
@@ -1437,18 +1849,6 @@ input:valid, textarea:valid {
 }
 
 /* Achievement column specific styling */
-.achievement-cell {
-  min-width: 300px;
-  max-width: 400px;
-}
-
-/* Remarks column enhanced styling */
-.remarks-cell {
-  min-width: 350px;
-  max-width: 450px;
-  overflow: hidden;
-}
-
 .break-words {
   word-wrap: break-word;
   word-break: break-word;

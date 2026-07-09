@@ -3,19 +3,39 @@
     <div class="bg-white border border-gray-200 rounded-xl shadow-lg mt-4">
       <div class="bg-gray-100 px-6 py-4 border-b border-gray-200 rounded-t-xl">
         <div class="flex flex-wrap items-center justify-between gap-4">
-          <h2 class="text-3xl font-bold text-gray-800 flex items-center">
-            <i class="fas fa-users me-2 text-indigo-600"></i>
-             HOD TARGET FORM 
-          </h2>
+          <div>
+            <h2 class="text-3xl font-bold text-gray-800 flex items-center">
+              <i class="fas fa-users me-2 text-indigo-600"></i>
+              Key result indicators - <%= @selected_financial_year %>
+            </h2>
+            <%
+              department_names = @user_details.map { |detail| detail.department&.department_type }.compact_blank.uniq
+              employee_names = @user_details.map { |detail| detail.employee_detail&.employee_name }.compact_blank.uniq
+              department_label = department_names.one? ? department_names.first : "#{department_names.first || 'N/A'}#{department_names.size > 1 ? " +#{department_names.size - 1}" : ""}"
+              employee_label = employee_names.one? ? employee_names.first : "#{employee_names.first || 'N/A'}#{employee_names.size > 1 ? " +#{employee_names.size - 1}" : ""}"
+            %>
+            <div class="target-meta-row mt-3">
+              <span><strong>Department:</strong> <%= department_label %></span>
+              <span><strong>Employee name:</strong> <%= employee_label %></span>
+            </div>
+          </div>
 
-          <%= form_with url: user_details_path, method: :get, local: true, class: "flex items-center gap-3" do |form| %>
-            <%= form.label :financial_year, "Financial Year", class: "text-sm font-semibold text-gray-700" %>
-            <%= form.select :financial_year,
-                options_for_select(@financial_years, @selected_financial_year),
-                {},
-                class: "bg-white border border-gray-300 rounded-lg px-4 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500",
-                onchange: "this.form.submit();" %>
-          <% end %>
+          <div class="flex flex-wrap items-center gap-3">
+            <%= link_to export_user_details_path(format: :xlsx, financial_year: @selected_financial_year),
+                class: "inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold shadow-md transition duration-200" do %>
+              <i class="fas fa-file-excel"></i>
+              Export Excel
+            <% end %>
+
+            <%= form_with url: user_details_path, method: :get, local: true, class: "flex items-center gap-3" do |form| %>
+              <%= form.label :financial_year, "Financial year", class: "text-sm font-semibold text-gray-700" %>
+              <%= form.select :financial_year,
+                  options_for_select(@financial_years, @selected_financial_year),
+                  {},
+                  class: "bg-white border border-gray-300 rounded-lg px-4 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500",
+                  onchange: "this.form.submit();" %>
+            <% end %>
+          </div>
         </div>
       </div>
 
@@ -24,126 +44,39 @@
           <table class="table table-hover w-full min-w-full">
             <thead class="bg-gray-800">
               <tr>
-                <th class="px-5 py-4 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Department</th>
-                <th class="px-5 py-4 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Financial Year</th>
-                <th class="px-5 py-4 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Employee Name</th>
-                <th class="px-5 py-4 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Activity</th>
-                <th class="px-5 py-4 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Theme</th>
-                <th class="px-5 py-4 text-left text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600">Unit</th>
-                <th class="px-5 py-4 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 bg-gray-700">April</th>
-                <th class="px-5 py-4 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 bg-gray-700">May</th>
-                <th class="px-5 py-4 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 bg-gray-700">June</th>
-                <th class="px-5 py-4 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 bg-gray-700">July</th>
-                <th class="px-5 py-4 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 bg-gray-700">August</th>
-                <th class="px-5 py-4 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 bg-gray-700">September</th>
-                <th class="px-5 py-4 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 bg-gray-700">October</th>
-                <th class="px-5 py-4 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 bg-gray-700">November</th>
-                <th class="px-5 py-4 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 bg-gray-700">December</th>
-                <th class="px-5 py-4 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 bg-gray-700">January</th>
-                <th class="px-5 py-4 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 bg-gray-700">February</th>
-                <th class="px-5 py-4 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 bg-gray-700">March</th>
-                <th class="px-5 py-4 text-center text-xs font-medium text-white uppercase tracking-wider border-r border-gray-600 bg-gray-700">Actions</th>
+                <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600">S.No</th>
+                <th class="px-5 py-4 text-left text-xs font-medium text-white tracking-wider border-r border-gray-600">Key result indicators</th>
+                <th class="px-5 py-4 text-left text-xs font-medium text-white tracking-wider border-r border-gray-600">Unit of measurement</th>
+                <th class="px-5 py-4 text-left text-xs font-medium text-white tracking-wider border-r border-gray-600"><%= annual_target_fy_label(@selected_financial_year) %></th>
+                <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">APR</th>
+                <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">MAY</th>
+                <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">JUN</th>
+                <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">JUL</th>
+                <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">AUG</th>
+                <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">SEP</th>
+                <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">OCT</th>
+                <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">NOV</th>
+                <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">DEC</th>
+                <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">JAN</th>
+                <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">FEB</th>
+                <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">MAR</th>
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
               <% @user_details.each_with_index do |detail, index| %>
                 <tr class="<%= index.even? ? 'bg-gray-50' : 'bg-white' %> hover:bg-gray-100 transition-colors duration-200">
-                  <td class="px-5 py-4 text-sm text-gray-800 font-medium border-r border-gray-200"><%= detail.department.department_type %></td>
-                  <td class="px-5 py-4 text-sm text-gray-800 font-medium border-r border-gray-200">
-                    <span class="text-emerald-700 font-semibold bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
-                      <%= detail.financial_year.presence || @selected_financial_year %>
-                    </span>
-                  </td>
-                  <td class="px-5 py-4 text-sm text-gray-800 font-medium border-r border-gray-200"><%= detail.employee_detail&.employee_name || 'N/A' %></td>
+                  <td class="px-5 py-4 text-sm text-gray-800 border-r border-gray-200 text-center"><%= index + 1 %></td>
                   <td class="px-5 py-4 text-sm text-gray-800 border-r border-gray-200"><%= detail.activity.activity_name %></td>
-                  <td class="px-5 py-4 text-sm text-gray-800 border-r border-gray-200"><%= detail.activity.theme_name.present? ? detail.activity.theme_name : 'No Theme' %></td>
                   <td class="px-5 py-4 text-sm text-gray-800 border-r border-gray-200 text-center"><%= detail.activity.unit.present? ? detail.activity.unit : "" %></td>
-                  <td class="px-5 py-4 text-sm text-center border-r border-gray-200">
-                    <span class="<%= detail.april.presence ? 'text-indigo-700 font-semibold bg-indigo-50 px-3 py-1 rounded-full' : 'text-gray-400' %>">
-                      <%= detail.april.presence || '-' %>
-                    </span>
-                  </td>
-                  <td class="px-5 py-4 text-sm text-center border-r border-gray-200">
-                    <span class="<%= detail.may.presence ? 'text-indigo-700 font-semibold bg-indigo-50 px-3 py-1 rounded-full' : 'text-gray-400' %>">
-                      <%= detail.may.presence || '-' %>
-                    </span>
-                  </td>
-                  <td class="px-5 py-4 text-sm text-center border-r border-gray-200">
-                    <span class="<%= detail.june.presence ? 'text-indigo-700 font-semibold bg-indigo-50 px-3 py-1 rounded-full' : 'text-gray-400' %>">
-                      <%= detail.june.presence || '-' %>
-                    </span>
-                  </td>
-                  <td class="px-5 py-4 text-sm text-center border-r border-gray-200">
-                    <span class="<%= detail.july.presence ? 'text-indigo-700 font-semibold bg-indigo-50 px-3 py-1 rounded-full' : 'text-gray-400' %>">
-                      <%= detail.july.presence || '-' %>
-                    </span>
-                  </td>
-                  <td class="px-5 py-4 text-sm text-center border-r border-gray-200">
-                    <span class="<%= detail.august.presence ? 'text-indigo-700 font-semibold bg-indigo-50 px-3 py-1 rounded-full' : 'text-gray-400' %>">
-                      <%= detail.august.presence || '-' %>
-                    </span>
-                  </td>
-                  <td class="px-5 py-4 text-sm text-center border-r border-gray-200">
-                    <span class="<%= detail.september.presence ? 'text-indigo-700 font-semibold bg-indigo-50 px-3 py-1 rounded-full' : 'text-gray-400' %>">
-                      <%= detail.september.presence || '-' %>
-                    </span>
-                  </td>
-                  <td class="px-5 py-4 text-sm text-center border-r border-gray-200">
-                    <span class="<%= detail.october.presence ? 'text-indigo-700 font-semibold bg-indigo-50 px-3 py-1 rounded-full' : 'text-gray-400' %>">
-                      <%= detail.october.presence || '-' %>
-                    </span>
-                  </td>
-                  <td class="px-5 py-4 text-sm text-center border-r border-gray-200">
-                    <span class="<%= detail.november.presence ? 'text-indigo-700 font-semibold bg-indigo-50 px-3 py-1 rounded-full' : 'text-gray-400' %>">
-                      <%= detail.november.presence || '-' %>
-                    </span>
-                  </td>
-                  <td class="px-5 py-4 text-sm text-center border-r border-gray-200">
-                    <span class="<%= detail.december.presence ? 'text-indigo-700 font-semibold bg-indigo-50 px-3 py-1 rounded-full' : 'text-gray-400' %>">
-                      <%= detail.december.presence || '-' %>
-                    </span>
-                  </td>
-                  <td class="px-5 py-4 text-sm text-center border-r border-gray-200">
-                    <span class="<%= detail.january.presence ? 'text-indigo-700 font-semibold bg-indigo-50 px-3 py-1 rounded-full' : 'text-gray-400' %>">
-                      <%= detail.january.presence || '-' %>
-                    </span>
-                  </td>
-                  <td class="px-5 py-4 text-sm text-center border-r border-gray-200">
-                    <span class="<%= detail.february.presence ? 'text-indigo-700 font-semibold bg-indigo-50 px-3 py-1 rounded-full' : 'text-gray-400' %>">
-                      <%= detail.february.presence || '-' %>
-                    </span>
-                  </td>
-                  <td class="px-5 py-4 text-sm text-center border-r border-gray-200">
-                    <span class="<%= detail.march.presence ? 'text-indigo-700 font-semibold bg-indigo-50 px-3 py-1 rounded-full' : 'text-gray-400' %>">
-                      <%= detail.march.presence || '-' %>
-                    </span>
-                  </td>
-                  <td class="px-5 py-4 text-center border-r border-gray-200">
-                    <div class="flex space-x-2 justify-center">
-                      <%= link_to edit_user_detail_path(detail), 
-                          class: "inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200",
-                          title: "Edit this target" do %>
-                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                        </svg>
-                        Edit
-                      <% end %>
-                      
-                      <%= link_to user_detail_path(detail), 
-                          method: :delete,
-                          data: { 
-                            confirm: "Are you sure you want to delete this target? This action cannot be undone.",
-                            turbo_method: :delete
-                          },
-                          class: "inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200",
-                          title: "Delete this target" do %>
-                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                        </svg>
-                        Delete
-                      <% end %>
-                    </div>
-                  </td>
+                  <td class="px-5 py-4 text-sm text-gray-800 border-r border-gray-200 text-center"><%= annual_target_display(detail.activity) %></td>
+                  <% %i[april may june july august september october november december january february march].each do |month| %>
+                    <% target_value = clean_spreadsheet_display_value(detail.public_send(month)) %>
+                    <td class="px-5 py-4 text-sm text-center border-r border-gray-200">
+                      <span class="<%= target_value.present? ? 'text-indigo-700 font-semibold bg-indigo-50 px-3 py-1 rounded-full' : 'text-gray-400' %>">
+                        <%= target_value.presence || '-' %>
+                      </span>
+                    </td>
+                  <% end %>
                 </tr>
               <% end %>
             </tbody>
@@ -157,11 +90,11 @@
         <div class="flex flex-wrap items-center justify-between gap-4">
           <h2 class="text-3xl font-bold text-gray-800 flex items-center">
             <i class="fas fa-users me-2 text-indigo-600"></i>
-             HOD TARGET FORM
+             Key result indicators
           </h2>
 
           <%= form_with url: user_details_path, method: :get, local: true, class: "flex items-center gap-3" do |form| %>
-            <%= form.label :financial_year, "Financial Year", class: "text-sm font-semibold text-gray-700" %>
+            <%= form.label :financial_year, "Financial year", class: "text-sm font-semibold text-gray-700" %>
             <%= form.select :financial_year,
                 options_for_select(@financial_years, @selected_financial_year),
                 {},
@@ -188,7 +121,7 @@
         </div>
 
         <h2 class="text-4xl font-extrabold text-gray-800 mb-3">
-          No Targets Found
+          No targets found
         </h2>
 
         <!-- Sub-text -->
@@ -237,7 +170,6 @@
   background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
   color: white;
   font-weight: 600;
-  text-transform: uppercase;
   font-size: 0.75rem;
   letter-spacing: 0.05em;
 }
@@ -259,6 +191,24 @@
   font-size: 1rem;
   color: #6b7280;
   line-height: 1.6;
+}
+
+.target-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  color: #334155;
+  font-size: 0.95rem;
+}
+
+.target-meta-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  background: #ffffff;
 }
 
 /* Enhanced card styling */
@@ -306,12 +256,12 @@ tbody tr:hover {
 }
 
 /* Improved spacing for month columns */
-.table th:nth-child(n+6) {
+.table th:nth-child(n+4) {
   min-width: 100px;
 }
 
 /* Enhanced visual hierarchy */
-.table td:nth-child(-n+5) {
+.table td:nth-child(-n+3) {
   background-color: #fafafa;
   font-weight: 500;
 }

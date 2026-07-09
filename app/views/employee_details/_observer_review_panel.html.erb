@@ -1,0 +1,69 @@
+<script>
+(function() {
+function initObserverReviewPanel() {
+  const modal = document.getElementById('observerModal');
+  const cancelBtn = document.getElementById('observerModalCancelBtn');
+  const approveBtn = document.getElementById('observerApproveBtn');
+  const returnBtn = document.getElementById('observerReturnBtn');
+  const formTitle = document.getElementById('observerFormTitle');
+  const actionTypeInput = document.getElementById('observerActionType');
+  const remarksInput = document.getElementById('observerRemarks');
+  const form = document.getElementById('observerForm');
+
+  if (!modal) return;
+
+  function closeModal() {
+    modal.classList.add('hidden');
+    if (remarksInput) remarksInput.value = '';
+  }
+
+  function openModal(actionType) {
+    const isReturn = actionType === 'return';
+    if (actionTypeInput) actionTypeInput.value = actionType;
+    if (formTitle) formTitle.textContent = isReturn ? 'Return with Remarks' : 'Approve with Remarks';
+    if (remarksInput) remarksInput.value = '';
+    modal.classList.remove('hidden');
+    remarksInput?.focus();
+  }
+
+  if (approveBtn) approveBtn.onclick = () => openModal('approve');
+  if (returnBtn) returnBtn.onclick = () => openModal('return');
+  if (cancelBtn) cancelBtn.onclick = closeModal;
+
+  if (form) form.onsubmit = function(event) {
+    const activityRemarks = Array.from(document.querySelectorAll('.observer-remarks-input'))
+      .some((input) => input.value.trim() !== '');
+    const overallRemarks = remarksInput?.value.trim() !== '';
+
+    if (!activityRemarks && !overallRemarks) {
+      event.preventDefault();
+      alert('Please enter activity-wise observer remarks in the table or overall remarks before submitting.');
+    }
+  };
+}
+
+document.addEventListener('DOMContentLoaded', initObserverReviewPanel);
+document.addEventListener('turbo:load', initObserverReviewPanel);
+})();
+</script>
+
+<style>
+  .observer-action-area {
+    padding-top: 1rem;
+  }
+
+  .observer-modal-box {
+    animation: observerModalSlideIn 0.3s ease-out;
+  }
+
+  @keyframes observerModalSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+</style>

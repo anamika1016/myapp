@@ -35,17 +35,8 @@
   <!-- CSS HS -->
   <link rel="stylesheet" href="https://preline.co/assets/css/main.css?v=3.1.0">
   
-  <!-- ONLY UI FIX - Prevent layout shift during CSS loading -->
+  <!-- Sidebar layout guard -->
   <style>
-    /* Hide body until CSS is fully loaded */
-    body {
-      visibility: hidden;
-    }
-    
-    body.loaded {
-      visibility: visible;
-    }
-    
     /* Force proper sidebar layout immediately */
     #hs-application-sidebar {
       min-width: 16rem !important;
@@ -53,25 +44,29 @@
     }
     
     /* Force proper link layout */
-    #hs-application-sidebar .flex.items-center {
+    #hs-application-sidebar nav a.flex.items-center {
       display: flex !important;
       align-items: center !important;
-      gap: 0.875rem !important;
+      gap: 0.75rem !important;
       padding: 0.5rem 0.625rem !important;
       border-radius: 0.5rem !important;
     }
     
     /* Force icon size */
-    #hs-application-sidebar svg {
+    #hs-application-sidebar nav a svg.sidebar-nav-icon {
       width: 1.5rem !important;
       height: 1.5rem !important;
       flex-shrink: 0 !important;
     }
     
     /* Force text to show inline */
-    #hs-application-sidebar span {
-      display: inline !important;
+    #hs-application-sidebar nav a > span.font-semibold {
+      display: inline-flex !important;
+      align-items: center !important;
       white-space: nowrap !important;
+      gap: 0.35rem !important;
+      flex: 1 1 auto;
+      min-width: 0;
     }
     
     /* Force navigation to be visible */
@@ -81,14 +76,30 @@
       padding: 0.75rem !important;
     }
     
-    #hs-application-sidebar ul {
+    #hs-application-sidebar nav ul {
       display: flex !important;
       flex-direction: column !important;
-      gap: 0.25rem !important;
+      gap: 0.375rem !important;
     }
     
-    #hs-application-sidebar li {
+    #hs-application-sidebar nav li {
       display: block !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    #hs-application-sidebar nav li.hs-accordion {
+      overflow: visible !important;
+    }
+
+    .sidebar-pending-dot {
+      display: inline-block;
+      width: 0.55rem;
+      height: 0.55rem;
+      border-radius: 9999px;
+      background-color: #ef4444;
+      box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+      flex-shrink: 0;
     }
   </style>
 </head>
@@ -136,7 +147,7 @@
       <!-- Content -->    
     <div class="h-full overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-300">
       <nav class="hs-accordion-group p-3 w-full flex flex-col flex-wrap" data-hs-accordion-always-open>
-        <ul class="flex flex-col space-y-1">
+        <ul class="flex flex-col sidebar-nav-list">
 
           <!-- Employee Forms - Show for all employee types -->
           <% if current_user.employee? || current_user.hod? || current_user.admin? || current_user.l1_employer? || current_user.l2_employer? %>
@@ -226,8 +237,41 @@
             </li>
           <% end %>
 
-          <!-- L1 Employee Details - Show if user has L1 responsibilities -->
-          <% if current_user.hod? || EmployeeDetail.exists?(l1_code: current_user.employee_code) %>
+          <% if current_user.hod? || current_user.admin? %>
+            <li class="hs-accordion" id="users-accordion">
+              <%= link_to month_masters_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if current_page?(month_masters_path)} text-base text-gray-800 rounded-lg" do %>
+                <svg class="shrink-0 size-6 sidebar-nav-icon" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24">
+                  <rect x="4" y="5" width="16" height="15" rx="2.5" />
+                  <path d="M8 3.5v3M16 3.5v3M4 9h16" />
+                  <path d="M8 13h2.5M13.5 13H16M8 16.5h2.5M13.5 16.5H16" />
+                </svg>
+                <span class="font-semibold">Month Master</span>
+              <% end %>
+            </li>
+          <% end %>
+
+          <% if has_observer_pli_responsibilities? %>
+            <% observer_levels_for_current_user.each do |observer_level| %>
+              <% observer_index_path = observer_pli_index_path(observer_level) %>
+              <li class="hs-accordion" id="users-accordion">
+                <%= link_to observer_index_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if observer_menu_active?(observer_level)} text-base text-gray-800 rounded-lg" do %>
+                  <svg class="shrink-0 size-6 sidebar-nav-icon" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24">
+                    <path d="M4.5 12s2.8-5.5 7.5-5.5 7.5 5.5 7.5 5.5-2.8 5.5-7.5 5.5S4.5 12 4.5 12Z" />
+                    <circle cx="12" cy="12" r="2.5" />
+                    <path d="M18.5 5.5 20 4M20 8h-2" />
+                  </svg>
+                  <span class="font-semibold">
+                    <%= observer_menu_title_for(observer_level) %>
+                    <% if observer_pending_reviews?(observer_level) %>
+                      <span class="sidebar-pending-dot" title="Pending observer reviews" aria-label="Pending observer reviews"></span>
+                    <% end %>
+                  </span>
+                <% end %>
+              </li>
+            <% end %>
+          <% end %>
+
+          <% if has_l1_responsibilities? %>
             <li class="hs-accordion" id="users-accordion">
               <%= link_to l1_employee_details_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if current_page?(l1_employee_details_path)} text-base text-gray-800 rounded-lg" do %>
                 <svg class="shrink-0 size-6 sidebar-nav-icon" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24">
@@ -235,12 +279,32 @@
                   <path d="M12 9.8v4.4" />
                   <circle cx="12" cy="16.8" r=".7" fill="currentColor" stroke="none" />
                 </svg>
-                <span class="font-semibold">L1 Employee Details</span>
+                <span class="font-semibold">
+                  L1 Employee Details
+                  <% if l1_pending_reviews? %>
+                    <span class="sidebar-pending-dot" title="Pending L1 reviews" aria-label="Pending L1 reviews"></span>
+                  <% end %>
+                </span>
               <% end %>
             </li>
           <% end %>
 
-          <% if current_user.hod? || current_user.admin? || EmployeeDetail.exists?(l1_code: current_user.employee_code) || EmployeeDetail.exists?(l1_employer_name: current_user.email) %>
+          <% if has_quarterly_pli_responsibilities? %>
+            <li class="hs-accordion" id="users-accordion">
+              <%= link_to quarterly_pli_employee_details_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if current_page?(quarterly_pli_employee_details_path)} text-base text-gray-800 rounded-lg" do %>
+                <svg class="shrink-0 size-6 sidebar-nav-icon" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24">
+                  <path d="M4.5 19.5h15" />
+                  <path d="M7 16V9.5" />
+                  <path d="M12 16V5" />
+                  <path d="M17 16v-8" />
+                  <path d="m6 11 3-3 3 2 4-5" />
+                </svg>
+                <span class="font-semibold">Qutry PLI %</span>
+              <% end %>
+            </li>
+          <% end %>
+
+          <% if has_l1_responsibilities? %>
             <li class="hs-accordion" id="users-accordion">
               <%= link_to l1_pulse_360_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if current_page?(l1_pulse_360_path)} text-base text-gray-800 rounded-lg" do %>
                 <svg class="shrink-0 size-6 sidebar-nav-icon" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24">
@@ -249,19 +313,6 @@
                   <path d="M5 19.5h14" />
                 </svg>
                 <span class="font-semibold">L1_Pluse-360</span>
-              <% end %>
-            </li>
-          <% end %>
-
-          <!-- L2 Employee Details - Show if user has L2 responsibilities -->
-          <% if current_user.hod? || EmployeeDetail.exists?(l2_code: current_user.employee_code) || EmployeeDetail.exists?(l2_employer_name: current_user.email) %>
-            <li class="hs-accordion" id="users-accordion">
-              <%= link_to l2_employee_details_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if current_page?(l2_employee_details_path)} text-base text-gray-800 rounded-lg" do %>
-                <svg class="shrink-0 size-6 sidebar-nav-icon" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24">
-                  <path d="M12 4.5 18 7v5.4c0 3.1-2.1 5.9-6 7.1-3.9-1.2-6-4-6-7.1V7Z" />
-                  <path d="M9.2 12.1 11 13.9l3.8-3.8" />
-                </svg>
-                <span class="font-semibold">L2 Employee Details</span>
               <% end %>
             </li>
           <% end %>
@@ -356,35 +407,9 @@
   </div>
   <!-- End Sidebar -->
 
-  <!-- PERFORMANCE FIX: Optimized script to prevent double refresh -->
+  <!-- Sidebar is visible immediately; keep the loaded class only for compatibility. -->
   <script>
-    // Only apply loading state if page is not already loaded
-    if (document.readyState === 'loading') {
-      document.body.style.visibility = 'hidden';
-      
-      // Function to show content
-      function showContent() {
-        document.body.classList.add('loaded');
-        document.body.style.visibility = 'visible';
-      }
-      
-      // Wait for DOM to be ready
-      if (document.readyState === 'interactive' || document.readyState === 'complete') {
-        showContent();
-      } else {
-        document.addEventListener('DOMContentLoaded', showContent);
-      }
-      
-      // Fallback - show content after 200ms (reduced from 500ms)
-      setTimeout(function() {
-        if (!document.body.classList.contains('loaded')) {
-          showContent();
-        }
-      }, 200);
-    } else {
-      // Page is already loaded, just add the loaded class
-      document.body.classList.add('loaded');
-    }
+    document.body.classList.add('loaded');
   </script>
 </body>
 </html>

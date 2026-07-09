@@ -56,6 +56,42 @@ class Ability
       EmployeeDetail.where("l2_code = ? OR l2_employer_name = ?", user.employee_code, user.email).exists?
     end
 
+    observer_actions = [ :observer_1, :observer_2, :observer_3, :observer_4, :observer_pli_detail, :save_observer_pli ]
+    observer_action_levels = {
+      observer_1: "obs_code1",
+      observer_2: "obs_code2",
+      observer_3: "obs_code3",
+      observer_4: "obs_code4"
+    }
+
+    if user.admin? || user.hod?
+      can observer_actions, EmployeeDetail
+    else
+      observer_code = resolved_observer_code_for(user)
+
+      observer_action_levels.each do |action, column|
+        can action, EmployeeDetail do
+          next false if observer_code.blank?
+
+          EmployeeDetail.where(
+            "LOWER(TRIM(COALESCE(#{column}, ''))) = ?",
+            observer_code
+          ).exists?
+        end
+      end
+
+      can [ :observer_pli_detail, :save_observer_pli ], EmployeeDetail do
+        next false if observer_code.blank?
+
+        observer_action_levels.values.any? do |column|
+          EmployeeDetail.where(
+            "LOWER(TRIM(COALESCE(#{column}, ''))) = ?",
+            observer_code
+          ).exists?
+        end
+      end
+    end
+
     # UserDetail permissions
     if user.employee? || user.l1_employer? || user.l2_employer?
       # Users can read, edit, update, and destroy their own user details
@@ -63,5 +99,17 @@ class Ability
         ud.employee_detail&.employee_email == user.email
       end
     end
+  end
+
+  private
+
+  def resolved_observer_code_for(user)
+    code = user.employee_code.to_s.strip.presence
+    return code.downcase if code.present?
+
+    detail = user.employee_detail ||
+             EmployeeDetail.find_by("LOWER(employee_email) = ?", user.email.to_s.downcase) ||
+             EmployeeDetail.find_by("LOWER(employee_code) = ?", user.employee_code.to_s.downcase)
+    detail&.employee_code.to_s.strip.downcase.presence
   end
 end

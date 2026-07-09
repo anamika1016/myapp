@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_06_09_090000) do
+ActiveRecord::Schema[8.0].define(version: 2026_07_09_000100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -23,6 +23,11 @@ ActiveRecord::Schema[8.0].define(version: 2026_06_09_090000) do
     t.datetime "updated_at", null: false
     t.text "employee_remarks"
     t.bigint "achievement_id", null: false
+    t.text "reporting_manager_remarks"
+    t.text "obs_code1_remarks"
+    t.text "obs_code2_remarks"
+    t.text "obs_code3_remarks"
+    t.text "obs_code4_remarks"
     t.index ["achievement_id"], name: "index_achievement_remarks_on_achievement_id"
   end
 
@@ -81,6 +86,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_06_09_090000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "theme_name"
+    t.string "annual_target_fy_2026_27"
     t.index ["department_id"], name: "index_activities_on_department_id"
   end
 
@@ -117,6 +123,15 @@ ActiveRecord::Schema[8.0].define(version: 2026_06_09_090000) do
     t.string "mobile_number"
     t.boolean "assignments_managed", default: false
     t.boolean "portal_active", default: true, null: false
+    t.string "location"
+    t.string "obs_code1"
+    t.string "obs_code2"
+    t.string "obs_code3"
+    t.string "obs_code4"
+    t.index ["obs_code1"], name: "index_employee_details_on_obs_code1"
+    t.index ["obs_code2"], name: "index_employee_details_on_obs_code2"
+    t.index ["obs_code3"], name: "index_employee_details_on_obs_code3"
+    t.index ["obs_code4"], name: "index_employee_details_on_obs_code4"
     t.index ["user_id"], name: "index_employee_details_on_user_id"
   end
 
@@ -153,6 +168,50 @@ ActiveRecord::Schema[8.0].define(version: 2026_06_09_090000) do
     t.index ["employee_detail_id", "l1_user_id"], name: "index_l1_pulse_assessments_on_employee_and_l1_user", unique: true
     t.index ["employee_detail_id"], name: "index_l1_pulse_assessments_on_employee_detail_id"
     t.index ["l1_user_id"], name: "index_l1_pulse_assessments_on_l1_user_id"
+  end
+
+  create_table "month_masters", force: :cascade do |t|
+    t.string "month_name", null: false
+    t.string "month_key", null: false
+    t.string "financial_year", null: false
+    t.boolean "active", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["active"], name: "index_month_masters_on_active"
+    t.index ["financial_year", "month_key"], name: "index_month_masters_on_financial_year_and_month_key", unique: true
+  end
+
+  create_table "observer_pli_reviews", force: :cascade do |t|
+    t.bigint "employee_detail_id", null: false
+    t.string "financial_year", null: false
+    t.string "quarter", null: false
+    t.string "observer_level", null: false
+    t.string "status", default: "approved", null: false
+    t.text "final_remarks"
+    t.bigint "reviewed_by_id"
+    t.datetime "reviewed_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "month"
+    t.index ["employee_detail_id", "financial_year", "quarter", "month", "observer_level"], name: "index_observer_pli_reviews_unique_month_level", unique: true
+    t.index ["employee_detail_id"], name: "index_observer_pli_reviews_on_employee_detail_id"
+    t.index ["reviewed_by_id"], name: "index_observer_pli_reviews_on_reviewed_by_id"
+  end
+
+  create_table "quarterly_pli_reviews", force: :cascade do |t|
+    t.bigint "employee_detail_id", null: false
+    t.string "financial_year", null: false
+    t.string "quarter", null: false
+    t.text "final_remarks"
+    t.float "final_percentage"
+    t.bigint "reviewed_by_id"
+    t.datetime "reviewed_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "status", default: "approved", null: false
+    t.index ["employee_detail_id", "financial_year", "quarter"], name: "index_quarterly_pli_reviews_unique_quarter", unique: true
+    t.index ["employee_detail_id"], name: "index_quarterly_pli_reviews_on_employee_detail_id"
+    t.index ["reviewed_by_id"], name: "index_quarterly_pli_reviews_on_reviewed_by_id"
   end
 
   create_table "sms_logs", force: :cascade do |t|
@@ -282,6 +341,10 @@ ActiveRecord::Schema[8.0].define(version: 2026_06_09_090000) do
   add_foreign_key "employee_details", "users"
   add_foreign_key "l1_pulse_assessments", "employee_details"
   add_foreign_key "l1_pulse_assessments", "users", column: "l1_user_id"
+  add_foreign_key "observer_pli_reviews", "employee_details"
+  add_foreign_key "observer_pli_reviews", "users", column: "reviewed_by_id"
+  add_foreign_key "quarterly_pli_reviews", "employee_details"
+  add_foreign_key "quarterly_pli_reviews", "users", column: "reviewed_by_id"
   add_foreign_key "sms_logs", "employee_details"
   add_foreign_key "target_submissions", "employee_details"
   add_foreign_key "target_submissions", "user_details"

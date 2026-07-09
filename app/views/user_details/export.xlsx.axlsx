@@ -1,32 +1,47 @@
 wb = xlsx_package.workbook
 
-wb.add_worksheet(name: "User Details") do |sheet|
+wb.add_worksheet(name: "Key result indicators") do |sheet|
   sheet.add_row [
-    "Financial Year", "Employee Name", "Employee Email", "Department", "Activity",
-    "April", "May", "June", "July",
-    "August", "September", "October", "November",
-    "December", "January", "February", "March"
+    "Financial year", "Mobile No.", "Employee name", "Employee Email", "Employee code", "Post", "Location", "Department",
+    "L1 Code", "L1 Employer Name",
+    "OBS Code 1", "OBS Code 2", "OBS Code 3", "OBS Code 4",
+    "Key result indicators", "Unit of measurement", annual_target_fy_label(@selected_financial_year),
+    "APR", "MAY", "JUN", "JUL",
+    "AUG", "SEP", "OCT", "NOV",
+    "DEC", "JAN", "FEB", "MAR"
   ]
 
   @user_details.each do |ud|
     sheet.add_row [
       ud.financial_year,
+      ud.employee_detail&.mobile_number,
       ud.employee_detail&.employee_name,
       ud.employee_detail&.employee_email,
+      ud.employee_detail&.employee_code,
+      ud.employee_detail&.post,
+      ud.employee_detail&.location,
       ud.department&.department_type,
+      ud.employee_detail&.l1_code,
+      ud.employee_detail&.l1_employer_name,
+      ud.employee_detail&.obs_code1,
+      ud.employee_detail&.obs_code2,
+      ud.employee_detail&.obs_code3,
+      ud.employee_detail&.obs_code4,
       ud.activity&.activity_name,
-      ud.try(:april),
-      ud.try(:may),
-      ud.try(:june),
-      ud.try(:july),
-      ud.try(:august),
-      ud.try(:september),
-      ud.try(:october),
-      ud.try(:november),
-      ud.try(:december),
-      ud.try(:january),
-      ud.try(:february),
-      ud.try(:march)
+      ud.activity&.unit,
+      annual_target_display(ud.activity),
+      target_display_value(ud.try(:april)),
+      target_display_value(ud.try(:may)),
+      target_display_value(ud.try(:june)),
+      target_display_value(ud.try(:july)),
+      target_display_value(ud.try(:august)),
+      target_display_value(ud.try(:september)),
+      target_display_value(ud.try(:october)),
+      target_display_value(ud.try(:november)),
+      target_display_value(ud.try(:december)),
+      target_display_value(ud.try(:january)),
+      target_display_value(ud.try(:february)),
+      target_display_value(ud.try(:march))
     ]
   end
 end

@@ -33,15 +33,44 @@ class ApplicationController < ActionController::Base
       EmployeeDetail.find_by("lower(employee_code) = ?", user.employee_code.to_s.downcase)
   end
 
+  def current_user_identity_code
+    current_user&.employee_code.to_s.strip.presence
+  end
+
+  def current_user_identity_email
+    current_user&.email.to_s.strip.presence
+  end
+
   def has_l1_responsibilities?
-    return true if current_user.hod?
-    EmployeeDetail.exists?(l1_code: current_user.employee_code)
+    return true if current_user.hod? || current_user.admin?
+
+    code = current_user_identity_code
+    email = current_user_identity_email
+    return false if code.blank? && email.blank?
+
+    EmployeeDetail.where(
+      "(:code != '' AND TRIM(COALESCE(l1_code, '')) = :code) OR (:email != '' AND TRIM(COALESCE(l1_employer_name, '')) = :email)",
+      code: code.to_s,
+      email: email.to_s
+    ).exists?
   end
 
   def has_l2_responsibilities?
-    return true if current_user.hod?
-    EmployeeDetail.exists?(l2_code: current_user.employee_code) ||
-    EmployeeDetail.exists?(l2_employer_name: current_user.email)
+    return true if current_user.hod? || current_user.admin?
+
+    code = current_user_identity_code
+    email = current_user_identity_email
+    return false if code.blank? && email.blank?
+
+    EmployeeDetail.where(
+      "(:code != '' AND TRIM(COALESCE(l2_code, '')) = :code) OR (:email != '' AND TRIM(COALESCE(l2_employer_name, '')) = :email)",
+      code: code.to_s,
+      email: email.to_s
+    ).exists?
+  end
+
+  def has_quarterly_pli_responsibilities?
+    has_l1_responsibilities?
   end
 
   def normalize_financial_year(value)
@@ -58,5 +87,31 @@ class ApplicationController < ActionController::Base
     "#{start_year}-#{end_year}"
   end
 
-  helper_method :has_l1_responsibilities?, :has_l2_responsibilities?
+  def l1_pending_reviews_count
+    return 0 unless user_signed_in? && has_l1_responsibilities?
+
+    employee_scope = if current_user.hod? || current_user.admin?
+      EmployeeDetail.all
+    else
+      code = current_user_identity_code
+      return 0 if code.blank?
+
+      EmployeeDetail.where(l1_code: code)
+    end
+
+    Achievement.joins(user_detail: :employee_detail)
+      .merge(employee_scope)
+      .where.not(achievement: [ nil, "" ])
+      .where(status: [ nil, "pending", "submitted" ])
+      .count
+  rescue StandardError
+    0
+  end
+
+  def l1_pending_reviews?
+    l1_pending_reviews_count.positive?
+  end
+
+  helper_method :has_l1_responsibilities?, :has_l2_responsibilities?, :has_quarterly_pli_responsibilities?,
+                :l1_pending_reviews_count, :l1_pending_reviews?
 end
