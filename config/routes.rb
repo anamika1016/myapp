@@ -123,6 +123,12 @@ Rails.application.routes.draw do
     end
   end
 
+  # JSON API endpoints (no email flow)
+  namespace :api do
+    post 'password/reset_by_code', to: 'passwords#reset_by_code'
+    post 'account/change_employee_code', to: 'accounts#change_employee_code'
+  end
+
   devise_for :users, controllers: {
     sessions: "users/sessions",
     registrations: "users/registrations",
