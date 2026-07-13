@@ -132,7 +132,7 @@
             
             
             <% if activity_detail_rows.any? %>
-              <%= form_with url: bulk_create_user_details_path, method: :post, local: true, id: 'bulk-form' do |form| %>
+              <%= form_with url: bulk_create_user_details_path, method: :post, local: true, data: { turbo: false }, id: 'bulk-form' do |form| %>
                 <%= form.hidden_field :department_id, value: resolved_department_id %>
                 <%= form.hidden_field :employee_detail_id, value: params[:employee_detail_id] %>
                 <%= form.hidden_field :financial_year, value: @selected_financial_year %>
@@ -176,7 +176,7 @@
                             <%= form.hidden_field "user_details[#{row_key}][department_id]", value: row_department_id %>
                             <%= form.hidden_field "user_details[#{row_key}][activity_id]", value: activity.id %>
                             <%= form.hidden_field "user_details[#{row_key}][activity_name]", value: activity.activity_name %>
-                            <%= form.hidden_field "user_details[#{row_key}][theme_name]", value: "" %>
+                            <%= form.hidden_field "user_details[#{row_key}][theme_name]", value: activity.theme_name %>
                           </td>
                           <td class="sticky-col unit-col">
                             <%= form.text_field "user_details[#{row_key}][unit]",
@@ -187,8 +187,10 @@
                           <td>
                             <%= form.text_field "user_details[#{row_key}][annual_target_fy]",
                                 value: annual_target_display(activity) == "-" ? "" : annual_target_display(activity),
-                                class: "form-control form-control-sm text-center",
-                                placeholder: "Annual target" %>
+                                class: "form-control form-control-sm text-center numeric-percent-input",
+                                inputmode: "decimal",
+                                autocomplete: "off",
+                                placeholder: "e.g. 100 or 100%" %>
                           </td>
                           
                           <% %w[april may june july august september october november december january february march].each do |month| %>
@@ -202,8 +204,10 @@
                               %>
                               <%= form.text_field "user_details[#{row_key}][#{month}]",
                                   value: existing_value,
-                                  class: "form-control form-control-sm text-center", 
-                                  placeholder: "Target/Task" %>
+                                  class: "form-control form-control-sm text-center numeric-percent-input",
+                                  inputmode: "decimal",
+                                  autocomplete: "off",
+                                  placeholder: "e.g. 50 or 50.5%" %>
                             </td>
                           <% end %>
                         </tr>
@@ -312,6 +316,52 @@
     const selectedFile = document.getElementById("selected-file");
     const saveBtn = document.getElementById("save-btn");
     const bulkForm = document.getElementById("bulk-form");
+    const numericPercentPattern = /^-?\d+(\.\d+)?%?$/;
+    const numericPercentTypingPattern = /^-?\d*\.?\d*%?$/;
+
+    function sanitizeNumericPercentInput(value) {
+      let cleaned = String(value || "").replace(/[^0-9.%-]/g, "");
+      const hasPercent = cleaned.includes("%");
+      cleaned = cleaned.replace(/%/g, "");
+
+      const firstDot = cleaned.indexOf(".");
+      if (firstDot !== -1) {
+        cleaned = cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, "");
+      }
+
+      if (cleaned.startsWith("-")) {
+        cleaned = "-" + cleaned.slice(1).replace(/-/g, "");
+      } else {
+        cleaned = cleaned.replace(/-/g, "");
+      }
+
+      return hasPercent && cleaned !== "" && cleaned !== "-" && cleaned !== "." ? cleaned + "%" : cleaned;
+    }
+
+    function isValidNumericPercent(value, allowTypingPartial) {
+      const trimmed = String(value || "").trim();
+      if (trimmed === "") return true;
+      if (allowTypingPartial) return numericPercentTypingPattern.test(trimmed);
+      return numericPercentPattern.test(trimmed);
+    }
+
+    document.querySelectorAll(".numeric-percent-input").forEach(function(input) {
+      input.addEventListener("input", function() {
+        const sanitized = sanitizeNumericPercentInput(this.value);
+        if (this.value !== sanitized) {
+          this.value = sanitized;
+        }
+        this.classList.toggle("is-invalid", !isValidNumericPercent(this.value, true));
+      });
+
+      input.addEventListener("blur", function() {
+        let value = String(this.value || "").trim();
+        if (value.endsWith(".")) value = value.slice(0, -1);
+        if (value === "-" || value === "%") value = "";
+        this.value = value;
+        this.classList.toggle("is-invalid", !isValidNumericPercent(this.value, false));
+      });
+    });
 
     // File selection handler
     if (fileInput) {
@@ -326,7 +376,20 @@
 
     // Form submission with loading state - only if both elements exist
     if (bulkForm && saveBtn) {
-      bulkForm.addEventListener("submit", function() {
+      bulkForm.addEventListener("submit", function(event) {
+        const invalidInputs = Array.from(bulkForm.querySelectorAll(".numeric-percent-input"))
+          .filter(function(input) { return !isValidNumericPercent(input.value, false); });
+
+        if (invalidInputs.length > 0) {
+          event.preventDefault();
+          invalidInputs.forEach(function(input) { input.classList.add("is-invalid"); });
+          invalidInputs[0].focus();
+          alert("Annual target and monthly values allow only numbers, optional decimal, and optional % (e.g. 100, 50.5, 100%).");
+          saveBtn.disabled = false;
+          saveBtn.textContent = "Save All Data";
+          return;
+        }
+
         saveBtn.disabled = true;
         saveBtn.textContent = "Saving...";
       });
@@ -595,6 +658,11 @@
     border-color: var(--primary-gray);
     box-shadow: 0 0 0 0.2rem rgba(108, 117, 125, 0.25);
     outline: none;
+  }
+
+  .numeric-percent-input.is-invalid {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.2);
   }
 
   .form-select {

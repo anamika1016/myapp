@@ -913,32 +913,32 @@ class UserDetailsController < ApplicationController
     employee_detail_id = params[:employee_detail_id]
     financial_year = normalize_financial_year(params[:financial_year]) || current_financial_year
     user_details_params = params[:user_details]
+    redirect_params = {
+      department_id: department_id,
+      employee_detail_id: employee_detail_id,
+      financial_year: financial_year
+    }
 
     # Enhanced validation
     if department_id.blank?
-      render json: { error: "Department ID is required" }, status: :bad_request
-      return
+      return bulk_create_error_response("Department ID is required", :bad_request, redirect_params)
     end
 
     if employee_detail_id.blank?
-      render json: { error: "Employee Detail ID is required" }, status: :bad_request
-      return
+      return bulk_create_error_response("Employee Detail ID is required", :bad_request, redirect_params)
     end
 
     if user_details_params.blank?
-      render json: { error: "No user details provided" }, status: :bad_request
-      return
+      return bulk_create_error_response("No user details provided", :bad_request, redirect_params)
     end
 
     # Validate that department and employee exist
     unless Department.exists?(department_id)
-      render json: { error: "Department not found" }, status: :not_found
-      return
+      return bulk_create_error_response("Department not found", :not_found, redirect_params)
     end
 
     unless EmployeeDetail.exists?(employee_detail_id)
-      render json: { error: "Employee not found" }, status: :not_found
-      return
+      return bulk_create_error_response("Employee not found", :not_found, redirect_params)
     end
 
     created_count = 0
@@ -958,20 +958,18 @@ class UserDetailsController < ApplicationController
           end
 
           # Extract monthly data
-          month_data = {
-            april: extract_month_value(details, "april"),
-            may: extract_month_value(details, "may"),
-            june: extract_month_value(details, "june"),
-            july: extract_month_value(details, "july"),
-            august: extract_month_value(details, "august"),
-            september: extract_month_value(details, "september"),
-            october: extract_month_value(details, "october"),
-            november: extract_month_value(details, "november"),
-            december: extract_month_value(details, "december"),
-            january: extract_month_value(details, "january"),
-            february: extract_month_value(details, "february"),
-            march: extract_month_value(details, "march")
-          }
+          month_data = {}
+          invalid_month = false
+          %w[april may june july august september october november december january february march].each do |month|
+            month_value = extract_month_value(details, month)
+            if month_value.present? && !valid_numeric_percent_value?(month_value)
+              errors << "Invalid #{month.upcase} value for #{details['activity_name'] || details[:activity_name] || "activity #{activity_id}"}: only numbers, optional decimal, and optional % are allowed"
+              invalid_month = true
+            else
+              month_data[month.to_sym] = month_value
+            end
+          end
+          next if invalid_month
 
           # Extract activity metadata (unit and theme_name)
           # Handle blank values properly - convert empty strings to nil for database
@@ -980,12 +978,16 @@ class UserDetailsController < ApplicationController
           annual_target_present = details.key?("annual_target_fy") || details.key?(:annual_target_fy) ||
                                   details.key?("annual_target_fy_2026_27") || details.key?(:annual_target_fy_2026_27)
           annual_target_value = details["annual_target_fy"] || details[:annual_target_fy] || details["annual_target_fy_2026_27"] || details[:annual_target_fy_2026_27]
+          if annual_target_value.present? && !valid_numeric_percent_value?(annual_target_value)
+            errors << "Invalid annual target for #{details['activity_name'] || details[:activity_name] || "activity #{activity_id}"}: only numbers, optional decimal, and optional % are allowed"
+            next
+          end
 
           activity_metadata = {
             unit: unit_value.present? ? unit_value : nil,
             theme_name: theme_value.present? ? theme_value : nil
           }
-          activity_metadata[:annual_target_fy] = annual_target_value.present? ? annual_target_value : nil if annual_target_present
+          activity_metadata[:annual_target_fy] = annual_target_value.present? ? annual_target_value.to_s.strip : nil if annual_target_present
 
           # Update Activity metadata (always update to handle clearing values)
           activity = Activity.find(activity_id)
@@ -1042,29 +1044,45 @@ class UserDetailsController < ApplicationController
     end
 
     if errors.empty? || (created_count + updated_count) > 0
-      message = []
-      message << "#{created_count} records created" if created_count > 0
-      message << "#{updated_count} records updated" if updated_count > 0
-      message = [ "No changes made" ] if message.empty?
+      message_parts = []
+      message_parts << "#{created_count} records created" if created_count > 0
+      message_parts << "#{updated_count} records updated" if updated_count > 0
+      message_parts = [ "No changes made" ] if message_parts.empty?
+      message = message_parts.join(", ")
+      message = "#{message}. Warnings: #{errors.first(3).join('; ')}" if errors.present?
 
-      response_data = {
-        success: true,
-        message: message.join(", "),
-        created: created_count,
-        updated: updated_count
-      }
-
-      response_data[:warnings] = errors if errors.present?
-
-      render json: response_data
+      respond_to do |format|
+        format.html do
+          redirect_to new_user_detail_path(redirect_params), notice: "Data saved successfully. #{message}."
+        end
+        format.json do
+          response_data = {
+            success: true,
+            message: message,
+            created: created_count,
+            updated: updated_count
+          }
+          response_data[:warnings] = errors if errors.present?
+          render json: response_data
+        end
+      end
     else
-      render json: {
-        success: false,
-        error: "Failed to save records",
-        errors: errors,
-        created: created_count,
-        updated: updated_count
-      }, status: :unprocessable_entity
+      error_message = "Failed to save records: #{errors.first(3).join('; ')}"
+
+      respond_to do |format|
+        format.html do
+          redirect_to new_user_detail_path(redirect_params), alert: error_message
+        end
+        format.json do
+          render json: {
+            success: false,
+            error: "Failed to save records",
+            errors: errors,
+            created: created_count,
+            updated: updated_count
+          }, status: :unprocessable_entity
+        end
+      end
     end
   end
 
@@ -1156,20 +1174,13 @@ class UserDetailsController < ApplicationController
 
 
 
-            months = {
-              april: normalize_percentage(row["april"]),
-              may: normalize_percentage(row["may"]),
-              june: normalize_percentage(row["june"]),
-              july: normalize_percentage(row["july"]),
-              august: normalize_percentage(row["august"]),
-              september: normalize_percentage(row["september"]),
-              october: normalize_percentage(row["october"]),
-              november: normalize_percentage(row["november"]),
-              december: normalize_percentage(row["december"]),
-              january: normalize_percentage(row["january"]),
-              february: normalize_percentage(row["february"]),
-              march: normalize_percentage(row["march"])
-            }
+            percent_context = unit.to_s.strip == "%"
+            months = MONTH_ATTRIBUTES.index_with do |month|
+              normalize_import_display_value(
+                import_row_month_value(row, month),
+                percent_context: percent_context
+              )
+            end
 
 
 
@@ -1725,6 +1736,17 @@ class UserDetailsController < ApplicationController
     params.permit(:department_id, :employee_detail_id, :financial_year, user_details: {})
   end
 
+  def bulk_create_error_response(message, status, redirect_params = {})
+    respond_to do |format|
+      format.html do
+        redirect_to new_user_detail_path(redirect_params.compact), alert: message
+      end
+      format.json do
+        render json: { error: message }, status: status
+      end
+    end
+  end
+
   def set_financial_year_context
     @financial_years = financial_year_options
     requested_financial_year = normalize_financial_year(params[:financial_year])
@@ -1854,12 +1876,41 @@ class UserDetailsController < ApplicationController
 
     return nil if value.blank?
     return nil if spreadsheet_error_value?(value)
-    return value.to_f if value.is_a?(String) && value.match?(/^\d+\.?\d*$/)
-    value
+
+    value.to_s.strip
+  end
+
+  def valid_numeric_percent_value?(value)
+    value.to_s.strip.match?(/\A-?\d+(?:\.\d+)?%?\z/)
   end
 
   def normalize_percentage(value)
     normalize_import_display_value(value)
+  end
+
+  # Excel export uses APR/JUN/…; import must also accept full names (april/june/…).
+  MONTH_HEADER_ALIASES = {
+    "april" => %w[april apr],
+    "may" => %w[may],
+    "june" => %w[june jun],
+    "july" => %w[july jul],
+    "august" => %w[august aug],
+    "september" => %w[september sep sept],
+    "october" => %w[october oct],
+    "november" => %w[november nov],
+    "december" => %w[december dec],
+    "january" => %w[january jan],
+    "february" => %w[february feb],
+    "march" => %w[march mar]
+  }.freeze
+
+  def import_row_month_value(row, month)
+    aliases = MONTH_HEADER_ALIASES[month.to_s] || [ month.to_s ]
+    aliases.each do |key|
+      value = row[key]
+      return value unless value.nil? || (value.respond_to?(:blank?) && value.blank?)
+    end
+    nil
   end
 
   def valid_numeric_value?(value)

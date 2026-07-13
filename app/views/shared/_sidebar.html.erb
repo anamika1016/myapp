@@ -150,20 +150,6 @@
         <ul class="flex flex-col sidebar-nav-list">
 
           <!-- Employee Forms - Show for all employee types -->
-          <% if current_user.employee? || current_user.hod? || current_user.admin? || current_user.l1_employer? || current_user.l2_employer? %>
-          <li class="hs-accordion" id="users-accordion">
-            <%= link_to dashboard_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if current_page?(dashboard_path) || current_page?(root_path)} text-base text-gray-800 rounded-lg" do %>
-              <svg class="shrink-0 size-6 sidebar-nav-icon" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24">
-                <rect x="3.5" y="4" width="7" height="7" rx="1.5" />
-                <rect x="13.5" y="4" width="7" height="4.5" rx="1.5" />
-                <rect x="13.5" y="11.5" width="7" height="8.5" rx="1.5" />
-                <rect x="3.5" y="14" width="7" height="6" rx="1.5" />
-              </svg>
-              <span class="font-semibold">Dashbord</span>
-            <% end %>
-          </li>
-          <% end %>
-
           <% if current_user.employee? || current_user.l1_employer? || current_user.l2_employer? %>
           <li class="hs-accordion" id="users-accordion">
             <%= link_to user_details_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if current_page?(user_details_path)} text-base text-gray-800 rounded-lg" do %>
@@ -304,18 +290,6 @@
             </li>
           <% end %>
 
-          <% if has_l1_responsibilities? %>
-            <li class="hs-accordion" id="users-accordion">
-              <%= link_to l1_pulse_360_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if current_page?(l1_pulse_360_path)} text-base text-gray-800 rounded-lg" do %>
-                <svg class="shrink-0 size-6 sidebar-nav-icon" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24">
-                  <path d="M5 17.5c1.6-1.9 4.1-3 7-3s5.4 1.1 7 3" />
-                  <path d="M7 13V8.5M12 13V6M17 13v-2.5" />
-                  <path d="M5 19.5h14" />
-                </svg>
-                <span class="font-semibold">L1_Pluse-360</span>
-              <% end %>
-            </li>
-          <% end %>
            <li>
             <%= link_to trainings_path,
                 class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if current_page?(trainings_path)} text-base text-gray-800 rounded-lg" do %>

@@ -734,7 +734,21 @@ class DepartmentsController < ApplicationController
         }[normalized_column]
         mapped_key ||= "activity_name" if %w[key_result_indicator key_result_indicators].include?(normalized_column)
         mapped_key ||= "annual_target_fy" if normalized_column.start_with?("annual_target_fy")
-        mapped_key ||= normalized_column if %w[april may june july august september october november december january february march].include?(normalized_column)
+        month_alias_map = {
+          "apr" => "april", "april" => "april",
+          "may" => "may",
+          "jun" => "june", "june" => "june",
+          "jul" => "july", "july" => "july",
+          "aug" => "august", "august" => "august",
+          "sep" => "september", "sept" => "september", "september" => "september",
+          "oct" => "october", "october" => "october",
+          "nov" => "november", "november" => "november",
+          "dec" => "december", "december" => "december",
+          "jan" => "january", "january" => "january",
+          "feb" => "february", "february" => "february",
+          "mar" => "march", "march" => "march"
+        }
+        mapped_key ||= month_alias_map[normalized_column]
         mapped[mapped_key] = value if mapped_key.present?
       end
       financial_year = normalize_financial_year(mapped["financial_year"]) || @selected_financial_year
@@ -856,84 +870,97 @@ class DepartmentsController < ApplicationController
   end
 
   def destroy
+    set_financial_year_context
+    year = @selected_financial_year
+    message = nil
+
     begin
       # Check if this is a request to delete a specific user's activities
       if params[:user_id].present?
-        # Delete only specific user's activities from this department
-        delete_user_activities_from_department(params[:user_id])
-        message = "User activities deleted successfully from this department."
+        # Delete only specific user's activities for the selected financial year
+        delete_user_activities_from_department(params[:user_id], year)
+        message = "User activities for #{year} deleted successfully from this department."
       else
-        # Delete the entire department (existing behavior)
+        # Delete only this department's data for the selected financial year
         ActiveRecord::Base.transaction do
-          # First, delete all records that reference activities in this department
           @department.activities.each do |activity|
-            # Delete user_details that reference this activity
-            user_details = UserDetail.where(activity_id: activity.id)
-            user_details.destroy_all
+            UserDetail.where(activity_id: activity.id, financial_year: year).destroy_all
           end
 
-          # Now delete the activities
-          @department.activities.destroy_all
+          # Also clear any department-scoped user_details for this year
+          UserDetail.where(department_id: @department.id, financial_year: year).destroy_all
 
-          # Finally delete the department
-          @department.destroy
+          remaining_user_details = UserDetail.where(department_id: @department.id)
+          if remaining_user_details.none?
+            # No other financial years use this department — safe to remove it fully
+            @department.activities.destroy_all
+            @department.destroy
+            message = "Department was successfully deleted."
+          else
+            # Other years still have data — keep department/activities intact
+            message = "Department data for #{year} deleted successfully. Other financial years were kept."
+          end
         end
-        message = "Department was successfully deleted."
       end
 
       respond_to do |format|
-        format.html { redirect_to departments_path, notice: message }
+        format.html { redirect_to departments_path(financial_year: year), notice: message }
         format.json { render json: { success: true, message: message } }
       end
     rescue => e
       Rails.logger.error "Error deleting department: #{e.message}"
       respond_to do |format|
-        format.html { redirect_to departments_path, alert: "Error deleting department: #{e.message}" }
+        format.html { redirect_to departments_path(financial_year: year), alert: "Error deleting department: #{e.message}" }
         format.json { render json: { success: false, message: "Error deleting department: #{e.message}" }, status: :unprocessable_entity }
       end
     end
   end
 
-  # New method to delete specific user's activities from a department
-  def delete_user_activities_from_department(user_id)
+  # Delete a specific user's activities for one financial year only
+  def delete_user_activities_from_department(user_id, financial_year = nil)
+    year = normalize_financial_year(financial_year) ||
+           normalize_financial_year(params[:financial_year]) ||
+           @selected_financial_year ||
+           current_financial_year
+
     Rails.logger.info "=== delete_user_activities_from_department method called ==="
-    Rails.logger.info "Deleting activities for user: #{user_id} from department: #{@department.id}"
+    Rails.logger.info "Deleting activities for user: #{user_id} for FY: #{year}"
 
     begin
       ActiveRecord::Base.transaction do
-        # Find the employee detail for this user
         employee_detail = find_employee_by_reference(user_id)
 
         if employee_detail
           Rails.logger.info "Found employee: #{employee_detail.employee_name}"
 
-          # Find all user_details for this specific employee in this department
+          # Only this employee's records for the selected financial year
           user_details = UserDetail.where(
-            department_id: @department.id,
-            employee_detail_id: employee_detail.id
+            employee_detail_id: employee_detail.id,
+            financial_year: year
           )
 
+          affected_department_ids = user_details.distinct.pluck(:department_id)
           user_details_count = user_details.count
-          Rails.logger.info "Found #{user_details_count} user_details for employee #{employee_detail.employee_name} in department #{@department.id}"
+          Rails.logger.info "Found #{user_details_count} user_details for employee #{employee_detail.employee_name} for FY #{year}"
 
           if user_details_count > 0
-            # Delete the user_details (achievements and achievement_remarks will be deleted automatically due to dependent: :destroy)
             user_details.destroy_all
-            Rails.logger.info "Deleted #{user_details_count} user_details for employee #{employee_detail.employee_name}"
+            Rails.logger.info "Deleted #{user_details_count} user_details for employee #{employee_detail.employee_name} (FY #{year})"
 
-            # Check if this was the only employee in this department
-            remaining_user_details = UserDetail.where(department_id: @department.id)
-
-            if remaining_user_details.count == 0
-              Rails.logger.info "No more user_details in department #{@department.id}, deleting department and activities"
-              # If no more user_details, delete the department and activities
-              @department.activities.destroy_all
-              @department.destroy
-            else
-              Rails.logger.info "Department #{@department.id} still has #{remaining_user_details.count} other user_details, keeping department"
+            # Only remove department/activities when no other year still uses them
+            Department.where(id: affected_department_ids).find_each do |dept|
+              remaining_user_details = UserDetail.where(department_id: dept.id)
+              if remaining_user_details.none?
+                Rails.logger.info "No more user_details in department #{dept.id}, deleting department and activities"
+                dept.activities.destroy_all
+                dept.destroy
+              else
+                remaining_other_years = remaining_user_details.where.not(financial_year: year).count
+                Rails.logger.info "Department #{dept.id} still has #{remaining_user_details.count} user_details (#{remaining_other_years} in other years), keeping department"
+              end
             end
           else
-            Rails.logger.info "No user_details found for employee #{employee_detail.employee_name} in department #{@department.id}"
+            Rails.logger.info "No user_details found for employee #{employee_detail.employee_name} for FY #{year}"
           end
         else
           Rails.logger.error "Employee detail not found for user_id: #{user_id}"
@@ -948,31 +975,34 @@ class DepartmentsController < ApplicationController
 
   # New method to handle the delete_user_activities route
   def delete_user_activities
+    set_financial_year_context
+    year = @selected_financial_year
+
     # Handle both form data and JSON parameters
     user_id = params[:employee_id] || params[:user_id]
 
     if user_id.blank?
       respond_to do |format|
-        format.html { redirect_to departments_path, alert: "Employee ID is required" }
+        format.html { redirect_to departments_path(financial_year: year), alert: "Employee ID is required" }
         format.json { render json: { success: false, message: "Employee ID is required" }, status: :bad_request }
       end
       return
     end
 
-    Rails.logger.info "delete_user_activities called with user_id: #{user_id}"
+    Rails.logger.info "delete_user_activities called with user_id: #{user_id}, financial_year: #{year}"
 
     begin
-      delete_user_activities_from_department(user_id)
+      delete_user_activities_from_department(user_id, year)
 
       respond_to do |format|
-        format.html { redirect_to departments_path, notice: "User activities deleted successfully from this department!" }
-        format.json { render json: { success: true, message: "User activities deleted successfully from this department!" } }
+        format.html { redirect_to departments_path(financial_year: year), notice: "User activities for #{year} deleted successfully. Other financial years were kept." }
+        format.json { render json: { success: true, message: "User activities for #{year} deleted successfully. Other financial years were kept." } }
       end
     rescue => e
       Rails.logger.error "Error in delete_user_activities: #{e.message}"
 
       respond_to do |format|
-        format.html { redirect_to departments_path, alert: "Error deleting user activities: #{e.message}" }
+        format.html { redirect_to departments_path(financial_year: year), alert: "Error deleting user activities: #{e.message}" }
         format.json { render json: { success: false, message: "Error deleting user activities: #{e.message}" }, status: :unprocessable_entity }
       end
     end
@@ -980,6 +1010,8 @@ class DepartmentsController < ApplicationController
 
   # New method to handle the delete_user_from_department route
   def delete_user_from_department
+    set_financial_year_context
+    year = @selected_financial_year
     user_id = params[:user_id] || params[:employee_id]
 
     if user_id.blank?
@@ -988,8 +1020,8 @@ class DepartmentsController < ApplicationController
     end
 
     begin
-      delete_user_activities_from_department(user_id)
-      render json: { success: true, message: "User deleted successfully from this department!" }
+      delete_user_activities_from_department(user_id, year)
+      render json: { success: true, message: "User data for #{year} deleted successfully. Other financial years were kept." }
     rescue => e
       Rails.logger.error "Error in delete_user_from_department: #{e.message}"
       render json: { success: false, message: "Error deleting user from department: #{e.message}" }, status: :unprocessable_entity

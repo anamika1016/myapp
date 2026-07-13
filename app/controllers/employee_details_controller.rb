@@ -264,17 +264,29 @@ class EmployeeDetailsController < ApplicationController
       "annualtargetfy" => "annual_target_fy",
       "annualtargetfy202627" => "annual_target_fy",
       "april" => "april",
+      "apr" => "april",
       "may" => "may",
       "june" => "june",
+      "jun" => "june",
       "july" => "july",
+      "jul" => "july",
       "august" => "august",
+      "aug" => "august",
       "september" => "september",
+      "sep" => "september",
+      "sept" => "september",
       "october" => "october",
+      "oct" => "october",
       "november" => "november",
+      "nov" => "november",
       "december" => "december",
+      "dec" => "december",
       "january" => "january",
+      "jan" => "january",
       "february" => "february",
-      "march" => "march"
+      "feb" => "february",
+      "march" => "march",
+      "mar" => "march"
     }
 
     employee_count = 0
