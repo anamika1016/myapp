@@ -838,6 +838,7 @@ end
       financial_year: financial_year,
       quarter: quarter
     )
+    @review = current_quarterly_pli_review_for(@review, @employee_detail, financial_year, quarter)
   end
 
   def save_quarterly_pli
@@ -1890,7 +1891,12 @@ end
         payload = quarter_pli_payload_for(employee, financial_year, quarter_name)
         next unless payload
 
-        review = reviews[[ employee.id, quarter_name ]]
+        review = current_quarterly_pli_review_for(
+          reviews[[ employee.id, quarter_name ]],
+          employee,
+          financial_year,
+          quarter_name
+        )
         {
           employee: employee,
           financial_year: financial_year,
@@ -1908,6 +1914,41 @@ end
         row[:quarter]
       ]
     end
+  end
+
+  def current_quarterly_pli_review_for(review, employee_detail, financial_year, quarter)
+    return nil if review.blank?
+
+    reviewed_at = review.reviewed_at || review.updated_at || review.created_at
+    source_updated_at = quarterly_pli_source_updated_at(employee_detail, financial_year, quarter)
+
+    return review if source_updated_at.blank?
+    return review if reviewed_at.present? && reviewed_at >= source_updated_at
+
+    nil
+  end
+
+  def quarterly_pli_source_updated_at(employee_detail, financial_year, quarter)
+    quarter_months = get_quarter_months(quarter)
+    return nil if quarter_months.empty?
+
+    timestamps = []
+
+    employee_detail.user_details.each do |detail|
+      next unless detail.financial_year.to_s == financial_year.to_s && detail.activity.present?
+      next unless quarter_months.any? { |month| target_present_for_review_month?(detail, month) }
+
+      timestamps << detail.updated_at
+
+      detail.achievements.each do |achievement|
+        next unless quarter_months.include?(achievement.month.to_s.downcase)
+
+        timestamps << achievement.updated_at
+        timestamps << achievement.achievement_remark&.updated_at
+      end
+    end
+
+    timestamps.compact.max
   end
 
   def quarterly_pli_export_percentage(value)

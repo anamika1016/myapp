@@ -253,26 +253,24 @@ module ApplicationHelper
 
     employee_ids = employees.map(&:id)
     approved_keys = ObserverPliReview
-      .where(employee_detail_id: employee_ids, observer_level: observer_level, status: "approved")
+      .where(employee_detail_id: employee_ids, observer_level: observer_level, financial_year: sidebar_current_financial_year, status: "approved")
       .pluck(:employee_detail_id, :financial_year, :quarter, :month)
       .to_set
 
     pending_keys = Set.new
     employees.each do |employee|
-      financial_years = employee.user_details.map(&:financial_year).compact.uniq
-      financial_years.each do |financial_year|
-        details = employee.user_details.select { |detail| detail.financial_year == financial_year }
-        details.flat_map(&:achievements).each do |achievement|
-          next if achievement.achievement.blank?
+      financial_year = sidebar_current_financial_year
+      details = employee.user_details.select { |detail| detail.financial_year.to_s == financial_year }
+      details.flat_map(&:achievements).each do |achievement|
+        next if achievement.achievement.blank?
 
-          month = achievement.month.to_s.downcase
-          quarter = quarter_name_for_month(month)
-          next if quarter.blank?
-          next unless observer_month_ready_for_review?(employee, observer_level, details, month)
+        month = achievement.month.to_s.downcase
+        quarter = quarter_name_for_month(month)
+        next if quarter.blank?
+        next unless observer_month_ready_for_review?(employee, observer_level, details, month)
 
-          key = [ employee.id, financial_year, quarter, month ]
-          pending_keys.add(key) unless approved_keys.include?(key)
-        end
+        key = [ employee.id, financial_year, quarter, month ]
+        pending_keys.add(key) unless approved_keys.include?(key)
       end
     end
 
