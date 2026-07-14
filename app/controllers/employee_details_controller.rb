@@ -1,6 +1,7 @@
 require "roo"
 require "axlsx"
 require "securerandom"
+require "set"
 
 class EmployeeDetailsController < ApplicationController
   before_action :set_employee_detail, only: [ :edit, :update, :destroy, :toggle_portal_status ]
@@ -10,6 +11,7 @@ class EmployeeDetailsController < ApplicationController
     @employee_detail = EmployeeDetail.new
     @q = EmployeeDetail.ransack(params[:q])
     @employee_details = @q.result.order(Arel.sql("LOWER(employee_name) ASC")).page(params[:page]).per(10)
+    load_observer_names_for_employee_list
   end
 
   def create
@@ -20,6 +22,7 @@ class EmployeeDetailsController < ApplicationController
       redirect_to employee_details_path, notice: "Employee created successfully."
     else
       @employee_details = @q.result.order(Arel.sql("LOWER(employee_name) ASC")).page(params[:page]).per(10)
+      load_observer_names_for_employee_list
       flash.now[:alert] = "Failed to create employee."
       render :index, status: :unprocessable_entity
     end
@@ -89,8 +92,13 @@ class EmployeeDetailsController < ApplicationController
     workbook.add_worksheet(name: "Employees") do |sheet|
       sheet.add_row [
         "Name", "Email", "Employee Code",
-        "L1 Code", "L1 Name", "OBS Code 1", "OBS Code 2", "OBS Code 3", "OBS Code 4", "Post", "Location", "Department"
+        "L1 Code", "L1 Name",
+        "OBS Code 1", "OBS Name 1", "OBS Code 2", "OBS Name 2",
+        "OBS Code 3", "OBS Name 3", "OBS Code 4", "OBS Name 4",
+        "Post", "Location", "Department"
       ]
+
+      observer_names_by_code = observer_names_by_code_for(@employee_details)
 
       @employee_details.each do |emp|
         sheet.add_row [
@@ -100,9 +108,13 @@ class EmployeeDetailsController < ApplicationController
           emp.l1_code,
           emp.l1_employer_name,
           emp.obs_code1,
+          observer_names_by_code[emp.obs_code1.to_s.strip.downcase],
           emp.obs_code2,
+          observer_names_by_code[emp.obs_code2.to_s.strip.downcase],
           emp.obs_code3,
+          observer_names_by_code[emp.obs_code3.to_s.strip.downcase],
           emp.obs_code4,
+          observer_names_by_code[emp.obs_code4.to_s.strip.downcase],
           emp.post,
           emp.location,
           emp.department
@@ -356,7 +368,7 @@ class EmployeeDetailsController < ApplicationController
       # PERFORMANCE FIX: Optimize includes to preload all necessary associations
       @employee_details = EmployeeDetail
                             .where(status: [ "pending", "l1_returned", "l1_approved", "l2_returned", "l2_approved" ])
-                            .where(l1_code: current_user.employee_code)
+                            .where("LOWER(TRIM(COALESCE(l1_code, ''))) = ?", current_user.employee_code.to_s.strip.downcase)
                             .includes(
                               user_details: [
                                 :activity,
@@ -368,11 +380,6 @@ class EmployeeDetailsController < ApplicationController
 
     prepare_review_filters(@employee_details)
 
-    # Group employees by quarters for display
-    @quarterly_data = group_employees_by_quarters(@employee_details)
-
-    # Create the data structure expected by the view
-    @quarterly_employee_data = build_quarterly_employee_data(@employee_details)
     @monthly_employee_data = build_monthly_employee_data(
       @employee_details,
       approval_level: "l1",
@@ -380,9 +387,6 @@ class EmployeeDetailsController < ApplicationController
       financial_year: @selected_financial_year
     )
     @monthly_employee_data = filter_l1_rows_by_observer_chain(@monthly_employee_data)
-
-    # PERFORMANCE FIX: Pre-calculate summary data to avoid processing in view
-    @summary_data = calculate_summary_data(@employee_details)
   end
 
   # Show employee details with quarterly view
@@ -882,7 +886,9 @@ end
 
     if review.save
       save_observer_activity_remarks(employee_detail, month, observer_level)
+      l1_sms_result = review.status == "approved" ? notify_l1_after_observer_chain_approval(employee_detail, financial_year, quarter, month) : nil
       notice_message = review.status == "returned" ? "#{observer_menu_title(observer_level)} returned #{month_label(month)} for #{employee_detail.employee_name}." : "#{observer_menu_title(observer_level)} approved #{month_label(month)} for #{employee_detail.employee_name}."
+      notice_message = "#{notice_message} L1 SMS sent." if l1_sms_result&.dig(:success) && l1_sms_result[:sent]
       redirect_to observer_pli_redirect_path(observer_level, financial_year: financial_year, quarter: quarter), notice: notice_message
     else
       redirect_to observer_pli_detail_employee_detail_path(employee_detail, observer_level: observer_level, financial_year: financial_year, quarter: quarter, month: month), alert: review.errors.full_messages.to_sentence
@@ -1105,6 +1111,91 @@ end
   end
 
   private
+
+  def load_observer_names_for_employee_list
+    @observer_names_by_code = observer_names_by_code_for(@employee_details)
+  end
+
+  def observer_names_by_code_for(employee_details)
+    observer_codes = Array(employee_details).flat_map do |employee|
+      ApplicationHelper::OBSERVER_LEVELS.map { |observer_level| employee.public_send(observer_level).to_s.strip }
+    end.reject(&:blank?).map(&:downcase).uniq
+
+    return {} if observer_codes.empty?
+
+    EmployeeDetail
+      .where("LOWER(TRIM(employee_code)) IN (?)", observer_codes)
+      .pluck(:employee_code, :employee_name)
+      .each_with_object({}) do |(code, name), names_by_code|
+        names_by_code[code.to_s.strip.downcase] = name
+      end
+  end
+
+  def notify_l1_after_observer_chain_approval(employee_detail, financial_year, quarter, month)
+    return { success: true, sent: false, message: "Observer approval chain is still pending" } unless observer_chain_approved_for_month?(employee_detail, financial_year, quarter, month)
+
+    quarter_label = quarter_sms_label(quarter)
+    return { success: true, sent: false, message: "L1 SMS already sent" } if l1_sms_already_sent?(employee_detail.id, quarter_label, month)
+
+    result = send_sms_to_l1_after_observers(employee_detail, quarter_label, month)
+    mark_l1_sms_as_sent(employee_detail.id, quarter_label, month) if result[:success]
+    result.merge(sent: result[:success])
+  end
+
+  def send_sms_to_l1_after_observers(employee_detail, quarter_label, month)
+    l1_code = employee_detail.l1_code.to_s.strip
+    return { success: false, error: "L1 code not found for employee" } if l1_code.blank?
+
+    l1_manager = employee_detail_for_code(l1_code)
+    return { success: false, error: "L1 manager not found with code: #{l1_code}" } unless l1_manager
+    return { success: false, error: "L1 manager mobile number not found" } if l1_manager.mobile_number.blank?
+
+    month_text = month.present? ? " #{month_label(month)}" : ""
+    message = "Emp-Code: #{employee_detail.employee_code}, Emp-Name: #{employee_detail.employee_name} has submitted his#{month_text} #{quarter_label} Qtr KRA MIS. Please review and approve in the system. Ploughman Agro Private Limited"
+
+    SmsNotificationService.send_message(l1_manager.mobile_number, message)
+  end
+
+  def l1_sms_already_sent?(employee_detail_id, quarter, month)
+    SmsLog.exists?(
+      employee_detail_id: employee_detail_id,
+      quarter: quarter,
+      month: month,
+      recipient_role: "l1",
+      sent: true
+    )
+  end
+
+  def mark_l1_sms_as_sent(employee_detail_id, quarter, month)
+    SmsLog.create!(
+      employee_detail_id: employee_detail_id,
+      quarter: quarter,
+      month: month,
+      recipient_role: "l1",
+      sent: true,
+      sent_at: Time.current
+    )
+  rescue => e
+    Rails.logger.error "Failed to mark L1 SMS as sent: #{e.message}"
+  end
+
+  def quarter_sms_label(quarter)
+    case quarter.to_s
+    when "Q1" then "Q1 (APR-JUN)"
+    when "Q2" then "Q2 (JUL-SEP)"
+    when "Q3" then "Q3 (OCT-DEC)"
+    when "Q4" then "Q4 (JAN-MAR)"
+    else quarter.to_s
+    end
+  end
+
+  def employee_detail_for_code(employee_code)
+    code = employee_code.to_s.strip
+    return nil if code.blank?
+
+    EmployeeDetail.where("LOWER(TRIM(employee_code)) = ?", code.downcase).first ||
+      EmployeeDetail.find_by("employee_code LIKE ?", "#{code}%")
+  end
 
   def prepare_employee_detail_show(financial_year: nil, month: nil, quarter: nil)
     @user_detail_id = params[:user_detail_id]
@@ -1393,14 +1484,14 @@ end
     current_user.hod? ||
       current_user.admin? ||
       EmployeeDetail.where(
-        "TRIM(COALESCE(l1_code, '')) = ? OR TRIM(COALESCE(l1_employer_name, '')) = ?",
-        current_user.employee_code.to_s.strip,
-        current_user.email.to_s.strip
+        "LOWER(TRIM(COALESCE(l1_code, ''))) = ? OR LOWER(TRIM(COALESCE(l1_employer_name, ''))) = ?",
+        current_user.employee_code.to_s.strip.downcase,
+        current_user.email.to_s.strip.downcase
       ).exists? ||
       EmployeeDetail.where(
-        "TRIM(COALESCE(l2_code, '')) = ? OR TRIM(COALESCE(l2_employer_name, '')) = ?",
-        current_user.employee_code.to_s.strip,
-        current_user.email.to_s.strip
+        "LOWER(TRIM(COALESCE(l2_code, ''))) = ? OR LOWER(TRIM(COALESCE(l2_employer_name, ''))) = ?",
+        current_user.employee_code.to_s.strip.downcase,
+        current_user.email.to_s.strip.downcase
       ).exists?
   end
 
@@ -1409,9 +1500,9 @@ end
     return scope if current_user.hod? || current_user.admin?
 
     scope.where(
-      "TRIM(COALESCE(l1_code, '')) = :code OR TRIM(COALESCE(l1_employer_name, '')) = :email OR TRIM(COALESCE(l2_code, '')) = :code OR TRIM(COALESCE(l2_employer_name, '')) = :email",
-      code: current_user.employee_code.to_s.strip,
-      email: current_user.email.to_s.strip
+      "LOWER(TRIM(COALESCE(l1_code, ''))) = :code OR LOWER(TRIM(COALESCE(l1_employer_name, ''))) = :email OR LOWER(TRIM(COALESCE(l2_code, ''))) = :code OR LOWER(TRIM(COALESCE(l2_employer_name, ''))) = :email",
+      code: current_user.employee_code.to_s.strip.downcase,
+      email: current_user.email.to_s.strip.downcase
     )
   end
 
@@ -1591,13 +1682,39 @@ end
   end
 
   def filter_l1_rows_by_observer_chain(monthly_employee_data)
-    monthly_employee_data.select do |_key, data|
-      observer_chain_approved_for_month?(
-        data[:employee],
-        data[:financial_year],
-        data[:quarter_name],
-        data[:month]
+    rows = monthly_employee_data.values
+    return monthly_employee_data if rows.empty?
+
+    employee_ids = rows.map { |data| data[:employee]&.id }.compact.uniq
+    financial_years = rows.map { |data| data[:financial_year] }.compact.uniq
+    quarters = rows.map { |data| data[:quarter_name] }.compact.uniq
+    months = rows.map { |data| data[:month] }.compact.uniq
+
+    approved_observer_keys = ObserverPliReview
+      .where(
+        employee_detail_id: employee_ids,
+        financial_year: financial_years,
+        quarter: quarters,
+        month: months,
+        status: "approved"
       )
+      .pluck(:employee_detail_id, :financial_year, :quarter, :month, :observer_level)
+      .to_set
+
+    monthly_employee_data.select do |_key, data|
+      employee = data[:employee]
+      assigned_levels = observer_levels_for(employee)
+      next true if assigned_levels.empty?
+
+      assigned_levels.all? do |observer_level|
+        approved_observer_keys.include?([
+          employee.id,
+          data[:financial_year],
+          data[:quarter_name],
+          data[:month],
+          observer_level
+        ])
+      end
     end
   end
 
@@ -1825,17 +1942,22 @@ end
   end
 
   def can_act_as_l1?(employee_detail)
+    code = current_user.employee_code.to_s.strip.downcase
+    email = current_user.email.to_s.strip.downcase
+
     current_user.hod? ||
-    current_user.employee_code == employee_detail.l1_code ||
-    current_user.email == employee_detail.l1_employer_name
+    code == employee_detail.l1_code.to_s.strip.downcase ||
+    email == employee_detail.l1_employer_name.to_s.strip.downcase
   end
 
   def can_act_as_l2?(employee_detail)
     return false unless l2_reviewer_assigned?(employee_detail)
+    code = current_user.employee_code.to_s.strip.downcase
+    email = current_user.email.to_s.strip.downcase
 
     current_user.hod? ||
-    current_user.employee_code.to_s.strip == employee_detail.l2_code.to_s.strip ||
-    current_user.email.to_s.strip == employee_detail.l2_employer_name.to_s.strip
+    code == employee_detail.l2_code.to_s.strip.downcase ||
+    email == employee_detail.l2_employer_name.to_s.strip.downcase
   end
 
   def l2_reviewer_assigned?(employee_detail)
@@ -2107,12 +2229,20 @@ end
                       end
 
       detail_groups.each do |group_financial_year, details_for_review|
+        achievements_by_detail_and_month = details_for_review.each_with_object({}) do |detail, lookup|
+          lookup[detail.id] = detail.achievements
+                             .select { |achievement| achievement.achievement.present? }
+                             .group_by { |achievement| achievement.month.to_s.downcase }
+        end
+
         months_to_review.each do |review_month|
           details_with_month_data = details_for_review.select do |detail|
-            submitted_review_detail_for_month?(detail, review_month)
+            target_present_for_review_month?(detail, review_month) &&
+              achievements_by_detail_and_month.dig(detail.id, review_month).present?
           end
-          month_achievements = details_with_month_data.flat_map(&:achievements).select do |achievement|
-            next false unless achievement.month == review_month && achievement.achievement.present?
+          month_achievements = details_with_month_data.flat_map do |detail|
+            achievements_by_detail_and_month.dig(detail.id, review_month) || []
+          end.select do |achievement|
 
             if approval_level == "l2"
               [ "l1_approved", "l2_approved", "l2_returned" ].include?(achievement.status)

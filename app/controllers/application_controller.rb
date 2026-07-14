@@ -10,9 +10,9 @@ class ApplicationController < ActionController::Base
     devise_parameter_sanitizer.permit(:sign_up, keys: [ :employee_code, :role ])
   end
 
-  # Override Devise's after_sign_in_path_for to always redirect to dashboard
+  # Show the user profile first after every successful login.
   def after_sign_in_path_for(resource)
-    dashboard_path
+    settings_path
   end
 
   def sign_out_inactive_portal_user
@@ -49,9 +49,9 @@ class ApplicationController < ActionController::Base
     return false if code.blank? && email.blank?
 
     EmployeeDetail.where(
-      "(:code != '' AND TRIM(COALESCE(l1_code, '')) = :code) OR (:email != '' AND TRIM(COALESCE(l1_employer_name, '')) = :email)",
-      code: code.to_s,
-      email: email.to_s
+      "(:code != '' AND LOWER(TRIM(COALESCE(l1_code, ''))) = :code) OR (:email != '' AND LOWER(TRIM(COALESCE(l1_employer_name, ''))) = :email)",
+      code: code.to_s.downcase,
+      email: email.to_s.downcase
     ).exists?
   end
 
@@ -63,9 +63,9 @@ class ApplicationController < ActionController::Base
     return false if code.blank? && email.blank?
 
     EmployeeDetail.where(
-      "(:code != '' AND TRIM(COALESCE(l2_code, '')) = :code) OR (:email != '' AND TRIM(COALESCE(l2_employer_name, '')) = :email)",
-      code: code.to_s,
-      email: email.to_s
+      "(:code != '' AND LOWER(TRIM(COALESCE(l2_code, ''))) = :code) OR (:email != '' AND LOWER(TRIM(COALESCE(l2_employer_name, ''))) = :email)",
+      code: code.to_s.downcase,
+      email: email.to_s.downcase
     ).exists?
   end
 
@@ -96,7 +96,7 @@ class ApplicationController < ActionController::Base
       code = current_user_identity_code
       return 0 if code.blank?
 
-      EmployeeDetail.where(l1_code: code)
+      EmployeeDetail.where("LOWER(TRIM(COALESCE(l1_code, ''))) = ?", code.downcase)
     end
 
     Achievement.joins(user_detail: :employee_detail)

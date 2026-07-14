@@ -132,10 +132,18 @@
                 <!-- L2 columns hidden as requested -->
                 <!-- <td class="px-4 py-4 whitespace-nowrap text-gray-900"><%= emp.l2_code %></td> -->
                 <!-- <td class="px-4 py-4 whitespace-nowrap text-gray-900"><%= emp.l2_employer_name %></td> -->
-                <td class="px-4 py-4 whitespace-nowrap text-gray-900"><%= emp.obs_code1 %></td>
-                <td class="px-4 py-4 whitespace-nowrap text-gray-900"><%= emp.obs_code2 %></td>
-                <td class="px-4 py-4 whitespace-nowrap text-gray-900"><%= emp.obs_code3 %></td>
-                <td class="px-4 py-4 whitespace-nowrap text-gray-900"><%= emp.obs_code4 %></td>
+                <% %i[obs_code1 obs_code2 obs_code3 obs_code4].each do |observer_field| %>
+                  <%
+                    observer_code = emp.public_send(observer_field).to_s.strip
+                    observer_name = @observer_names_by_code[observer_code.downcase]
+                  %>
+                  <td class="px-4 py-4 whitespace-nowrap text-gray-900">
+                    <div class="font-medium"><%= observer_code.presence || "-" %></div>
+                    <% if observer_name.present? %>
+                      <div class="text-xs text-gray-500"><%= observer_name %></div>
+                    <% end %>
+                  </td>
+                <% end %>
                 <td class="px-4 py-4 whitespace-nowrap text-gray-900"><%= emp.post %></td>
                 <td class="px-4 py-4 whitespace-nowrap text-gray-900"><%= emp.location %></td>
                 <td class="px-4 py-4 whitespace-nowrap text-gray-900"><%= emp.department %></td>

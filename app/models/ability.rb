@@ -17,32 +17,36 @@ class Ability
 
     # L1 Permissions - Check if user's employee_code matches any l1_code OR email matches l1_employer_name
     can :read, EmployeeDetail do |ed|
-      (ed.l1_code == user.employee_code || ed.l1_employer_name == user.email) &&
+      (code_matches?(ed.l1_code, user.employee_code) || code_matches?(ed.l1_employer_name, user.email)) &&
       [ "pending", "l1_returned", "l1_approved", "l2_returned", "l2_approved" ].include?(ed.status)
     end
 
     can [ :approve, :return ], EmployeeDetail do |ed|
-      (ed.l1_code == user.employee_code || ed.l1_employer_name == user.email) &&
+      (code_matches?(ed.l1_code, user.employee_code) || code_matches?(ed.l1_employer_name, user.email)) &&
       [ "pending", "l1_returned" ].include?(ed.status)
     end
 
     can :l1, EmployeeDetail do
       # User can access L1 view if they have any L1 assignments
-      EmployeeDetail.where("l1_code = ? OR l1_employer_name = ?", user.employee_code, user.email).exists?
+      EmployeeDetail.where(
+        "LOWER(TRIM(COALESCE(l1_code, ''))) = ? OR LOWER(TRIM(COALESCE(l1_employer_name, ''))) = ?",
+        user.employee_code.to_s.strip.downcase,
+        user.email.to_s.strip.downcase
+      ).exists?
     end
 
     # L2 Permissions - Check if user's employee_code matches any l2_code OR email matches l2_employer_name
     can :read, EmployeeDetail do |ed|
-      (ed.l2_code == user.employee_code || ed.l2_employer_name == user.email) &&
+      (code_matches?(ed.l2_code, user.employee_code) || code_matches?(ed.l2_employer_name, user.email)) &&
       [ "l1_approved", "l2_returned", "l2_approved" ].include?(ed.status)
     end
 
     can :show_l2, EmployeeDetail do |ed|
-      ed.l2_code == user.employee_code || ed.l2_employer_name == user.email
+      code_matches?(ed.l2_code, user.employee_code) || code_matches?(ed.l2_employer_name, user.email)
     end
 
     can [ :l2_approve, :l2_return ], EmployeeDetail do |ed|
-      (ed.l2_code == user.employee_code || ed.l2_employer_name == user.email) &&
+      (code_matches?(ed.l2_code, user.employee_code) || code_matches?(ed.l2_employer_name, user.email)) &&
       [ "l1_approved", "l2_returned" ].include?(ed.status)
     end
 
@@ -53,7 +57,11 @@ class Ability
 
     can :l2, EmployeeDetail do
       # User can access L2 view if they have any L2 assignments
-      EmployeeDetail.where("l2_code = ? OR l2_employer_name = ?", user.employee_code, user.email).exists?
+      EmployeeDetail.where(
+        "LOWER(TRIM(COALESCE(l2_code, ''))) = ? OR LOWER(TRIM(COALESCE(l2_employer_name, ''))) = ?",
+        user.employee_code.to_s.strip.downcase,
+        user.email.to_s.strip.downcase
+      ).exists?
     end
 
     observer_actions = [ :observer_1, :observer_2, :observer_3, :observer_4, :observer_pli_detail, :save_observer_pli ]
@@ -102,6 +110,10 @@ class Ability
   end
 
   private
+
+  def code_matches?(left, right)
+    left.to_s.strip.downcase == right.to_s.strip.downcase
+  end
 
   def resolved_observer_code_for(user)
     code = user.employee_code.to_s.strip.presence
