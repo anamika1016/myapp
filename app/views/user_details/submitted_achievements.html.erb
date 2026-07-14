@@ -87,8 +87,7 @@
                   achievement = achievement_record&.achievement
                   remarks = achievement_record&.employee_remarks
                   achievement_remark = achievement_record&.achievement_remark
-                  l1_remarks = achievement_remark&.l1_remarks
-                  reporting_manager_remarks = achievement_remark&.reporting_manager_remarks.presence || l1_remarks
+                  reporting_manager_remarks = achievement_remark&.reporting_manager_remarks
                   progress_percentage = if target_value.present? && target_value.to_s.strip != "0" && target_value.to_s.delete(",").to_f.positive? && achievement.present?
                     ((achievement.to_s.delete(",").to_f / target_value.to_s.delete(",").to_f) * 100.0).round(2)
                   end
@@ -226,12 +225,35 @@
             return value !== null && value !== undefined && String(value).trim() !== '' && String(value).trim() !== '-';
           }
 
+          function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, (character) => ({
+              '&': '&amp;',
+              '<': '&lt;',
+              '>': '&gt;',
+              '"': '&quot;',
+              "'": '&#39;'
+            }[character]));
+          }
+
+          function percentageCard(title, value, cardClass) {
+            if (!hasDisplayValue(value)) return '';
+            const numericValue = Number.parseFloat(String(value).replace('%', ''));
+            const displayValue = Number.isFinite(numericValue) ? `${numericValue.toFixed(2)}%` : escapeHtml(value);
+
+            return `
+              <div class="rounded-lg border p-5 ${cardClass}">
+                <h4 class="font-semibold text-sm mb-2">${escapeHtml(title)}</h4>
+                <div class="text-2xl font-bold text-gray-900">${displayValue}</div>
+              </div>
+            `;
+          }
+
           function remarkCard(title, remarks, cardClass) {
             if (!hasDisplayValue(remarks)) return '';
             return `
               <div class="rounded-lg border p-5 ${cardClass}">
-                <h4 class="font-semibold text-base mb-3">${title}</h4>
-                <div class="text-gray-800 text-sm whitespace-pre-wrap">${remarks}</div>
+                <h4 class="font-semibold text-base mb-3">${escapeHtml(title)}</h4>
+                <div class="text-gray-800 text-sm whitespace-pre-wrap">${escapeHtml(remarks)}</div>
               </div>
             `;
           }
@@ -239,6 +261,25 @@
           function renderFinalRemarks(summary) {
             const cards = [];
             const observers = summary.observer_summaries || [];
+            const pli = summary.quarterly_pli || {};
+
+            cards.push(percentageCard(
+              'Calculated %',
+              summary.calculated_percentage,
+              'border-emerald-200 bg-emerald-50'
+            ));
+
+            cards.push(percentageCard(
+              'L1 %',
+              summary.l1_percentage,
+              'border-yellow-200 bg-yellow-50'
+            ));
+
+            cards.push(percentageCard(
+              'Final PLI %',
+              pli.final_percentage,
+              'border-teal-200 bg-teal-50'
+            ));
 
             observers.forEach((observer) => {
               const card = remarkCard(
@@ -256,7 +297,6 @@
             );
             if (l1Card) cards.push(l1Card);
 
-            const pli = summary.quarterly_pli || {};
             const pliCard = remarkCard(
               `Quality PLI Final Remarks${pli.quarter ? ` - ${pli.quarter}` : ''}`,
               pli.final_remarks,
@@ -266,8 +306,10 @@
 
             if (!finalRemarksContent || !noFinalRemarksMessage) return;
 
-            if (cards.length) {
-              finalRemarksContent.innerHTML = cards.join('');
+            const visibleCards = cards.filter(Boolean);
+
+            if (visibleCards.length) {
+              finalRemarksContent.innerHTML = visibleCards.join('');
               finalRemarksContent.classList.remove('hidden');
               noFinalRemarksMessage.classList.add('hidden');
             } else {

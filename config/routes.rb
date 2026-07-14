@@ -99,9 +99,11 @@ Rails.application.routes.draw do
       get :export_quarterly_xlsx  # Export quarterly L1 L2 data
       post :import
       patch :bulk_update_portal_status
+      delete :bulk_destroy
       get "l1"
       get "l2"  # ➤ this is your sidebar L1 view
       get :quarterly_pli
+      get :export_quarterly_pli_xlsx
       post :save_quarterly_pli
       get :observer_1
       get :observer_2

@@ -862,8 +862,14 @@ class UserDetailsController < ApplicationController
       response_message += " Warnings: #{errors.first(3).join(', ')}" if errors.any?
       if sms_results.any?
         successful_sms = sms_results.select { |r| r[:success] }
+        failed_sms = sms_results.reject { |r| r[:success] }
         if successful_sms.any?
-          response_message += " 📱 SMS notifications sent for #{successful_sms.count} quarter(s)."
+          response_message += " SMS notifications sent for #{successful_sms.count} quarter(s)."
+        end
+
+        if failed_sms.any?
+          failure_messages = failed_sms.filter_map { |result| result[:message].presence }.uniq.first(3)
+          response_message += " SMS not sent: #{failure_messages.join(', ')}." if failure_messages.any?
         end
       end
 
@@ -1154,6 +1160,10 @@ class UserDetailsController < ApplicationController
       import_sheets.each do |sheet_info|
         spreadsheet = sheet_info[:spreadsheet]
         sheet_name = sheet_info[:name]
+        if spreadsheet.respond_to?(:default_sheet=) && spreadsheet.respond_to?(:sheets) && spreadsheet.sheets.include?(sheet_name)
+          spreadsheet.default_sheet = sheet_name
+        end
+
         header = import_spreadsheet_row(spreadsheet, 1)
         next if spreadsheet.last_row.to_i < 2
 
@@ -1422,7 +1432,7 @@ class UserDetailsController < ApplicationController
       shared_strings = read_xlsx_shared_strings(zip_file)
       percentage_styles = read_xlsx_percentage_styles(zip_file)
 
-      zip_file.glob("xl/worksheets/sheet*.xml").sort_by(&:name).each_with_index do |worksheet_entry, index|
+      zip_file.glob("xl/worksheets/sheet*.xml").sort_by { |entry| entry.name[/sheet(\d+)\.xml/, 1].to_i }.each_with_index do |worksheet_entry, index|
         worksheet = Nokogiri::XML(worksheet_entry.get_input_stream.read)
         rows = worksheet.xpath("//*[local-name()='sheetData']/*[local-name()='row']").map do |row_node|
           cells = []
@@ -2034,13 +2044,18 @@ class UserDetailsController < ApplicationController
     results = observer_levels.map do |observer_level|
       send_sms_to_observer(employee_detail, quarter, month, observer_level)
     end
-    sent_count = results.count { |result| result[:success] }
+    sent_count = results.count { |result| result[:success] && !result[:already_sent] }
+    already_sent_count = results.count { |result| result[:success] && result[:already_sent] }
     failed_results = results.reject { |result| result[:success] }
 
-    if sent_count.positive?
+    if sent_count.positive? || already_sent_count.positive?
+      message_parts = []
+      message_parts << "Observer SMS sent to #{sent_count} reviewer(s)" if sent_count.positive?
+      message_parts << "Observer SMS already sent to #{already_sent_count} reviewer(s)" if already_sent_count.positive?
+
       {
         success: true,
-        message: "Observer SMS sent to #{sent_count} reviewer(s)",
+        message: message_parts.join(", "),
         observer_results: results
       }
     else
@@ -2055,11 +2070,28 @@ class UserDetailsController < ApplicationController
   def send_sms_to_observer(employee_detail, quarter, month, observer_level)
     observer_code = employee_detail.public_send(observer_level).to_s.strip
     return { success: false, error: "#{observer_level} code not found" } if observer_code.blank?
-    return { success: true, message: "#{observer_level} SMS already sent" } if observer_sms_already_sent?(employee_detail.id, quarter, month, observer_level)
+    if observer_sms_already_sent?(employee_detail.id, quarter, month, observer_level)
+      return {
+        success: true,
+        already_sent: true,
+        message: "#{observer_label(observer_level)} SMS already sent",
+        observer_level: observer_level,
+        observer_code: observer_code
+      }
+    end
 
     observer = employee_detail_for_code(observer_code)
-    return { success: false, error: "Observer not found with code: #{observer_code}" } unless observer
-    return { success: false, error: "Observer mobile number not found for code: #{observer_code}" } if observer.mobile_number.blank?
+    unless observer
+      error = "#{observer_label(observer_level)} not found with code: #{observer_code}"
+      Rails.logger.warn "Observer SMS skipped: #{error} for employee_detail_id=#{employee_detail.id}"
+      return { success: false, error: error, observer_level: observer_level, observer_code: observer_code }
+    end
+
+    if observer.mobile_number.blank?
+      error = "#{observer_label(observer_level)} mobile number not found for code: #{observer_code}"
+      Rails.logger.warn "Observer SMS skipped: #{error} for employee_detail_id=#{employee_detail.id}"
+      return { success: false, error: error, observer_level: observer_level, observer_code: observer_code, observer_name: observer.employee_name }
+    end
 
     month_text = month.present? ? " #{short_month_label(month)}" : ""
     message = "Emp-Code: #{employee_detail.employee_code}, Emp-Name: #{employee_detail.employee_name} has submitted his#{month_text} #{quarter} Qtr KRA MIS. Please review and approve in the system. Ploughman Agro Private Limited"
@@ -2074,9 +2106,15 @@ class UserDetailsController < ApplicationController
         recipient_employee_detail_id: observer.id,
         observer_level: observer_level
       )
+    else
+      Rails.logger.warn "Observer SMS failed for employee_detail_id=#{employee_detail.id}, #{observer_level}=#{observer_code}: #{result[:error]}"
     end
 
     result.merge(observer_level: observer_level, observer_code: observer_code, observer_name: observer.employee_name)
+  end
+
+  def observer_label(observer_level)
+    "OB#{observer_level.to_s.gsub(/\D/, '')}"
   end
 
   def employee_detail_for_code(employee_code)

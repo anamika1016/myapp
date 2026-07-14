@@ -154,10 +154,11 @@ module UserDetailsHelper
     month_achievements = employee_details.flat_map(&:achievements).select do |achievement|
       achievement.month.to_s.downcase == month.to_s.downcase
     end
+    calculated_percentage = submitted_quarter_calculated_percentage(employee_details, quarter)
 
     latest_l1_remark = month_achievements
       .filter_map(&:achievement_remark)
-      .select { |remark| remark.l1_remarks.present? || remark.reporting_manager_remarks.present? }
+      .select { |remark| remark.l1_remarks.present? }
       .max_by(&:updated_at)
 
     observer_summaries = ApplicationHelper::OBSERVER_LEVELS.filter_map do |observer_level|
@@ -188,8 +189,9 @@ module UserDetailsHelper
     {
       month_label: short_month_label(month),
       quarter: quarter,
+      calculated_percentage: calculated_percentage,
       l1_name: employee_detail.l1_employer_name,
-      l1_final_remarks: latest_l1_remark&.l1_remarks.presence || latest_l1_remark&.reporting_manager_remarks,
+      l1_final_remarks: latest_l1_remark&.l1_remarks,
       l1_percentage: latest_l1_remark&.l1_percentage,
       observer_summaries: observer_summaries,
       quarterly_pli: {
@@ -199,5 +201,39 @@ module UserDetailsHelper
         status: quarterly_pli&.status
       }
     }
+  end
+
+  def submitted_quarter_calculated_percentage(employee_details, quarter)
+    month_percentages = submitted_quarter_months(quarter).filter_map do |quarter_month|
+      progress_values = employee_details.filter_map do |detail|
+        target_value = clean_spreadsheet_display_value(detail.public_send(quarter_month))
+        target_number = target_value.to_s.delete(",").to_f
+        next unless target_number.positive?
+
+        achievement = detail.achievements.find do |record|
+          record.month.to_s.downcase == quarter_month && record.achievement.present?
+        end
+        next unless achievement
+
+        (((achievement.achievement.to_s.delete(",").to_f / target_number) * 100.0 * 100).floor / 100.0)
+      end
+
+      next if progress_values.empty?
+
+      ((progress_values.sum / progress_values.size) * 100).floor / 100.0
+    end
+
+    return nil if month_percentages.empty?
+
+    ((month_percentages.sum / month_percentages.size) * 100).floor / 100.0
+  end
+
+  def submitted_quarter_months(quarter)
+    {
+      "Q1" => %w[april may june],
+      "Q2" => %w[july august september],
+      "Q3" => %w[october november december],
+      "Q4" => %w[january february march]
+    }[quarter.to_s] || []
   end
 end

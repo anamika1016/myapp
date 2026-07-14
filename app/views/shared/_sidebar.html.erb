@@ -285,7 +285,12 @@
                   <path d="M17 16v-8" />
                   <path d="m6 11 3-3 3 2 4-5" />
                 </svg>
-                <span class="font-semibold">Quarterly PLI %</span>
+                <span class="font-semibold">
+                  Quarterly PLI %
+                  <% if quarterly_pli_pending_reviews? %>
+                    <span class="sidebar-pending-dot" title="Pending Quarterly PLI reviews" aria-label="Pending Quarterly PLI reviews"></span>
+                  <% end %>
+                </span>
               <% end %>
             </li>
           <% end %>

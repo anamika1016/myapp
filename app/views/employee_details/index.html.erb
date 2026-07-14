@@ -13,9 +13,12 @@
 
     <!-- Bulk Upload and Export Buttons -->
     <div class="w-full max-w-7xl mx-auto mt-4 flex justify-between items-center bg-white p-6 rounded-xl shadow">
-      <%= form_with(url: import_employee_details_path, local: true, html: { multipart: true }, class: "flex space-x-4 items-center") do |f| %>
-        <%= f.file_field :file, class: "block w-full border border-gray-300 rounded-lg px-4 py-2" %>
-        <%= f.submit "Upload Excel", class: "bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-800" %>
+      <%= form_with(url: import_employee_details_path, local: true, html: { multipart: true }, class: "flex flex-col gap-2") do |f| %>
+        <div class="flex space-x-4 items-center">
+          <%= f.file_field :file, class: "block w-full border border-gray-300 rounded-lg px-4 py-2" %>
+          <%= f.submit "Upload Excel", class: "bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-800" %>
+        </div>
+        <p class="text-xs text-gray-500">Single-sheet and multi-sheet Excel files are supported; every sheet with the same header format will be imported.</p>
       <% end %>
 
       <div class="flex space-x-4">
@@ -67,23 +70,40 @@
 
       </div>
 
+      <% employee_search_params = params[:q].respond_to?(:to_unsafe_h) ? params[:q].to_unsafe_h : {} %>
+      <% employee_search_signature = employee_search_params.to_query %>
       <%= form_with(url: bulk_update_portal_status_employee_details_path,
-                    method: :patch,
+                    method: :post,
+                    authenticity_token: true,
                     local: true,
                     data: { turbo: false },
-                    html: { id: "employee-bulk-status-form" },
+                    html: { id: "employee-bulk-status-form", data: { search_signature: employee_search_signature } },
                     class: "mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3") do %>
+        <%= hidden_field_tag :_method, "patch", id: "employee-bulk-method" %>
+        <%= hidden_field_tag :selection_scope, "current_page", id: "employee-selection-scope" %>
+        <% employee_search_params.each do |key, value| %>
+          <%= hidden_field_tag "q[#{key}]", value %>
+        <% end %>
         <span class="text-sm font-semibold text-gray-700">Selected employees:</span>
         <%= button_tag "Mark Active",
                        type: "submit",
                        name: "portal_active",
                        value: "true",
+                       data: { bulk_action: "status" },
                        class: "rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700" %>
         <%= button_tag "Mark Inactive",
                        type: "submit",
                        name: "portal_active",
                        value: "false",
+                       data: { bulk_action: "status" },
                        class: "rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700" %>
+        <%= button_tag "Delete All",
+                       type: "submit",
+                       data: { bulk_action: "delete", delete_url: bulk_destroy_employee_details_path },
+                       class: "rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-black" %>
+        <span id="employee-bulk-selection-note" class="hidden text-xs font-semibold text-red-700">
+          Select All is ON: action will apply to all filtered employees across pagination.
+        </span>
       <% end %>
 
       <div class="overflow-x-auto">
@@ -180,42 +200,168 @@
 </div>
 
 <script>
-  document.addEventListener("DOMContentLoaded", function () {
+  window.initializeEmployeeBulkControls = function () {
+    const selectAllStorageKey = "employeeBulkSelectAll";
     const searchInput = document.getElementById("global-search");
     const searchForm = document.getElementById("search-form");
+    const bulkForm = document.getElementById("employee-bulk-status-form");
+    const bulkMethod = document.getElementById("employee-bulk-method");
+    const selectionScope = document.getElementById("employee-selection-scope");
+    const selectionNote = document.getElementById("employee-bulk-selection-note");
+    const selectAll = document.getElementById("select-all-employees");
+    const employeeCheckboxes = Array.from(document.querySelectorAll(".employee-select"));
+    const statusUrl = bulkForm?.action;
+    const searchSignature = bulkForm?.dataset.searchSignature || "";
 
-    if (searchInput && searchForm) {
+    function clearStoredBulkSelectAll() {
+      try {
+        sessionStorage.removeItem(selectAllStorageKey);
+      } catch (error) {
+        // Ignore storage failures; the form still works for the current page.
+      }
+    }
+
+    if (searchInput && searchForm && searchForm.dataset.employeeSearchInitialized !== "true") {
+      searchForm.dataset.employeeSearchInitialized = "true";
       let timeout = null;
 
       searchInput.addEventListener("input", function () {
+        clearStoredBulkSelectAll();
         clearTimeout(timeout);
         timeout = setTimeout(() => {
           searchForm.submit();
         }, 300); // delay (in ms) after typing stops
       });
-    }
-  });
 
-  document.addEventListener("DOMContentLoaded", function () {
-    const selectAll = document.getElementById("select-all-employees");
-    const employeeCheckboxes = Array.from(document.querySelectorAll(".employee-select"));
+      searchForm.addEventListener("submit", clearStoredBulkSelectAll);
+    }
+
+    if (!bulkForm || bulkForm.dataset.employeeBulkInitialized === "true") {
+      return;
+    }
+
+    bulkForm.dataset.employeeBulkInitialized = "true";
+
+    function getStoredSelectAllState() {
+      try {
+        return JSON.parse(sessionStorage.getItem(selectAllStorageKey) || "null");
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function setStoredSelectAll(active) {
+      try {
+        if (active) {
+          sessionStorage.setItem(selectAllStorageKey, JSON.stringify({
+            active: true,
+            searchSignature: searchSignature
+          }));
+        } else {
+          sessionStorage.removeItem(selectAllStorageKey);
+        }
+      } catch (error) {
+        // Storage is only for pagination persistence; submit still uses hidden fields.
+      }
+    }
+
+    function storedSelectAllMatchesCurrentSearch() {
+      const storedState = getStoredSelectAllState();
+      return storedState?.active === true && storedState.searchSignature === searchSignature;
+    }
+
+    function ensureBulkCsrfToken() {
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content");
+      if (!csrfToken) return;
+
+      let tokenInput = bulkForm.querySelector('input[name="authenticity_token"]');
+      if (!tokenInput) {
+        tokenInput = document.createElement("input");
+        tokenInput.type = "hidden";
+        tokenInput.name = "authenticity_token";
+        bulkForm.appendChild(tokenInput);
+      }
+
+      tokenInput.value = csrfToken;
+    }
+
+    function setSelectionScope(scope) {
+      if (selectionScope) selectionScope.value = scope;
+      if (selectionNote) {
+        selectionNote.classList.toggle("hidden", scope !== "all_matching");
+      }
+    }
+
+    function applySelectAllMode(active) {
+      employeeCheckboxes.forEach((checkbox) => {
+        checkbox.checked = active;
+      });
+
+      if (selectAll) {
+        selectAll.checked = active;
+        selectAll.indeterminate = false;
+      }
+
+      setSelectionScope(active ? "all_matching" : "current_page");
+    }
+
+    if (storedSelectAllMatchesCurrentSearch()) {
+      applySelectAllMode(true);
+    }
 
     if (selectAll) {
       selectAll.addEventListener("change", function () {
-        employeeCheckboxes.forEach((checkbox) => {
-          checkbox.checked = selectAll.checked;
-        });
+        setStoredSelectAll(selectAll.checked);
+        applySelectAllMode(selectAll.checked);
       });
     }
 
     employeeCheckboxes.forEach((checkbox) => {
       checkbox.addEventListener("change", function () {
+        setStoredSelectAll(false);
+        setSelectionScope("current_page");
         const checkedCount = employeeCheckboxes.filter((item) => item.checked).length;
-        selectAll.checked = checkedCount === employeeCheckboxes.length && employeeCheckboxes.length > 0;
-        selectAll.indeterminate = checkedCount > 0 && checkedCount < employeeCheckboxes.length;
+        if (selectAll) {
+          selectAll.checked = checkedCount === employeeCheckboxes.length && employeeCheckboxes.length > 0;
+          selectAll.indeterminate = checkedCount > 0 && checkedCount < employeeCheckboxes.length;
+        }
       });
     });
-  });
+
+    bulkForm?.addEventListener("submit", function (event) {
+      const submitter = event.submitter;
+      const actionType = submitter?.dataset.bulkAction || "status";
+
+      if (actionType === "delete") {
+        const scopeText = selectionScope?.value === "all_matching" ? "all filtered employees across all pages" : "selected employees on this page";
+        if (!confirm(`Are you sure you want to delete ${scopeText}? This cannot be undone.`)) {
+          event.preventDefault();
+          return;
+        }
+
+        bulkForm.action = submitter.dataset.deleteUrl;
+        if (bulkMethod) bulkMethod.value = "delete";
+      } else {
+        bulkForm.action = statusUrl;
+        if (bulkMethod) bulkMethod.value = "patch";
+      }
+
+      ensureBulkCsrfToken();
+      setStoredSelectAll(false);
+    });
+  };
+
+  if (!window.employeeBulkControlEventsBound) {
+    document.addEventListener("DOMContentLoaded", function () {
+      window.initializeEmployeeBulkControls();
+    });
+    document.addEventListener("turbo:load", function () {
+      window.initializeEmployeeBulkControls();
+    });
+    window.employeeBulkControlEventsBound = true;
+  }
+
+  window.initializeEmployeeBulkControls();
 
   function confirmDelete(employeeName, deleteUrl) {
     if (confirm(`Are you sure you want to delete ${employeeName}?`)) {

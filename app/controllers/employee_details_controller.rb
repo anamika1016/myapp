@@ -5,7 +5,7 @@ require "set"
 
 class EmployeeDetailsController < ApplicationController
   before_action :set_employee_detail, only: [ :edit, :update, :destroy, :toggle_portal_status ]
-  load_and_authorize_resource except: [ :approve, :return, :l2_approve, :l2_return, :edit_l1, :edit_l2, :toggle_portal_status, :bulk_update_portal_status, :quarterly_pli, :quarterly_pli_detail, :save_quarterly_pli, :observer_1, :observer_2, :observer_3, :observer_4, :observer_pli_detail, :save_observer_pli ]
+  load_and_authorize_resource except: [ :approve, :return, :l2_approve, :l2_return, :edit_l1, :edit_l2, :toggle_portal_status, :bulk_update_portal_status, :bulk_destroy, :quarterly_pli, :export_quarterly_pli_xlsx, :quarterly_pli_detail, :save_quarterly_pli, :observer_1, :observer_2, :observer_3, :observer_4, :observer_pli_detail, :save_observer_pli ]
 
   def index
     @employee_detail = EmployeeDetail.new
@@ -69,18 +69,39 @@ class EmployeeDetailsController < ApplicationController
   def bulk_update_portal_status
     authorize! :manage, EmployeeDetail
 
-    employee_ids = Array(params[:employee_detail_ids]).reject(&:blank?)
-    if employee_ids.empty?
+    employees = bulk_selected_employee_scope
+    if employees.none?
       redirect_to employee_details_path(anchor: "employee-list"), alert: "Please select at least one employee."
       return
     end
 
     portal_active = ActiveModel::Type::Boolean.new.cast(params[:portal_active])
-    updated_count = EmployeeDetail.where(id: employee_ids).update_all(portal_active: portal_active, updated_at: Time.current)
+    updated_count = employees.update_all(portal_active: portal_active, updated_at: Time.current)
     status_label = portal_active ? "Active" : "Inactive"
 
     redirect_to employee_details_path(anchor: "employee-list"),
                 notice: "#{updated_count} employee(s) marked #{status_label}."
+  end
+
+  def bulk_destroy
+    authorize! :manage, EmployeeDetail
+
+    employees = bulk_selected_employee_scope
+    if employees.none?
+      redirect_to employee_details_path(anchor: "employee-list"), alert: "Please select at least one employee."
+      return
+    end
+
+    deleted_count = 0
+    employees.find_each do |employee|
+      deleted_count += 1 if employee.destroy
+    end
+
+    redirect_to employee_details_path(anchor: "employee-list"),
+                notice: "#{deleted_count} employee(s) deleted successfully."
+  rescue => e
+    Rails.logger.error "Bulk employee delete failed: #{e.message}"
+    redirect_to employee_details_path(anchor: "employee-list"), alert: "Failed to delete selected employees. Please try again."
   end
 
   def export_xlsx
@@ -218,9 +239,6 @@ class EmployeeDetailsController < ApplicationController
       return
     end
 
-    spreadsheet = Roo::Spreadsheet.open(file.path)
-    header = spreadsheet.row(1).map { |value| normalize_import_header(value) }
-
     header_map = {
       "employeeid" => "employee_id",
       "name" => "employee_name",
@@ -304,45 +322,62 @@ class EmployeeDetailsController < ApplicationController
     employee_count = 0
     target_count = 0
     import_errors = []
+    processed_employee_ids = Set.new
+    sheets_processed = 0
+    spreadsheet = Roo::Spreadsheet.open(file.path)
+    sheet_names = spreadsheet.respond_to?(:sheets) && spreadsheet.sheets.present? ? spreadsheet.sheets : [ spreadsheet.default_sheet || "Sheet1" ]
 
-    (2..spreadsheet.last_row).each do |i|
-      row = Hash[[ header, spreadsheet.row(i) ].transpose]
-      mapped_row = row.each_with_object({}) do |(key, value), mapped|
-        attribute_name = header_map[key.to_s]
-        next unless attribute_name
-        next if value.nil?
-
-        cleaned_value = value.is_a?(String) ? value.strip : value
-        next if cleaned_value.respond_to?(:blank?) ? cleaned_value.blank? : cleaned_value.nil?
-
-        mapped[attribute_name] = cleaned_value
+    sheet_names.each do |sheet_name|
+      if spreadsheet.respond_to?(:default_sheet=) && spreadsheet.respond_to?(:sheets) && spreadsheet.sheets.include?(sheet_name)
+        spreadsheet.default_sheet = sheet_name
       end
 
-      begin
-        next if mapped_row.empty?
+      next if spreadsheet.last_row.to_i < 2
 
-        normalize_import_manager_attributes!(mapped_row)
-        employee_attributes = mapped_row.slice(
-          "employee_id", "employee_name", "employee_email", "employee_code", "mobile_number",
-          "l1_code", "l1_employer_name", "l2_code", "l2_employer_name",
-          "obs_code1", "obs_code2", "obs_code3", "obs_code4",
-          "post", "location", "department"
-        )
-        employee_detail = find_existing_employee_detail(employee_attributes) || EmployeeDetail.new(employee_id: mapped_row["employee_id"].presence || mapped_row["employee_code"].presence || SecureRandom.uuid)
-        employee_detail.assign_attributes(employee_attributes)
-        employee_detail.post = "Imported" if employee_detail.post.blank?
-        employee_detail.save!
-        employee_count += 1
-        target_count += sync_imported_department_target_data!(employee_detail, mapped_row)
-      rescue => e
-        Rails.logger.error "Employee import failed for row #{i}: #{e.message}"
-        import_errors << "Row #{i}: #{e.message}"
-        next
+      sheets_processed += 1
+      header = spreadsheet.row(1).map { |value| normalize_import_header(value) }
+
+      (2..spreadsheet.last_row).each do |i|
+        row_label = sheet_names.size > 1 ? "#{sheet_name} Row #{i}" : "Row #{i}"
+        row = Hash[[ header, spreadsheet.row(i) ].transpose]
+        mapped_row = row.each_with_object({}) do |(key, value), mapped|
+          attribute_name = header_map[key.to_s]
+          next unless attribute_name
+          next if value.nil?
+
+          cleaned_value = value.is_a?(String) ? value.strip : value
+          next if cleaned_value.respond_to?(:blank?) ? cleaned_value.blank? : cleaned_value.nil?
+
+          mapped[attribute_name] = cleaned_value
+        end
+
+        begin
+          next if mapped_row.empty?
+
+          normalize_import_manager_attributes!(mapped_row)
+          employee_attributes = mapped_row.slice(
+            "employee_id", "employee_name", "employee_email", "employee_code", "mobile_number",
+            "l1_code", "l1_employer_name", "l2_code", "l2_employer_name",
+            "obs_code1", "obs_code2", "obs_code3", "obs_code4",
+            "post", "location", "department"
+          )
+          employee_detail = find_existing_employee_detail(employee_attributes) || EmployeeDetail.new(employee_id: mapped_row["employee_id"].presence || mapped_row["employee_code"].presence || SecureRandom.uuid)
+          employee_detail.assign_attributes(employee_attributes)
+          employee_detail.post = "Imported" if employee_detail.post.blank?
+          employee_detail.save!
+          employee_count += 1 if processed_employee_ids.add?(employee_detail.id)
+          target_count += sync_imported_department_target_data!(employee_detail, mapped_row)
+        rescue => e
+          Rails.logger.error "Employee import failed for #{row_label}: #{e.message}"
+          import_errors << "#{row_label}: #{e.message}"
+          next
+        end
       end
     end
 
     message = "✅ #{employee_count} employee(s) imported successfully!"
     message += " #{target_count} department/KRI row(s) updated." if target_count.positive?
+    message += " Processed #{sheets_processed} sheet(s)." if sheets_processed.positive?
 
     if import_errors.any?
       redirect_to employee_details_path, alert: "#{message} Some rows failed: #{import_errors.first(10).join(', ')}"
@@ -661,7 +696,7 @@ end
     end
 
     @selected_quarterly_pli_quarter = params[:quarter].presence
-    @selected_financial_year = selected_financial_year
+    @selected_financial_year = selected_financial_year || current_financial_year
     @quarter_options = get_all_quarters.map do |quarter|
       [ "#{quarter} (#{get_quarter_months(quarter).map { |month| month_label(month) }.join('-')})", quarter ]
     end
@@ -679,12 +714,97 @@ end
       employee.user_details.map(&:financial_year)
     }.compact.reject(&:blank?).uniq.sort.reverse
 
-    @selected_financial_year ||= @financial_year_options.first
+    @selected_financial_year ||= @financial_year_options.first || current_financial_year
+    @financial_year_options |= [ @selected_financial_year ]
+    @financial_year_options.compact!
+    @financial_year_options.sort!.reverse!
     @quarterly_pli_rows = build_quarterly_pli_rows(
       employee_details,
       financial_year: @selected_financial_year,
       quarter: @selected_quarterly_pli_quarter
     )
+  end
+
+  def export_quarterly_pli_xlsx
+    unless quarterly_pli_authorized?
+      redirect_to root_path, alert: "You are not authorized to export Quarterly PLI %."
+      return
+    end
+
+    selected_quarter = params[:quarter].presence
+    selected_year = selected_financial_year || current_financial_year
+    employee_details = quarterly_pli_employee_scope.includes(
+      quarterly_pli_reviews: :reviewed_by,
+      user_details: [
+        :activity,
+        :department,
+        achievements: :achievement_remark
+      ]
+    )
+
+    financial_year_options = employee_details.flat_map { |employee|
+      employee.user_details.map(&:financial_year)
+    }.compact.reject(&:blank?).uniq.sort.reverse
+    selected_year ||= financial_year_options.first || current_financial_year
+
+    rows = build_quarterly_pli_rows(
+      employee_details,
+      financial_year: selected_year,
+      quarter: selected_quarter
+    )
+
+    package = Axlsx::Package.new
+    workbook = package.workbook
+    styles = workbook.styles
+    header_style = styles.add_style(
+      bg_color: "1F2937",
+      fg_color: "FFFFFF",
+      b: true,
+      alignment: { horizontal: :center, vertical: :center, wrap_text: true },
+      border: { style: :thin, color: "CBD5E1" }
+    )
+    cell_style = styles.add_style(
+      alignment: { vertical: :top, wrap_text: true },
+      border: { style: :thin, color: "E5E7EB" }
+    )
+
+    workbook.add_worksheet(name: "Quarterly PLI") do |sheet|
+      sheet.add_row [
+        "Employee Code",
+        "Name",
+        "Department",
+        "Financial Year",
+        "Quarter",
+        "Calculated %",
+        "Final PLI %",
+        "Final L1 Remarks"
+      ], style: header_style
+
+      rows.each do |row|
+        employee = row[:employee]
+        review = row[:review]
+
+        sheet.add_row [
+          employee.employee_code.presence || "-",
+          employee.employee_name.presence || "-",
+          employee.department.presence || "-",
+          row[:financial_year].presence || "-",
+          row[:quarter_label].presence || row[:quarter].presence || "-",
+          quarterly_pli_export_percentage(row[:calculated_percentage]),
+          review&.final_percentage.present? ? "#{format('%.2f', review.final_percentage.to_f)}%" : "-",
+          quarterly_pli_export_l1_remarks(row)
+        ], style: cell_style
+      end
+
+      sheet.column_widths 18, 28, 24, 18, 24, 16, 16, 60
+    end
+
+    filename_parts = [ "quarterly_pli", selected_year, selected_quarter.presence ].compact
+    tempfile = Tempfile.new([ filename_parts.join("_"), ".xlsx" ])
+    package.serialize(tempfile.path)
+    send_file tempfile.path,
+              filename: "#{filename_parts.join('_')}.xlsx",
+              type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   end
 
   def quarterly_pli_detail
@@ -1202,6 +1322,7 @@ end
     @selected_month = normalize_month_param(month || params[:month])
     @selected_quarter = quarter.presence || params[:quarter].presence || quarter_for_month(@selected_month)
     @selected_financial_year = financial_year.presence || selected_financial_year.presence ||
+                               current_financial_year ||
                                infer_review_financial_year(@employee_detail, @selected_month, @selected_quarter)
 
     @user_details = @employee_detail.user_details
@@ -1480,6 +1601,15 @@ end
     )
   end
 
+  def bulk_selected_employee_scope
+    if params[:selection_scope].to_s == "all_matching"
+      EmployeeDetail.ransack(params[:q]).result
+    else
+      employee_ids = Array(params[:employee_detail_ids]).reject(&:blank?)
+      EmployeeDetail.where(id: employee_ids)
+    end
+  end
+
   def quarterly_pli_authorized?
     current_user.hod? ||
       current_user.admin? ||
@@ -1516,7 +1646,7 @@ end
     @observer_title = observer_menu_title(observer_level)
     @selected_observer_pli_quarter = params[:quarter].presence
     @selected_observer_pli_month = normalize_month_param(params[:month])
-    @selected_financial_year = selected_financial_year
+    @selected_financial_year = selected_financial_year || current_financial_year
     @quarter_options = get_all_quarters.map do |quarter|
       [ "#{quarter} (#{get_quarter_months(quarter).map { |month| month_label(month) }.join('-')})", quarter ]
     end
@@ -1535,7 +1665,10 @@ end
       employee.user_details.map(&:financial_year)
     }.compact.reject(&:blank?).uniq.sort.reverse
 
-    @selected_financial_year ||= @financial_year_options.first
+    @selected_financial_year ||= @financial_year_options.first || current_financial_year
+    @financial_year_options |= [ @selected_financial_year ]
+    @financial_year_options.compact!
+    @financial_year_options.sort!.reverse!
     @observer_pli_rows = build_observer_pli_rows(
       employee_details,
       observer_level: observer_level,
@@ -1775,6 +1908,21 @@ end
         row[:quarter]
       ]
     end
+  end
+
+  def quarterly_pli_export_percentage(value)
+    return "-" if value.blank? || value.to_s == "-"
+
+    numeric_value = value.to_s.delete_suffix("%").to_f
+    "#{format('%.2f', numeric_value)}%"
+  end
+
+  def quarterly_pli_export_l1_remarks(row)
+    remarks = Array(row.dig(:detail_payload, :months)).flat_map do |month_payload|
+      Array(month_payload[:l1_remarks])
+    end.map { |remark| remark.to_s.strip }.reject(&:blank?).uniq
+
+    remarks.any? ? remarks.join("; ") : "-"
   end
 
   def quarter_ready_for_pli?(employee_detail, financial_year, quarter)
@@ -2124,10 +2272,13 @@ end
   def prepare_review_filters(employee_details)
     @month_options = review_months.map { |month| [ month_label(month), month ] }
     @selected_review_month = normalize_month_param(params[:month])
-    @selected_financial_year = selected_financial_year
+    @selected_financial_year = selected_financial_year || current_financial_year
     @financial_year_options = employee_details.flat_map { |employee|
       employee.user_details.map(&:financial_year)
     }.compact.reject(&:blank?).uniq.sort.reverse
+    @financial_year_options |= [ @selected_financial_year ]
+    @financial_year_options.compact!
+    @financial_year_options.sort!.reverse!
   end
 
   def review_user_details_for(employee_detail)
@@ -2254,6 +2405,16 @@ end
 
           statuses = month_achievements.map { |achievement| achievement.status || "pending" }
           current_status = calculate_month_status(statuses, month_achievements, approval_level)
+          progress_values = details_with_month_data.filter_map do |detail|
+            target_number = numeric_review_value(detail.public_send(review_month))
+            next unless target_number.positive?
+
+            achievement = (achievements_by_detail_and_month.dig(detail.id, review_month) || []).find { |record| record.achievement.present? }
+            next unless achievement
+
+            truncated_percentage(numeric_review_value(achievement.achievement), target_number)
+          end
+          progress_value = average_review_percentage(progress_values)
           key = [ emp.id, review_month, group_financial_year ].join("_")
 
           monthly_employee_data[key] = {
@@ -2264,7 +2425,9 @@ end
             financial_year: group_financial_year == "No Financial Year" ? nil : group_financial_year,
             status: current_status,
             status_config: approval_level == "l2" ? get_l2_status_config(current_status) : get_status_config(current_status),
-            achievements_count: month_achievements.size
+            achievements_count: month_achievements.size,
+            progress_value: progress_value,
+            progress: format_pli_percentage(progress_value)
           }
         end
       end

@@ -87,6 +87,11 @@ class ApplicationController < ActionController::Base
     "#{start_year}-#{end_year}"
   end
 
+  def current_financial_year
+    start_year = Date.current.month >= 4 ? Date.current.year : Date.current.year - 1
+    "#{start_year}-#{start_year + 1}"
+  end
+
   def l1_pending_reviews_count
     return 0 unless user_signed_in? && has_l1_responsibilities?
 
@@ -94,22 +99,67 @@ class ApplicationController < ActionController::Base
       EmployeeDetail.all
     else
       code = current_user_identity_code
-      return 0 if code.blank?
+      email = current_user_identity_email
+      return 0 if code.blank? && email.blank?
 
-      EmployeeDetail.where("LOWER(TRIM(COALESCE(l1_code, ''))) = ?", code.downcase)
+      EmployeeDetail.where(
+        "(:code != '' AND LOWER(TRIM(COALESCE(l1_code, ''))) = :code) OR (:email != '' AND LOWER(TRIM(COALESCE(l1_employer_name, ''))) = :email)",
+        code: code.to_s.downcase,
+        email: email.to_s.downcase
+      )
     end
 
     Achievement.joins(user_detail: :employee_detail)
       .merge(employee_scope)
+      .where(user_details: { financial_year: current_financial_year })
       .where.not(achievement: [ nil, "" ])
       .where(status: [ nil, "pending", "submitted" ])
-      .count
+      .includes(user_detail: :employee_detail)
+      .to_a
+      .count { |achievement| l1_actionable_achievement?(achievement) }
   rescue StandardError
     0
   end
 
   def l1_pending_reviews?
     l1_pending_reviews_count.positive?
+  end
+
+  def l1_actionable_achievement?(achievement)
+    employee_detail = achievement.user_detail&.employee_detail
+    return false if employee_detail.blank?
+
+    observer_chain_approved_for_achievement?(employee_detail, achievement.user_detail&.financial_year, achievement.month)
+  end
+
+  def observer_chain_approved_for_achievement?(employee_detail, financial_year, month)
+    assigned_levels = %w[obs_code1 obs_code2 obs_code3 obs_code4].select do |observer_level|
+      employee_detail.public_send(observer_level).to_s.strip.present?
+    end
+    return true if assigned_levels.empty?
+
+    quarter = quarter_name_for_sidebar_month(month)
+    return false if quarter.blank? || financial_year.blank?
+
+    assigned_levels.all? do |observer_level|
+      ObserverPliReview.exists?(
+        employee_detail: employee_detail,
+        financial_year: financial_year,
+        quarter: quarter,
+        month: month.to_s.downcase,
+        observer_level: observer_level,
+        status: "approved"
+      )
+    end
+  end
+
+  def quarter_name_for_sidebar_month(month)
+    {
+      "april" => "Q1", "may" => "Q1", "june" => "Q1",
+      "july" => "Q2", "august" => "Q2", "september" => "Q2",
+      "october" => "Q3", "november" => "Q3", "december" => "Q3",
+      "january" => "Q4", "february" => "Q4", "march" => "Q4"
+    }[month.to_s.downcase]
   end
 
   helper_method :has_l1_responsibilities?, :has_l2_responsibilities?, :has_quarterly_pli_responsibilities?,

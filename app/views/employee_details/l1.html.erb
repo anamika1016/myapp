@@ -46,7 +46,7 @@
               <th class="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider border-r border-gray-600">Financial Year</th>
               <th class="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider border-r border-gray-600">Month</th>
               <th class="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider border-r border-gray-600">L1 Manager</th>
-              <th class="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider border-r border-gray-600">L2 Manager</th>
+              <th class="px-6 py-4 text-center text-xs font-semibold text-white uppercase tracking-wider border-r border-gray-600">% Progress</th>
               <th class="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider border-r border-gray-600">Status</th>
               <th class="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Action</th>
             </tr>
@@ -74,7 +74,11 @@
                       <span class="ml-2 text-xs text-gray-500"><%= quarter_name %></span>
                     </td>
                     <td class="px-6 py-4 text-sm text-gray-700 border-r border-gray-200"><%= emp.l1_employer_name %></td>
-                    <td class="px-6 py-4 text-sm text-gray-700 border-r border-gray-200"><%= emp.l2_employer_name %></td>
+                    <td class="px-6 py-4 text-sm text-center border-r border-gray-200">
+                      <span class="<%= data[:progress_value].present? ? 'inline-flex items-center px-3 py-1 rounded bg-emerald-50 text-emerald-700 font-semibold' : 'text-gray-400' %>">
+                        <%= data[:progress_value].present? ? "#{data[:progress]}%" : "-" %>
+                      </span>
+                    </td>
                     <td class="px-6 py-4 text-sm border-r border-gray-200">
                       <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border <%= status_config[:color] %>">
                         <% if ["l1_approved", "l2_approved"].include?(current_status) %>
@@ -104,12 +108,11 @@
       <%
         monthly_statuses = @monthly_employee_data.values.map { |data| data[:status] }
         l1_approved_count = monthly_statuses.count("l1_approved")
-        l2_approved_count = monthly_statuses.count("l2_approved")
         pending_count = monthly_statuses.count("pending")
-        returned_count = monthly_statuses.count { |status| ["l1_returned", "l2_returned"].include?(status) }
+        returned_count = monthly_statuses.count("l1_returned")
       %>
 
-      <div class="mt-6 grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div class="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
         <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
           <div class="flex items-center">
             <i class="fas fa-layer-group text-blue-600 mr-3"></i>
@@ -138,17 +141,6 @@
             <div>
               <p class="text-sm font-medium text-green-800">L1 Approved</p>
               <p class="text-2xl font-bold text-green-900"><%= l1_approved_count %></p>
-            </div>
-          </div>
-        </div>
-
-        <!-- L2 Approved -->
-        <div class="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
-          <div class="flex items-center">
-            <i class="fas fa-check-double text-emerald-600 mr-3"></i>
-            <div>
-              <p class="text-sm font-medium text-emerald-800">L2 Approved</p>
-              <p class="text-2xl font-bold text-emerald-900"><%= l2_approved_count %></p>
             </div>
           </div>
         </div>
