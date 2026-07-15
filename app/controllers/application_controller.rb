@@ -114,7 +114,7 @@ class ApplicationController < ActionController::Base
       .where(user_details: { financial_year: current_financial_year })
       .where.not(achievement: [ nil, "" ])
       .where(status: [ nil, "pending", "submitted" ])
-      .includes(user_detail: :employee_detail)
+      .includes(:achievement_remark, user_detail: :employee_detail)
       .to_a
       .count { |achievement| l1_actionable_achievement?(achievement) }
   rescue StandardError
@@ -126,10 +126,18 @@ class ApplicationController < ActionController::Base
   end
 
   def l1_actionable_achievement?(achievement)
+    return false if l1_review_saved_for_achievement?(achievement)
+
     employee_detail = achievement.user_detail&.employee_detail
     return false if employee_detail.blank?
 
     observer_chain_approved_for_achievement?(employee_detail, achievement.user_detail&.financial_year, achievement.month)
+  end
+
+  def l1_review_saved_for_achievement?(achievement)
+    %w[l1_approved l2_approved l1_returned l2_returned].include?(achievement.status.to_s) ||
+      achievement.achievement_remark&.l1_percentage.present? ||
+      achievement.achievement_remark&.l1_remarks.present?
   end
 
   def observer_chain_approved_for_achievement?(employee_detail, financial_year, month)

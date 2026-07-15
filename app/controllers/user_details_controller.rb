@@ -2180,7 +2180,7 @@ class UserDetailsController < ApplicationController
     value = normalize_import_display_value(user_detail.public_send(month_key))
     return false if value.blank?
 
-    target_text = value.to_s.delete(",").strip
+    target_text = value.to_s.delete(",").delete("%").strip
     return false if target_text.match?(/\A-?\d+(?:\.\d+)?\z/) && target_text.to_f <= 0
 
     true

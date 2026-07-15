@@ -88,8 +88,8 @@
                   remarks = achievement_record&.employee_remarks
                   achievement_remark = achievement_record&.achievement_remark
                   reporting_manager_remarks = achievement_remark&.reporting_manager_remarks
-                  progress_percentage = if target_value.present? && target_value.to_s.strip != "0" && target_value.to_s.delete(",").to_f.positive? && achievement.present?
-                    ((achievement.to_s.delete(",").to_f / target_value.to_s.delete(",").to_f) * 100.0).round(2)
+                  progress_percentage = if target_value.present? && target_value.to_s.strip != "0" && target_value.to_s.delete(",").delete("%").to_f.positive? && achievement.present?
+                    ((achievement.to_s.delete(",").delete("%").to_f / target_value.to_s.delete(",").delete("%").to_f) * 100.0).round(2)
                   end
                   month_summary_payload = submitted_month_review_summary(
                     detail.employee_detail,
@@ -267,12 +267,6 @@
               'Calculated %',
               summary.calculated_percentage,
               'border-emerald-200 bg-emerald-50'
-            ));
-
-            cards.push(percentageCard(
-              'L1 %',
-              summary.l1_percentage,
-              'border-yellow-200 bg-yellow-50'
             ));
 
             cards.push(percentageCard(

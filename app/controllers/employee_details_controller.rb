@@ -2095,7 +2095,7 @@ end
   end
 
   def numeric_review_value(value)
-    value.to_s.delete(",").to_f
+    value.to_s.delete(",").delete("%").to_f
   end
 
   def parse_pli_percentage(value)
@@ -2503,7 +2503,7 @@ end
     return false unless detail.respond_to?(month)
 
     target_value = normalize_import_display_value(detail.public_send(month))
-    target_text = target_value.to_s.delete(",").strip
+    target_text = target_value.to_s.delete(",").delete("%").strip
     target_is_numeric = target_text.match?(/\A-?\d+(?:\.\d+)?\z/)
     target_value.present? && (!target_is_numeric || target_text.to_f.positive?)
   end

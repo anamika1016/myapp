@@ -103,7 +103,7 @@
             end
             target_present_for_display = lambda do |detail, month_symbol|
               target_value = detail.public_send(month_symbol)
-              target_text = target_value.to_s.delete(",").strip
+              target_text = target_value.to_s.delete(",").delete("%").strip
               target_is_numeric = target_text.match?(/\A-?\d+(?:\.\d+)?\z/)
               target_value.present? && (!target_is_numeric || target_text.to_f.positive?)
             end
@@ -163,7 +163,7 @@
                     <% display_months.each do |month_symbol, month_name| %>
                       <%
                         target_value = detail.send(month_symbol)
-                        target_text = target_value.to_s.delete(",").strip
+                        target_text = target_value.to_s.delete(",").delete("%").strip
                         target_is_numeric = target_text.match?(/\A-?\d+(?:\.\d+)?\z/)
                         has_target = target_value.present? && (!target_is_numeric || target_text.to_f.positive?)
                         achievement_record = existing_achievements[month_symbol.to_s]
@@ -175,7 +175,7 @@
                         end
                         l2_manager_remarks = achievement_record&.achievement_remark&.l2_remarks
                         target_number = target_is_numeric ? target_text.to_f : 0.0
-                        achievement_number = achievement_value.to_s.delete(",").to_f
+                        achievement_number = achievement_value.to_s.delete(",").delete("%").to_f
                         progress_percentage = has_target && target_number.positive? && achievement_value.present? ? (((achievement_number / target_number) * 100.0 * 100).floor / 100.0) : nil
                         if has_target && target_number.positive?
                           monthly_summary_totals[month_symbol][:progress_sum] += (progress_percentage || 0.0)
