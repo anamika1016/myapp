@@ -223,9 +223,9 @@ module ApplicationHelper
     return 0 if employees.empty?
 
     employee_ids = employees.map(&:id)
-    approved_keys = QuarterlyPliReview
-      .where(employee_detail_id: employee_ids, financial_year: sidebar_current_financial_year, status: "approved")
-      .pluck(:employee_detail_id, :financial_year, :quarter)
+    reviews = QuarterlyPliReview
+      .where(employee_detail_id: employee_ids, financial_year: sidebar_current_financial_year)
+      .index_by { |review| [ review.employee_detail_id, review.financial_year, review.quarter ] }
 
     pending_keys = []
     employees.each do |employee|
@@ -236,7 +236,8 @@ module ApplicationHelper
         next unless quarter_ready_for_sidebar_pli?(employee, details, quarter)
 
         key = [ employee.id, sidebar_current_financial_year, quarter ]
-        pending_keys << key unless approved_keys.include?(key)
+        review = sidebar_current_quarterly_pli_review_for(reviews[key], employee, sidebar_current_financial_year, quarter)
+        pending_keys << key if review.blank?
       end
     end
 
@@ -252,8 +253,8 @@ module ApplicationHelper
     return 0 if employees.none?
 
     employee_ids = employees.map(&:id)
-    approved_keys = ObserverPliReview
-      .where(employee_detail_id: employee_ids, observer_level: observer_level, financial_year: sidebar_current_financial_year, status: "approved")
+    reviewed_keys = ObserverPliReview
+      .where(employee_detail_id: employee_ids, observer_level: observer_level, financial_year: sidebar_current_financial_year)
       .pluck(:employee_detail_id, :financial_year, :quarter, :month)
       .to_set
 
@@ -270,7 +271,7 @@ module ApplicationHelper
         next unless observer_month_ready_for_review?(employee, observer_level, details, month)
 
         key = [ employee.id, financial_year, quarter, month ]
-        pending_keys.add(key) unless approved_keys.include?(key)
+        pending_keys.add(key) unless reviewed_keys.include?(key)
       end
     end
 
@@ -326,6 +327,47 @@ module ApplicationHelper
     %w[l1_approved l2_approved].include?(achievement.status.to_s) ||
       achievement.achievement_remark&.l1_percentage.present? ||
       achievement.achievement_remark&.l1_remarks.present?
+  end
+
+  def sidebar_current_quarterly_pli_review_for(review, employee_detail, financial_year, quarter)
+    return nil if review.blank?
+
+    reviewed_at = review.reviewed_at || review.updated_at || review.created_at
+    source_updated_at = sidebar_quarterly_pli_source_updated_at(employee_detail, financial_year, quarter)
+
+    return review if source_updated_at.blank?
+    return review if reviewed_at.present? && reviewed_at >= source_updated_at
+
+    nil
+  end
+
+  def sidebar_quarterly_pli_source_updated_at(employee_detail, financial_year, quarter)
+    quarter_months = sidebar_quarter_months(quarter)
+    return nil if quarter_months.empty?
+
+    timestamps = []
+    employee_detail.user_details.each do |detail|
+      next unless detail.financial_year.to_s == financial_year.to_s && detail.activity.present?
+      next unless quarter_months.any? { |month| target_present_for_sidebar_review_month?(detail, month) }
+
+      timestamps << detail.updated_at
+      detail.achievements.each do |achievement|
+        next unless quarter_months.include?(achievement.month.to_s.downcase)
+
+        timestamps << achievement.updated_at
+        timestamps << achievement.achievement_remark&.updated_at
+      end
+    end
+
+    timestamps.compact.max
+  end
+
+  def target_present_for_sidebar_review_month?(detail, month)
+    return false unless detail.respond_to?(month)
+
+    target_text = clean_spreadsheet_display_value(detail.public_send(month)).to_s.delete(",").strip
+    target_is_numeric = target_text.match?(/\A-?\d+(?:\.\d+)?\z/)
+    target_text.present? && (!target_is_numeric || target_text.to_f.positive?)
   end
 
   def sidebar_observer_chain_approved?(employee, financial_year, quarter, month)
