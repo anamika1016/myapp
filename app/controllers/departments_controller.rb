@@ -1,5 +1,6 @@
 require "roo"
 require "securerandom"
+require "nokogiri"
 
 class DepartmentsController < ApplicationController
   SPREADSHEET_ERROR_VALUES = %w[#DIV/0! #N/A #NAME? #NULL! #NUM! #REF! #VALUE!].freeze
@@ -1233,7 +1234,7 @@ class DepartmentsController < ApplicationController
     cleaned_value = if value.is_a?(Numeric)
       value.to_f.finite? && value.to_f == value.to_i ? value.to_i.to_s : value.to_s
     else
-      value.to_s.strip
+      strip_import_markup(value.to_s).strip
     end
 
     return nil if cleaned_value.blank?
@@ -1243,6 +1244,15 @@ class DepartmentsController < ApplicationController
     return "100%" if percent_context && cleaned_value.match?(/\A1(?:\.0+)?\z/)
 
     cleaned_value
+  end
+
+  def strip_import_markup(value)
+    text = value.to_s
+    return text unless text.match?(/<\/?[a-z][\s\S]*>/i)
+
+    Nokogiri::HTML.fragment(text).text.squish
+  rescue
+    text.gsub(/<\/?[^>]*>/, " ").squish
   end
 
   def spreadsheet_error_value?(value)
