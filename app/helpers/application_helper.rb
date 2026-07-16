@@ -108,8 +108,20 @@ module ApplicationHelper
     "OBS#{observer_level_number(observer_level)}"
   end
 
+  def observer_name_column_label(observer_level)
+    "#{observer_column_label(observer_level)} Name"
+  end
+
   def observer_menu_title_for(observer_level)
     "Observer Menu #{observer_level_number(observer_level)}"
+  end
+
+  def observer_menu_observer_name_for(user = current_user)
+    return nil if user.blank? || user.admin? || user.hod?
+
+    employee_name_for_code(resolved_observer_identity_code(user)) ||
+      portal_employee_detail_for(user)&.employee_name ||
+      user.email.to_s.split("@").first.to_s.presence
   end
 
   def observer_remark_column(observer_level)
@@ -196,7 +208,20 @@ module ApplicationHelper
     code = employee_detail.public_send(observer_level).to_s.strip
     return nil if code.blank?
 
-    EmployeeDetail.where("LOWER(employee_code) = ?", code.downcase).pick(:employee_name)
+    employee_name_for_code(code)
+  end
+
+  def employee_name_for_code(employee_code)
+    code = employee_code.to_s.strip
+    return nil if code.blank?
+
+    @employee_name_for_code_cache ||= {}
+    @employee_name_for_code_cache[code.downcase] ||= begin
+      EmployeeDetail
+        .where("LOWER(employee_code) = :code OR LOWER(:code) LIKE LOWER(employee_code) || '%'", code: code.downcase)
+        .order(Arel.sql("LENGTH(employee_code) DESC"))
+        .pick(:employee_name)
+    end
   end
 
   def observer_pli_index_path(observer_level, **options)

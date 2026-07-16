@@ -11,12 +11,34 @@
             <%
               department_names = @user_details.map { |detail| detail.department&.department_type }.compact_blank.uniq
               employee_names = @user_details.map { |detail| detail.employee_detail&.employee_name }.compact_blank.uniq
+              employee_details_for_labels = @user_details.map(&:employee_detail).compact.uniq { |employee| employee.id || employee.object_id }
+              reviewer_label_for = lambda do |values|
+                names = values.map(&:presence).compact.uniq
+                names.one? ? names.first : "#{names.first || 'N/A'}#{names.size > 1 ? " +#{names.size - 1}" : ""}"
+              end
+              observer_name_labels = ApplicationHelper::OBSERVER_LEVELS.filter_map do |observer_level|
+                observer_names = employee_details_for_labels.map do |employee|
+                  observer_employee_name_for(employee, observer_level).presence || employee.public_send(observer_level).presence
+                end.compact_blank.uniq
+
+                next if observer_names.blank?
+
+                [ observer_level, reviewer_label_for.call(observer_names) ]
+              end
               department_label = department_names.one? ? department_names.first : "#{department_names.first || 'N/A'}#{department_names.size > 1 ? " +#{department_names.size - 1}" : ""}"
               employee_label = employee_names.one? ? employee_names.first : "#{employee_names.first || 'N/A'}#{employee_names.size > 1 ? " +#{employee_names.size - 1}" : ""}"
+              l1_names = employee_details_for_labels.map { |employee| employee.l1_employer_name.presence }.compact_blank.uniq
+              l1_label = reviewer_label_for.call(l1_names) if l1_names.present?
             %>
             <div class="target-meta-row mt-3">
               <span><strong>Department:</strong> <%= department_label %></span>
               <span><strong>Employee name:</strong> <%= employee_label %></span>
+              <% observer_name_labels.each do |observer_level, observer_label| %>
+                <span><strong><%= observer_name_column_label(observer_level) %>:</strong> <%= observer_label %></span>
+              <% end %>
+              <% if l1_label.present? %>
+                <span><strong>L1 Name:</strong> <%= l1_label %></span>
+              <% end %>
             </div>
           </div>
 
