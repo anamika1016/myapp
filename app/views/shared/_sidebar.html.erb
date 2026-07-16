@@ -101,6 +101,40 @@
       box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
       flex-shrink: 0;
     }
+
+    .quarterly-pli-visibility-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.5rem;
+      height: 1.5rem;
+      border: 0;
+      border-radius: 9999px;
+      background: transparent;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .quarterly-pli-visibility-toggle__dot {
+      width: 0.65rem;
+      height: 0.65rem;
+      border-radius: 9999px;
+      display: inline-block;
+      box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.16);
+    }
+
+    .quarterly-pli-visibility-toggle.is-on .quarterly-pli-visibility-toggle__dot {
+      background: #22c55e;
+      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+    }
+
+    .quarterly-pli-visibility-toggle.is-off .quarterly-pli-visibility-toggle__dot {
+      background: #94a3b8;
+    }
+
+    .quarterly-pli-visibility-toggle:hover .quarterly-pli-visibility-toggle__dot {
+      transform: scale(1.18);
+    }
   </style>
 </head>
 
@@ -277,22 +311,50 @@
 
           <% if has_quarterly_pli_responsibilities? %>
             <li class="hs-accordion" id="users-accordion">
-              <%= link_to quarterly_pli_employee_details_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if current_page?(quarterly_pli_employee_details_path)} text-base text-gray-800 rounded-lg" do %>
-                <svg class="shrink-0 size-6 sidebar-nav-icon" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24">
-                  <path d="M4.5 19.5h15" />
-                  <path d="M7 16V9.5" />
-                  <path d="M12 16V5" />
-                  <path d="M17 16v-8" />
-                  <path d="m6 11 3-3 3 2 4-5" />
-                </svg>
-                <span class="font-semibold">
-                  Quarterly PLI %
-                  <% if quarterly_pli_pending_reviews? %>
-                    <span class="sidebar-pending-dot" title="Pending Quarterly PLI reviews" aria-label="Pending Quarterly PLI reviews"></span>
+              <div class="flex items-center rounded-lg #{'bg-gray-100' if current_page?(quarterly_pli_employee_details_path)}">
+                <%= link_to quarterly_pli_employee_details_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 flex-1 min-w-0 text-base text-gray-800 rounded-lg" do %>
+                  <svg class="shrink-0 size-6 sidebar-nav-icon" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24">
+                    <path d="M4.5 19.5h15" />
+                    <path d="M7 16V9.5" />
+                    <path d="M12 16V5" />
+                    <path d="M17 16v-8" />
+                    <path d="m6 11 3-3 3 2 4-5" />
+                  </svg>
+                  <span class="font-semibold">
+                    Quarterly PLI %
+                    <% if quarterly_pli_pending_reviews? %>
+                      <span class="sidebar-pending-dot" title="Pending Quarterly PLI reviews" aria-label="Pending Quarterly PLI reviews"></span>
+                    <% end %>
+                  </span>
+                <% end %>
+
+                <% if current_user.hod? || current_user.admin? %>
+                  <% menu_enabled = quarterly_pli_menu_enabled? %>
+                  <% confirmation_message = menu_enabled ? "Hide Quarterly PLI % menu for employee logins?" : "Show Quarterly PLI % menu for employee logins?" %>
+                  <%= button_to toggle_quarterly_pli_menu_settings_path,
+                      method: :patch,
+                      form: { class: "m-0 pr-2", data: { turbo_confirm: confirmation_message }, onsubmit: "return confirm('#{j(confirmation_message)}')" },
+                      class: "quarterly-pli-visibility-toggle #{menu_enabled ? 'is-on' : 'is-off'}",
+                      title: menu_enabled ? "Visible for employee logins" : "Hidden for employee logins" do %>
+                    <span class="quarterly-pli-visibility-toggle__dot"></span>
                   <% end %>
-                </span>
-              <% end %>
+                <% end %>
+              </div>
             </li>
+
+            <% if current_user.hod? %>
+              <li class="hs-accordion" id="users-accordion">
+                <%= link_to pli_dashboard_employee_details_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if current_page?(pli_dashboard_employee_details_path)} text-base text-gray-800 rounded-lg" do %>
+                  <svg class="shrink-0 size-6 sidebar-nav-icon" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24">
+                    <path d="M4.5 19.5h15" />
+                    <path d="M7 15.5 10 12l3 2 4-6" />
+                    <path d="M7 8.5h.01M10 8.5h.01M13 8.5h.01" />
+                    <path d="M17 15.5h2.5" />
+                  </svg>
+                  <span class="font-semibold">PLI Dashboard</span>
+                <% end %>
+              </li>
+            <% end %>
           <% end %>
 
            <li>

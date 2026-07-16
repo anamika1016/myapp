@@ -104,6 +104,8 @@ Rails.application.routes.draw do
       get "l2"  # ➤ this is your sidebar L1 view
       get :quarterly_pli
       get :export_quarterly_pli_xlsx
+      get :pli_dashboard
+      get :export_pli_dashboard_xlsx
       post :save_quarterly_pli
       get :observer_1
       get :observer_2
@@ -143,6 +145,7 @@ Rails.application.routes.draw do
   get "settings", to: "settings#show"
   patch "settings", to: "settings#update"
   patch "settings/password", to: "settings#update_password"
+  patch "settings/toggle_quarterly_pli_menu", to: "settings#toggle_quarterly_pli_menu", as: :toggle_quarterly_pli_menu_settings
 
   # Keep your other routes
   devise_scope :user do

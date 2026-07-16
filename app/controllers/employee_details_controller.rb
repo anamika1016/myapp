@@ -5,7 +5,7 @@ require "set"
 
 class EmployeeDetailsController < ApplicationController
   before_action :set_employee_detail, only: [ :edit, :update, :destroy, :toggle_portal_status ]
-  load_and_authorize_resource except: [ :approve, :return, :l2_approve, :l2_return, :edit_l1, :edit_l2, :toggle_portal_status, :bulk_update_portal_status, :bulk_destroy, :quarterly_pli, :export_quarterly_pli_xlsx, :quarterly_pli_detail, :save_quarterly_pli, :observer_1, :observer_2, :observer_3, :observer_4, :observer_pli_detail, :save_observer_pli ]
+  load_and_authorize_resource except: [ :approve, :return, :l2_approve, :l2_return, :edit_l1, :edit_l2, :toggle_portal_status, :bulk_update_portal_status, :bulk_destroy, :quarterly_pli, :export_quarterly_pli_xlsx, :pli_dashboard, :export_pli_dashboard_xlsx, :quarterly_pli_detail, :save_quarterly_pli, :observer_1, :observer_2, :observer_3, :observer_4, :observer_pli_detail, :save_observer_pli ]
 
   def index
     @employee_detail = EmployeeDetail.new
@@ -801,6 +801,140 @@ end
     end
 
     filename_parts = [ "quarterly_pli", selected_year, selected_quarter.presence ].compact
+    tempfile = Tempfile.new([ filename_parts.join("_"), ".xlsx" ])
+    package.serialize(tempfile.path)
+    send_file tempfile.path,
+              filename: "#{filename_parts.join('_')}.xlsx",
+              type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  end
+
+  def pli_dashboard
+    unless pli_dashboard_authorized?
+      redirect_to root_path, alert: "You are not authorized to access PLI Dashboard."
+      return
+    end
+
+    @selected_quarterly_pli_quarter = params[:quarter].presence
+    @selected_financial_year = selected_financial_year || current_financial_year
+    @selected_pli_comparison_status = pli_dashboard_status_param
+    @quarter_options = get_all_quarters.map do |quarter|
+      [ "#{quarter} (#{get_quarter_months(quarter).map { |month| month_label(month) }.join('-')})", quarter ]
+    end
+    @pli_dashboard_status_options = pli_dashboard_status_options
+
+    employee_details = quarterly_pli_employee_scope.includes(
+      quarterly_pli_reviews: :reviewed_by,
+      user_details: [
+        :activity,
+        :department,
+        achievements: :achievement_remark
+      ]
+    )
+
+    @financial_year_options = employee_details.flat_map { |employee|
+      employee.user_details.map(&:financial_year)
+    }.compact.reject(&:blank?).uniq.sort.reverse
+
+    @selected_financial_year ||= @financial_year_options.first || current_financial_year
+    @financial_year_options |= [ @selected_financial_year ]
+    @financial_year_options.compact!
+    @financial_year_options.sort!.reverse!
+
+    all_rows = build_pli_dashboard_rows(
+      employee_details,
+      financial_year: @selected_financial_year,
+      quarter: @selected_quarterly_pli_quarter
+    )
+    @pli_dashboard_summary = summarize_pli_dashboard_rows(all_rows)
+    @pli_dashboard_rows = filter_pli_dashboard_rows(all_rows, @selected_pli_comparison_status)
+  end
+
+  def export_pli_dashboard_xlsx
+    unless pli_dashboard_authorized?
+      redirect_to root_path, alert: "You are not authorized to export PLI Dashboard."
+      return
+    end
+
+    selected_quarter = params[:quarter].presence
+    selected_year = selected_financial_year || current_financial_year
+    selected_status = pli_dashboard_status_param
+    employee_details = quarterly_pli_employee_scope.includes(
+      quarterly_pli_reviews: :reviewed_by,
+      user_details: [
+        :activity,
+        :department,
+        achievements: :achievement_remark
+      ]
+    )
+    employee_details = employee_details.where(id: params[:employee_detail_id]) if params[:employee_detail_id].present?
+
+    financial_year_options = employee_details.flat_map { |employee|
+      employee.user_details.map(&:financial_year)
+    }.compact.reject(&:blank?).uniq.sort.reverse
+    selected_year ||= financial_year_options.first || current_financial_year
+
+    rows = build_pli_dashboard_rows(
+      employee_details,
+      financial_year: selected_year,
+      quarter: selected_quarter
+    )
+    rows = filter_pli_dashboard_rows(rows, selected_status)
+
+    package = Axlsx::Package.new
+    workbook = package.workbook
+    styles = workbook.styles
+    header_style = styles.add_style(
+      bg_color: "111827",
+      fg_color: "FFFFFF",
+      b: true,
+      alignment: { horizontal: :center, vertical: :center, wrap_text: true },
+      border: { style: :thin, color: "CBD5E1" }
+    )
+    cell_style = styles.add_style(
+      alignment: { vertical: :top, wrap_text: true },
+      border: { style: :thin, color: "E5E7EB" }
+    )
+
+    workbook.add_worksheet(name: "PLI Dashboard") do |sheet|
+      sheet.add_row [
+        "Employee Code",
+        "Name",
+        "Department",
+        "Financial Year",
+        "Quarter",
+        "Calculated %",
+        "Final PLI %",
+        "Difference %",
+        "Comparison",
+        "Remarks",
+        "Reviewed By",
+        "Reviewed At"
+      ], style: header_style
+
+      rows.each do |row|
+        employee = row[:employee]
+        review = row[:review]
+
+        sheet.add_row [
+          employee.employee_code.presence || "-",
+          employee.employee_name.presence || "-",
+          employee.department.presence || "-",
+          row[:financial_year].presence || "-",
+          row[:quarter_label].presence || row[:quarter].presence || "-",
+          pli_dashboard_export_percentage(row[:calculated_percentage_value]),
+          row[:final_percentage_value].present? ? pli_dashboard_export_percentage(row[:final_percentage_value]) : "-",
+          row[:difference_value].present? ? format("%+.2f%%", row[:difference_value]) : "-",
+          row[:comparison_label],
+          review&.final_remarks.presence || "-",
+          review&.reviewed_by&.email.presence || "-",
+          review&.reviewed_at&.strftime("%d-%b-%Y %I:%M %p") || "-"
+        ], style: cell_style
+      end
+
+      sheet.column_widths 18, 28, 24, 18, 24, 16, 16, 16, 18, 50, 28, 24
+    end
+
+    filename_parts = [ "pli_dashboard", selected_year, selected_quarter.presence, selected_status.presence, params[:employee_detail_id].present? ? "single" : nil ].compact
     tempfile = Tempfile.new([ filename_parts.join("_"), ".xlsx" ])
     package.serialize(tempfile.path)
     send_file tempfile.path,
@@ -1618,8 +1752,9 @@ end
   end
 
   def quarterly_pli_authorized?
-    current_user.hod? ||
-      current_user.admin? ||
+    return true if current_user.hod? || current_user.admin?
+    return false unless quarterly_pli_menu_enabled?
+
       EmployeeDetail.where(
         "LOWER(TRIM(COALESCE(l1_code, ''))) = ? OR LOWER(TRIM(COALESCE(l1_employer_name, ''))) = ?",
         current_user.employee_code.to_s.strip.downcase,
@@ -1630,6 +1765,10 @@ end
         current_user.employee_code.to_s.strip.downcase,
         current_user.email.to_s.strip.downcase
       ).exists?
+  end
+
+  def pli_dashboard_authorized?
+    current_user.hod?
   end
 
   def quarterly_pli_employee_scope
@@ -1932,6 +2071,111 @@ end
         row[:quarter]
       ]
     end
+  end
+
+  def build_pli_dashboard_rows(employee_details, financial_year:, quarter: nil)
+    build_quarterly_pli_rows(
+      employee_details,
+      financial_year: financial_year,
+      quarter: quarter
+    ).map { |row| pli_dashboard_comparison_row(row) }
+  end
+
+  def pli_dashboard_comparison_row(row)
+    review = row[:review]
+    calculated_value = pli_dashboard_numeric_percentage(row[:calculated_percentage])
+    final_value = review&.status == "approved" ? pli_dashboard_numeric_percentage(review.final_percentage) : nil
+    difference_value = calculated_value.present? && final_value.present? ? (final_value - calculated_value).round(2) : nil
+    comparison_key = pli_dashboard_comparison_key(review, difference_value)
+
+    row.merge(
+      calculated_percentage_value: calculated_value,
+      final_percentage_value: final_value,
+      difference_value: difference_value,
+      comparison_key: comparison_key,
+      comparison_label: pli_dashboard_comparison_label(comparison_key),
+      dashboard_remarks: pli_dashboard_comparison_remarks(comparison_key, difference_value)
+    )
+  end
+
+  def pli_dashboard_comparison_key(review, difference_value)
+    return "pending" if review.blank?
+    return "returned" if review.status == "returned"
+    return "pending" if difference_value.nil?
+    return "equal" if difference_value.zero?
+
+    difference_value.negative? ? "less" : "more"
+  end
+
+  def pli_dashboard_comparison_label(key)
+    {
+      "equal" => "Matched",
+      "less" => "Below Calculated",
+      "more" => "Above Calculated",
+      "pending" => "Pending Final PLI",
+      "returned" => "Returned"
+    }[key.to_s] || "All"
+  end
+
+  def pli_dashboard_comparison_remarks(key, difference_value)
+    case key.to_s
+    when "equal"
+      "Final PLI matches the calculated percentage."
+    when "less"
+      "Final PLI is #{format('%.2f', difference_value.abs)}% below the calculated percentage."
+    when "more"
+      "Final PLI is #{format('%.2f', difference_value.abs)}% above the calculated percentage."
+    when "returned"
+      "Final PLI was returned. Review the final remarks."
+    else
+      "Final PLI has not been saved yet."
+    end
+  end
+
+  def pli_dashboard_numeric_percentage(value)
+    return nil if value.blank? || value.to_s == "-"
+
+    value.to_s.delete(",").delete_suffix("%").to_f.round(2)
+  end
+
+  def filter_pli_dashboard_rows(rows, status)
+    return rows if status.blank? || status == "all"
+
+    rows.select { |row| row[:comparison_key] == status }
+  end
+
+  def summarize_pli_dashboard_rows(rows)
+    counts = rows.group_by { |row| row[:comparison_key] }.transform_values(&:size)
+    {
+      total: rows.size,
+      equal: counts["equal"].to_i,
+      less: counts["less"].to_i,
+      more: counts["more"].to_i,
+      pending: counts["pending"].to_i,
+      returned: counts["returned"].to_i
+    }
+  end
+
+  def pli_dashboard_status_param
+    status = params[:status].to_s.strip
+    pli_dashboard_status_options.map(&:last).include?(status) ? status : "all"
+  end
+
+  def pli_dashboard_status_options
+    [
+      [ "All", "all" ],
+      [ "Matched", "equal" ],
+      [ "Below Calculated", "less" ],
+      [ "Above Calculated", "more" ],
+      [ "Pending Final PLI", "pending" ],
+      [ "Returned", "returned" ]
+    ]
+  end
+
+  def pli_dashboard_export_percentage(value)
+    return "-" if value.blank?
+
+    "#{format('%.2f', value.to_f)}%"
   end
 
   def current_quarterly_pli_review_for(review, employee_detail, financial_year, quarter)

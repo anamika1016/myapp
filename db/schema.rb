@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_07_14_000300) do
+ActiveRecord::Schema[8.0].define(version: 2026_07_16_000100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -89,6 +89,14 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_14_000300) do
     t.string "annual_target_fy_2026_27"
     t.index ["department_id", "activity_name"], name: "index_activities_on_department_id_and_name"
     t.index ["department_id"], name: "index_activities_on_department_id"
+  end
+
+  create_table "app_settings", force: :cascade do |t|
+    t.string "key", null: false
+    t.string "value"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["key"], name: "index_app_settings_on_key", unique: true
   end
 
   create_table "departments", force: :cascade do |t|

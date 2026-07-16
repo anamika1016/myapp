@@ -1,0 +1,313 @@
+<div class="main-content sidebar-hidden bg-slate-50 min-h-screen">
+  <div class="min-h-screen pl-64 pr-4 pt-4 pb-12 overflow-x-auto bg-slate-50">
+    <div class="w-full max-w-7xl mx-auto bg-white p-8 rounded-lg shadow-lg border border-slate-200">
+      <div class="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-5 mb-7 pb-5 border-b border-slate-200">
+        <div class="flex items-center">
+          <span class="pli-dashboard-title-icon">
+            <i class="fas fa-chart-bar"></i>
+          </span>
+          <div>
+            <h2 class="text-3xl font-bold text-slate-900">PLI Variance Dashboard</h2>
+            <p class="text-sm text-slate-500 mt-1">Calculated percentage compared with final PLI allocation</p>
+          </div>
+        </div>
+
+        <div class="flex flex-col lg:flex-row lg:items-center gap-3 w-full xl:w-auto">
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <i class="fas fa-search text-slate-400"></i>
+            </div>
+            <input type="text"
+                   id="pliDashboardSearch"
+                   placeholder="Search employees..."
+                   class="pli-dashboard-control block w-full lg:w-64 pl-10 pr-3">
+          </div>
+
+          <%= form_with url: pli_dashboard_employee_details_path, method: :get, local: true, class: "grid grid-cols-1 sm:grid-cols-3 gap-3", data: { turbo: false } do %>
+            <%= select_tag :quarter,
+                options_for_select([["All Quarters", ""]] + @quarter_options, @selected_quarterly_pli_quarter),
+                class: "pli-dashboard-control w-full sm:w-48 px-3",
+                onchange: "this.form.submit()" %>
+            <%= select_tag :financial_year,
+                options_for_select(@financial_year_options, @selected_financial_year),
+                class: "pli-dashboard-control w-full sm:w-52 px-3",
+                onchange: "this.form.submit()" %>
+            <%= select_tag :status,
+                options_for_select(@pli_dashboard_status_options, @selected_pli_comparison_status),
+                class: "pli-dashboard-control w-full sm:w-56 px-3",
+                onchange: "this.form.submit()" %>
+          <% end %>
+
+          <%= link_to export_pli_dashboard_xlsx_employee_details_path(
+                financial_year: @selected_financial_year,
+                quarter: @selected_quarterly_pli_quarter,
+                status: @selected_pli_comparison_status
+              ),
+              class: "inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-md bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-semibold shadow-sm transition-all whitespace-nowrap" do %>
+            <i class="fas fa-file-excel"></i>
+            Export Excel
+          <% end %>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
+        <div class="pli-dashboard-stat border-slate-200 bg-slate-50">
+          <p class="pli-dashboard-stat-label text-slate-600">Total Records</p>
+          <p class="pli-dashboard-stat-value text-gray-900"><%= @pli_dashboard_summary[:total] %></p>
+        </div>
+        <div class="pli-dashboard-stat border-emerald-200 bg-emerald-50">
+          <p class="pli-dashboard-stat-label text-emerald-700">Matched</p>
+          <p class="pli-dashboard-stat-value text-emerald-800"><%= @pli_dashboard_summary[:equal] %></p>
+        </div>
+        <div class="pli-dashboard-stat border-rose-200 bg-rose-50">
+          <p class="pli-dashboard-stat-label text-rose-700">Below Calculated</p>
+          <p class="pli-dashboard-stat-value text-rose-800"><%= @pli_dashboard_summary[:less] %></p>
+        </div>
+        <div class="pli-dashboard-stat border-blue-200 bg-blue-50">
+          <p class="pli-dashboard-stat-label text-blue-700">Above Calculated</p>
+          <p class="pli-dashboard-stat-value text-blue-800"><%= @pli_dashboard_summary[:more] %></p>
+        </div>
+        <div class="pli-dashboard-stat border-amber-200 bg-amber-50">
+          <p class="pli-dashboard-stat-label text-amber-700">Pending/Returned</p>
+          <p class="pli-dashboard-stat-value text-amber-800"><%= @pli_dashboard_summary[:pending] + @pli_dashboard_summary[:returned] %></p>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto bg-white rounded-lg shadow-sm border border-slate-200">
+        <table id="pliDashboardTable" class="min-w-full divide-y divide-gray-300 text-sm">
+          <thead class="pli-dashboard-table-head">
+            <tr>
+              <th class="pli-dashboard-th text-left">Employee Code</th>
+              <th class="pli-dashboard-th text-left">Name</th>
+              <th class="pli-dashboard-th text-left">Department</th>
+              <th class="pli-dashboard-th text-left">Financial Year</th>
+              <th class="pli-dashboard-th text-left">Quarter</th>
+              <th class="pli-dashboard-th text-center">Calculated %</th>
+              <th class="pli-dashboard-th text-center">Final PLI %</th>
+              <th class="pli-dashboard-th text-center">Variance</th>
+              <th class="pli-dashboard-th text-left">Result</th>
+              <th class="pli-dashboard-th text-left">Remarks</th>
+              <th class="pli-dashboard-th text-center">Export</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <% @pli_dashboard_rows.each_with_index do |row, index| %>
+              <% employee = row[:employee] %>
+              <% review = row[:review] %>
+              <% comparison_classes = {
+                "equal" => "bg-emerald-100 text-emerald-800 border-emerald-300",
+                "less" => "bg-rose-100 text-rose-800 border-rose-300",
+                "more" => "bg-blue-100 text-blue-800 border-blue-300",
+                "pending" => "bg-amber-100 text-amber-800 border-amber-300",
+                "returned" => "bg-orange-100 text-orange-800 border-orange-300"
+              } %>
+              <tr class="<%= index.even? ? 'bg-slate-50' : 'bg-white' %> hover:bg-cyan-50 transition-colors duration-200 pli-dashboard-row">
+                <td class="pli-dashboard-td text-slate-700"><%= employee.employee_code.presence || "-" %></td>
+                <td class="pli-dashboard-td font-semibold text-slate-900"><%= employee.employee_name.presence || "-" %></td>
+                <td class="pli-dashboard-td text-slate-700"><%= employee.department.presence || "N/A" %></td>
+                <td class="pli-dashboard-td text-slate-700"><%= row[:financial_year] %></td>
+                <td class="pli-dashboard-td text-slate-700">
+                  <span class="font-semibold text-slate-900"><%= row[:quarter_label] %></span>
+                </td>
+                <td class="pli-dashboard-td text-center">
+                  <span class="pli-dashboard-percent bg-emerald-50 text-emerald-700"><%= format('%.2f', row[:calculated_percentage_value].to_f) %>%</span>
+                </td>
+                <td class="pli-dashboard-td text-center">
+                  <% if row[:final_percentage_value].present? %>
+                    <span class="pli-dashboard-percent bg-sky-50 text-sky-700"><%= format('%.2f', row[:final_percentage_value]) %>%</span>
+                  <% else %>
+                    <span class="text-gray-400">-</span>
+                  <% end %>
+                </td>
+                <td class="pli-dashboard-td text-center">
+                  <% if row[:difference_value].present? %>
+                    <% diff_class = row[:difference_value].negative? ? "text-rose-700" : (row[:difference_value].positive? ? "text-blue-700" : "text-emerald-700") %>
+                    <span class="font-bold <%= diff_class %>"><%= format('%+.2f%%', row[:difference_value]) %></span>
+                  <% else %>
+                    <span class="text-gray-400">-</span>
+                  <% end %>
+                </td>
+                <td class="pli-dashboard-td">
+                  <span class="inline-flex items-center px-3 py-1 rounded-md text-xs font-semibold border <%= comparison_classes[row[:comparison_key]] %>">
+                    <%= row[:comparison_label] %>
+                  </span>
+                </td>
+                <td class="pli-dashboard-td text-slate-700 min-w-80">
+                  <% if review&.final_remarks.present? %>
+                    <div class="font-medium text-slate-900"><%= review.final_remarks %></div>
+                  <% else %>
+                    <span class="text-slate-400">-</span>
+                  <% end %>
+                </td>
+                <td class="pli-dashboard-td text-center">
+                  <%= link_to export_pli_dashboard_xlsx_employee_details_path(
+                        employee_detail_id: employee.id,
+                        financial_year: row[:financial_year],
+                        quarter: row[:quarter],
+                        status: "all"
+                      ),
+                      class: "pli-dashboard-excel-button",
+                      title: "Export this row" do %>
+                    XLSX
+                  <% end %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+
+        <% if @pli_dashboard_rows.empty? %>
+          <div class="text-center py-12 text-gray-500">
+            <i class="fas fa-inbox text-4xl mb-4"></i>
+            <h3 class="text-lg font-semibold mb-2">No PLI Dashboard Records Found</h3>
+            <p class="text-sm">Selected filters ke liye completed quarterly PLI data available nahi hai.</p>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .min-h-screen {
+    padding-left: 16rem;
+  }
+
+  .sidebar-hidden .min-h-screen {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  .sidebar-hidden .max-w-7xl {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  .pli-dashboard-title-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    margin-right: 0.875rem;
+    border-radius: 0.5rem;
+    background: #e0f2fe;
+    color: #0369a1;
+    font-size: 1.15rem;
+    flex-shrink: 0;
+  }
+
+  .pli-dashboard-control {
+    height: 2.5rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.375rem;
+    background-color: #fff;
+    color: #0f172a;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .pli-dashboard-control:focus {
+    border-color: #0284c7;
+    box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.14);
+  }
+
+  .pli-dashboard-stat {
+    border-width: 1px;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  }
+
+  .pli-dashboard-stat-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .pli-dashboard-stat-value {
+    margin-top: 0.25rem;
+    font-size: 1.875rem;
+    line-height: 2.25rem;
+    font-weight: 800;
+  }
+
+  .pli-dashboard-table-head {
+    background: #1f2937;
+  }
+
+  .pli-dashboard-th {
+    padding: 0.95rem 1.25rem;
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-right: 1px solid rgba(255, 255, 255, 0.14);
+    white-space: nowrap;
+  }
+
+  .pli-dashboard-th:last-child {
+    border-right: 0;
+  }
+
+  .pli-dashboard-td {
+    padding: 1rem 1.25rem;
+    border-right: 1px solid #e2e8f0;
+    vertical-align: middle;
+  }
+
+  .pli-dashboard-td:last-child {
+    border-right: 0;
+  }
+
+  .pli-dashboard-percent {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 5.5rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.375rem;
+    font-weight: 700;
+  }
+
+  .pli-dashboard-excel-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 3.25rem;
+    height: 2rem;
+    padding: 0 0.625rem;
+    border-radius: 0.375rem;
+    border: 1px solid #16a34a;
+    background: #f0fdf4;
+    color: #166534;
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    box-shadow: 0 2px 8px rgba(22, 101, 52, 0.16);
+    transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .pli-dashboard-excel-button:hover {
+    background: #dcfce7;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(22, 101, 52, 0.22);
+  }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const searchInput = document.getElementById('pliDashboardSearch');
+
+  searchInput?.addEventListener('input', function() {
+    const term = this.value.toLowerCase().trim();
+    document.querySelectorAll('.pli-dashboard-row').forEach((row) => {
+      row.style.display = row.textContent.toLowerCase().includes(term) ? '' : 'none';
+    });
+  });
+});
+</script>

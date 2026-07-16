@@ -1,6 +1,7 @@
 class SettingsController < ApplicationController
   before_action :authenticate_user!
   before_action :set_user
+  before_action :require_hod_or_admin!, only: [ :toggle_quarterly_pli_menu ]
 
   def show
     # Settings page - show user profile and settings
@@ -42,6 +43,14 @@ class SettingsController < ApplicationController
     end
   end
 
+  def toggle_quarterly_pli_menu
+    enabled = AppSetting.set_quarterly_pli_menu_enabled(!AppSetting.quarterly_pli_menu_enabled?)
+    status_text = enabled ? "visible" : "hidden"
+
+    redirect_back fallback_location: root_path,
+                  notice: "Quarterly PLI % menu is now #{status_text} for employee logins."
+  end
+
   private
 
   def set_user
@@ -54,5 +63,11 @@ class SettingsController < ApplicationController
 
   def password_params
     params.require(:user).permit(:current_password, :password, :password_confirmation)
+  end
+
+  def require_hod_or_admin!
+    return if current_user.hod? || current_user.admin?
+
+    redirect_to root_path, alert: "You are not authorized to change menu visibility."
   end
 end

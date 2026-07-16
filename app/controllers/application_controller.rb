@@ -70,7 +70,16 @@ class ApplicationController < ActionController::Base
   end
 
   def has_quarterly_pli_responsibilities?
-    has_l1_responsibilities?
+    return true if current_user.hod? || current_user.admin?
+    return false unless quarterly_pli_menu_enabled?
+
+    has_l1_responsibilities? || has_l2_responsibilities?
+  end
+
+  def quarterly_pli_menu_enabled?
+    AppSetting.quarterly_pli_menu_enabled?
+  rescue ActiveRecord::StatementInvalid, ActiveRecord::NoDatabaseError, ActiveRecord::ConnectionNotEstablished
+    true
   end
 
   def normalize_financial_year(value)
@@ -171,5 +180,5 @@ class ApplicationController < ActionController::Base
   end
 
   helper_method :has_l1_responsibilities?, :has_l2_responsibilities?, :has_quarterly_pli_responsibilities?,
-                :l1_pending_reviews_count, :l1_pending_reviews?
+                :quarterly_pli_menu_enabled?, :l1_pending_reviews_count, :l1_pending_reviews?
 end

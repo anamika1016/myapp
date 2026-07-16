@@ -107,6 +107,50 @@ class EmployeeDetailsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "50.00", rows.first.dig(:detail_payload, :months, 0, :achievement_percentage)
   end
 
+  test "pli dashboard rows compare calculated and final pli percentages" do
+    employee_detail = create_partial_month_submission_source(status: "l1_approved", observer_code: nil)
+    QuarterlyPliReview.create!(
+      employee_detail: employee_detail,
+      financial_year: "2026-2027",
+      quarter: "Q1",
+      final_percentage: 40,
+      final_remarks: "Needs correction",
+      status: "approved",
+      reviewed_at: Time.current
+    )
+
+    rows = EmployeeDetailsController.new.send(
+      :build_pli_dashboard_rows,
+      [ employee_detail.reload ],
+      financial_year: "2026-2027",
+      quarter: "Q1"
+    )
+
+    assert_equal "less", rows.first[:comparison_key]
+    assert_equal -10.0, rows.first[:difference_value]
+    assert_equal "Final PLI is 10.00% below the calculated percentage.", rows.first[:dashboard_remarks]
+  end
+
+  test "pli dashboard summary counts equal more less and pending rows" do
+    controller = EmployeeDetailsController.new
+    rows = [
+      { comparison_key: "equal" },
+      { comparison_key: "more" },
+      { comparison_key: "less" },
+      { comparison_key: "pending" },
+      { comparison_key: "returned" }
+    ]
+
+    summary = controller.send(:summarize_pli_dashboard_rows, rows)
+
+    assert_equal 5, summary[:total]
+    assert_equal 1, summary[:equal]
+    assert_equal 1, summary[:more]
+    assert_equal 1, summary[:less]
+    assert_equal 1, summary[:pending]
+    assert_equal 1, summary[:returned]
+  end
+
   private
 
   def create_quarterly_pli_source(source_time: 1.day.ago)
