@@ -2,13 +2,32 @@
   <% if @user_details.any? %>
     <div class="bg-white border border-gray-200 rounded-xl shadow-lg mt-4">
       <div class="bg-gray-100 px-6 py-4 border-b border-gray-200 rounded-t-xl">
-        <div class="flex flex-wrap items-center justify-between gap-4">
-          <div>
+        <div class="target-header">
+          <div class="target-title-row">
             <h2 class="text-3xl font-bold text-gray-800 flex items-center">
               <i class="fas fa-users me-2 text-indigo-600"></i>
               Key result indicators - <%= @selected_financial_year %>
             </h2>
-            <%
+
+            <div class="target-actions">
+              <%= form_with url: user_details_path, method: :get, local: true, class: "flex items-center gap-3" do |form| %>
+                <%= form.label :financial_year, "Financial year", class: "text-sm font-semibold text-gray-700" %>
+                <%= form.select :financial_year,
+                    options_for_select(@financial_years, @selected_financial_year),
+                    {},
+                    class: "bg-white border border-gray-300 rounded-lg px-4 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500",
+                    onchange: "this.form.submit();" %>
+              <% end %>
+
+              <%= link_to export_user_details_path(format: :xlsx, financial_year: @selected_financial_year),
+                  class: "inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold shadow-md transition duration-200" do %>
+                <i class="fas fa-file-excel"></i>
+                Export Excel
+              <% end %>
+            </div>
+          </div>
+
+          <%
               department_names = @user_details.map { |detail| detail.department&.department_type }.compact_blank.uniq
               employee_names = @user_details.map { |detail| detail.employee_detail&.employee_name }.compact_blank.uniq
               employee_details_for_labels = @user_details.map(&:employee_detail).compact.uniq { |employee| employee.id || employee.object_id }
@@ -21,6 +40,10 @@
                   observer_employee_name_for(employee, observer_level).presence || employee.public_send(observer_level).presence
                 end.compact_blank.uniq
 
+                if observer_names.blank? && observer_level_assigned_to_user?(observer_level, current_user)
+                  observer_names = [ observer_menu_observer_name_for(current_user) ].compact_blank
+                end
+
                 next if observer_names.blank?
 
                 [ observer_level, reviewer_label_for.call(observer_names) ]
@@ -28,34 +51,19 @@
               department_label = department_names.one? ? department_names.first : "#{department_names.first || 'N/A'}#{department_names.size > 1 ? " +#{department_names.size - 1}" : ""}"
               employee_label = employee_names.one? ? employee_names.first : "#{employee_names.first || 'N/A'}#{employee_names.size > 1 ? " +#{employee_names.size - 1}" : ""}"
               l1_names = employee_details_for_labels.map { |employee| employee.l1_employer_name.presence }.compact_blank.uniq
+              if l1_names.blank? && has_l1_responsibilities? && !current_user.hod? && !current_user.admin?
+                l1_names = [ portal_employee_detail_for(current_user)&.employee_name || current_user.email.to_s.split("@").first.to_s.presence ].compact_blank
+              end
               l1_label = reviewer_label_for.call(l1_names) if l1_names.present?
-            %>
-            <div class="target-meta-row mt-3">
-              <span><strong>Department:</strong> <%= department_label %></span>
-              <span><strong>Employee name:</strong> <%= employee_label %></span>
-              <% observer_name_labels.each do |observer_level, observer_label| %>
-                <span><strong><%= observer_name_column_label(observer_level) %>:</strong> <%= observer_label %></span>
-              <% end %>
-              <% if l1_label.present? %>
-                <span><strong>L1 Name:</strong> <%= l1_label %></span>
-              <% end %>
-            </div>
-          </div>
-
-          <div class="flex flex-wrap items-center gap-3">
-            <%= link_to export_user_details_path(format: :xlsx, financial_year: @selected_financial_year),
-                class: "inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold shadow-md transition duration-200" do %>
-              <i class="fas fa-file-excel"></i>
-              Export Excel
+          %>
+          <div class="target-meta-row mt-3">
+            <span><strong>Department:</strong> <%= department_label %></span>
+            <span><strong>Employee name:</strong> <%= employee_label %></span>
+            <% observer_name_labels.each do |observer_level, observer_label| %>
+              <span><strong><%= observer_name_column_label(observer_level) %>:</strong> <%= observer_label %></span>
             <% end %>
-
-            <%= form_with url: user_details_path, method: :get, local: true, class: "flex items-center gap-3" do |form| %>
-              <%= form.label :financial_year, "Financial year", class: "text-sm font-semibold text-gray-700" %>
-              <%= form.select :financial_year,
-                  options_for_select(@financial_years, @selected_financial_year),
-                  {},
-                  class: "bg-white border border-gray-300 rounded-lg px-4 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500",
-                  onchange: "this.form.submit();" %>
+            <% if l1_label.present? %>
+              <span><strong>L1 Name:</strong> <%= l1_label %></span>
             <% end %>
           </div>
         </div>
@@ -67,7 +75,7 @@
             <thead class="bg-gray-800">
               <tr>
                 <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600">S.No</th>
-                <th class="px-5 py-4 text-left text-xs font-medium text-white tracking-wider border-r border-gray-600">Key result indicators</th>
+                <th class="target-kri-column px-5 py-4 text-left text-xs font-medium text-white tracking-wider border-r border-gray-600">Key result indicators</th>
                 <th class="px-5 py-4 text-left text-xs font-medium text-white tracking-wider border-r border-gray-600">Unit of measurement</th>
                 <th class="px-5 py-4 text-left text-xs font-medium text-white tracking-wider border-r border-gray-600"><%= annual_target_fy_label(@selected_financial_year) %></th>
                 <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">APR</th>
@@ -88,7 +96,7 @@
               <% @user_details.each_with_index do |detail, index| %>
                 <tr class="<%= index.even? ? 'bg-gray-50' : 'bg-white' %> hover:bg-gray-100 transition-colors duration-200">
                   <td class="px-5 py-4 text-sm text-gray-800 border-r border-gray-200 text-center"><%= index + 1 %></td>
-                  <td class="px-5 py-4 text-sm text-gray-800 border-r border-gray-200"><%= detail.activity.activity_name %></td>
+                  <td class="target-kri-column px-5 py-4 text-sm text-gray-800 border-r border-gray-200 text-left" title="<%= detail.activity.activity_name %>"><%= detail.activity.activity_name %></td>
                   <td class="px-5 py-4 text-sm text-gray-800 border-r border-gray-200 text-center"><%= detail.activity.unit.present? ? detail.activity.unit : "" %></td>
                   <td class="px-5 py-4 text-sm text-gray-800 border-r border-gray-200 text-center"><%= annual_target_display(detail.activity) %></td>
                   <% %i[april may june july august september october november december january february march].each do |month| %>
@@ -188,6 +196,17 @@
   vertical-align: middle;
 }
 
+.table .target-kri-column {
+  width: 420px;
+  min-width: 360px;
+  max-width: 480px;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.45;
+}
+
 .table th {
   background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
   color: white;
@@ -213,6 +232,26 @@
   font-size: 1rem;
   color: #6b7280;
   line-height: 1.6;
+}
+
+.target-header {
+  width: 100%;
+}
+
+.target-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.target-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-left: auto;
+  white-space: nowrap;
 }
 
 .target-meta-row {
@@ -250,6 +289,17 @@
   .main-content {
     margin-left: 0;
     padding: 1rem;
+  }
+
+  .target-title-row,
+  .target-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .target-actions {
+    margin-left: 0;
+    white-space: normal;
   }
 }
 

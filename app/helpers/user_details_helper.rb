@@ -185,6 +185,7 @@ module UserDetailsHelper
       financial_year: financial_year,
       quarter: quarter
     )
+    quarterly_pli = submitted_current_quarterly_pli_review_for(quarterly_pli, employee_detail, financial_year, quarter)
 
     {
       month_label: short_month_label(month),
@@ -205,17 +206,26 @@ module UserDetailsHelper
 
   def submitted_quarter_calculated_percentage(employee_details, quarter)
     month_percentages = submitted_quarter_months(quarter).filter_map do |quarter_month|
-      progress_values = employee_details.filter_map do |detail|
-        target_value = clean_spreadsheet_display_value(detail.public_send(quarter_month))
-        target_number = target_value.to_s.delete(",").to_f
-        next unless target_number.positive?
+      target_details = submitted_target_details_for_month(employee_details, quarter_month)
+      next if target_details.empty?
 
+      has_submitted_achievement = target_details.any? do |detail|
         achievement = detail.achievements.find do |record|
           record.month.to_s.downcase == quarter_month && record.achievement.present?
         end
-        next unless achievement
+        achievement.present?
+      end
+      next unless has_submitted_achievement
 
-        (((achievement.achievement.to_s.delete(",").to_f / target_number) * 100.0 * 100).floor / 100.0)
+      progress_values = target_details.map do |detail|
+        target_value = clean_spreadsheet_display_value(detail.public_send(quarter_month))
+        target_number = target_value.to_s.delete(",").delete("%").to_f
+        achievement = detail.achievements.find do |record|
+          record.month.to_s.downcase == quarter_month && record.achievement.present?
+        end
+        achievement_number = achievement.present? ? achievement.achievement.to_s.delete(",").delete("%").to_f : 0.0
+
+        (((achievement_number / target_number) * 100.0 * 100).floor / 100.0)
       end
 
       next if progress_values.empty?
@@ -226,6 +236,48 @@ module UserDetailsHelper
     return nil if month_percentages.empty?
 
     ((month_percentages.sum / month_percentages.size) * 100).floor / 100.0
+  end
+
+  def submitted_target_details_for_month(employee_details, month)
+    employee_details.select do |detail|
+      target_value = clean_spreadsheet_display_value(detail.public_send(month))
+      target_number = target_value.to_s.delete(",").delete("%").to_f
+
+      target_value_present?(target_value) && target_number.positive?
+    end
+  end
+
+  def submitted_current_quarterly_pli_review_for(review, employee_detail, financial_year, quarter)
+    return nil if review.blank?
+
+    reviewed_at = review.reviewed_at || review.updated_at || review.created_at
+    source_updated_at = submitted_quarterly_pli_source_updated_at(employee_detail, financial_year, quarter)
+
+    return review if source_updated_at.blank?
+    return review if reviewed_at.present? && reviewed_at >= source_updated_at
+
+    nil
+  end
+
+  def submitted_quarterly_pli_source_updated_at(employee_detail, financial_year, quarter)
+    quarter_months = submitted_quarter_months(quarter)
+    return nil if quarter_months.empty?
+
+    timestamps = []
+    employee_detail.user_details.each do |detail|
+      next unless detail.financial_year.to_s == financial_year.to_s && detail.activity.present?
+      next unless quarter_months.any? { |month| submitted_target_details_for_month([ detail ], month).any? }
+
+      timestamps << detail.updated_at
+      detail.achievements.each do |achievement|
+        next unless quarter_months.include?(achievement.month.to_s.downcase)
+
+        timestamps << achievement.updated_at
+        timestamps << achievement.achievement_remark&.updated_at
+      end
+    end
+
+    timestamps.compact.max
   end
 
   def submitted_quarter_months(quarter)

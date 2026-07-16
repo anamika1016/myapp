@@ -62,6 +62,51 @@ class EmployeeDetailsControllerTest < ActionDispatch::IntegrationTest
     )
   end
 
+  test "l1 monthly progress includes target rows without achievement as zero" do
+    employee_detail = create_partial_month_submission_source
+
+    rows = EmployeeDetailsController.new.send(
+      :build_monthly_employee_data,
+      [ employee_detail.reload ],
+      approval_level: "l1",
+      month: "april",
+      financial_year: "2026-2027",
+      include_unsubmitted_target_rows: true
+    )
+
+    assert_equal "50.00", rows.values.first[:progress]
+  end
+
+  test "observer calculated percentage matches monthly submission footer" do
+    employee_detail = create_partial_month_submission_source
+    controller = EmployeeDetailsController.new
+
+    observer_rows = controller.send(
+      :build_observer_pli_rows,
+      [ employee_detail.reload ],
+      observer_level: "obs_code1",
+      financial_year: "2026-2027",
+      quarter: "Q1",
+      month: "april"
+    )
+
+    assert_equal "50.00", observer_rows.first[:calculated_percentage]
+  end
+
+  test "quarterly pli rows include target rows without achievement as zero" do
+    employee_detail = create_partial_month_submission_source(status: "l1_approved", observer_code: nil)
+
+    rows = EmployeeDetailsController.new.send(
+      :build_quarterly_pli_rows,
+      [ employee_detail.reload ],
+      financial_year: "2026-2027",
+      quarter: "Q1"
+    )
+
+    assert_equal "50.00", rows.first[:calculated_percentage]
+    assert_equal "50.00", rows.first.dig(:detail_payload, :months, 0, :achievement_percentage)
+  end
+
   private
 
   def create_quarterly_pli_source(source_time: 1.day.ago)
@@ -97,5 +142,42 @@ class EmployeeDetailsControllerTest < ActionDispatch::IntegrationTest
     employee_detail.reload
 
     [ employee_detail, user_detail, achievement, remark ]
+  end
+
+  def create_partial_month_submission_source(status: "pending", observer_code: "OBS001")
+    department = Department.create!(department_type: "Accounts")
+    employee_detail = EmployeeDetail.create!(
+      employee_name: "Partial Progress Employee",
+      employee_code: "PAPL999",
+      department: "Accounts",
+      obs_code1: observer_code
+    )
+
+    first_activity = Activity.create!(department: department, activity_name: "Submitted KRI", unit: "Count", weight: 1)
+    second_activity = Activity.create!(department: department, activity_name: "Blank KRI", unit: "Count", weight: 1)
+
+    first_detail = UserDetail.create!(
+      department: department,
+      activity: first_activity,
+      employee_detail: employee_detail,
+      financial_year: "2026-2027",
+      april: "100"
+    )
+    UserDetail.create!(
+      department: department,
+      activity: second_activity,
+      employee_detail: employee_detail,
+      financial_year: "2026-2027",
+      april: "100"
+    )
+
+    Achievement.create!(
+      user_detail: first_detail,
+      month: "april",
+      achievement: "100",
+      status: status
+    )
+
+    employee_detail.reload
   end
 end

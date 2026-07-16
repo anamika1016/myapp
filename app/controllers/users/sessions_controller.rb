@@ -31,6 +31,12 @@ class Users::SessionsController < Devise::SessionsController
     end
 
     employee_detail ||= find_employee_detail_for_user(user)
+
+    if employee_detail.blank? && employee_list_required_for_login?(user)
+      flash[:alert] = "Your employee record was not found in Employee List. Please contact HOD."
+      redirect_to new_session_path(resource_name) and return
+    end
+
     if employee_detail.present? && !employee_detail.portal_active?
       flash[:alert] = "Your account is inactive. Please contact HOD."
       redirect_to new_session_path(resource_name) and return
@@ -64,5 +70,11 @@ class Users::SessionsController < Devise::SessionsController
     user.employee_detail ||
       EmployeeDetail.find_by("lower(employee_email) = ?", user.email.to_s.downcase) ||
       EmployeeDetail.find_by("lower(employee_code) = ?", user.employee_code.to_s.downcase)
+  end
+
+  def employee_list_required_for_login?(user)
+    return false unless user
+
+    !user.hod? && !user.admin?
   end
 end

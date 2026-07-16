@@ -419,7 +419,8 @@ class EmployeeDetailsController < ApplicationController
       @employee_details,
       approval_level: "l1",
       month: @selected_review_month,
-      financial_year: @selected_financial_year
+      financial_year: @selected_financial_year,
+      include_unsubmitted_target_rows: true
     )
     @monthly_employee_data = filter_l1_rows_by_observer_chain(@monthly_employee_data)
   end
@@ -824,7 +825,12 @@ end
       return
     end
 
-    @detail_payload = quarter_pli_payload_for(@employee_detail, financial_year, quarter)
+    @detail_payload = quarter_pli_payload_for(
+      @employee_detail,
+      financial_year,
+      quarter,
+      include_unsubmitted_target_rows: true
+    )
     unless @detail_payload
       redirect_to quarterly_pli_employee_details_path(financial_year: financial_year, quarter: quarter), alert: quarterly_pli_review_complete_message(@employee_detail)
       return
@@ -1702,7 +1708,14 @@ end
         (months_by_quarter[quarter_name] || []).each do |month_name|
           next unless observer_level_available_for_month?(employee, financial_year, quarter_name, month_name, observer_level)
 
-          payload = quarter_pli_payload_for(employee, financial_year, quarter_name, require_ready: false, month: month_name)
+          payload = quarter_pli_payload_for(
+            employee,
+            financial_year,
+            quarter_name,
+            require_ready: false,
+            month: month_name,
+            include_unsubmitted_target_rows: true
+          )
           next unless payload
 
           rows << {
@@ -1888,7 +1901,12 @@ end
 
     employee_details.flat_map do |employee|
       quarters.filter_map do |quarter_name|
-        payload = quarter_pli_payload_for(employee, financial_year, quarter_name)
+        payload = quarter_pli_payload_for(
+          employee,
+          financial_year,
+          quarter_name,
+          include_unsubmitted_target_rows: true
+        )
         next unless payload
 
         review = current_quarterly_pli_review_for(
@@ -1970,7 +1988,7 @@ end
     quarter_pli_payload_for(employee_detail, financial_year, quarter).present?
   end
 
-  def quarter_pli_payload_for(employee_detail, financial_year, quarter, require_ready: true, month: nil)
+  def quarter_pli_payload_for(employee_detail, financial_year, quarter, require_ready: true, month: nil, include_unsubmitted_target_rows: false)
     quarter_months = get_quarter_months(quarter)
     quarter_months = quarter_months.select { |quarter_month| quarter_month == month } if month.present?
     return nil if quarter_months.empty?
@@ -1999,9 +2017,8 @@ end
       detail_achievements = submitted_target_achievements_for_pli_month(user_details, month)
       next if require_ready && !month_ready_for_quarterly_pli?(employee_detail, user_details, month, financial_year)
 
-      items = user_details.filter_map do |detail|
-        next unless target_present_for_review_month?(detail, month)
-
+      item_details = include_unsubmitted_target_rows ? target_details_for_pli_month(user_details, month) : detail_achievements.map(&:first)
+      items = item_details.filter_map do |detail|
         target_number = numeric_review_value(detail.public_send(month))
         next unless target_number.positive?
 
@@ -2179,9 +2196,7 @@ end
   end
 
   def submitted_target_achievements_for_pli_month(user_details, month)
-    user_details.filter_map do |detail|
-      next unless target_present_for_review_month?(detail, month)
-
+    target_details_for_pli_month(user_details, month).filter_map do |detail|
       achievement = detail.achievements.find do |record|
         record.month.to_s.downcase == month && record.achievement.present?
       end
@@ -2189,6 +2204,10 @@ end
 
       [ detail, achievement ]
     end
+  end
+
+  def target_details_for_pli_month(user_details, month)
+    user_details.select { |detail| target_present_for_review_month?(detail, month) }
   end
 
   def required_quarterly_pli_status(employee_detail)
@@ -2407,7 +2426,7 @@ end
     params[:selected_quarter].present? ? get_quarter_months(params[:selected_quarter]) : []
   end
 
-  def build_monthly_employee_data(employee_details, approval_level:, month: nil, financial_year: nil)
+  def build_monthly_employee_data(employee_details, approval_level:, month: nil, financial_year: nil, include_unsubmitted_target_rows: false)
     monthly_employee_data = {}
     months_to_review = month.present? ? [ month ] : review_months
 
@@ -2428,11 +2447,14 @@ end
         end
 
         months_to_review.each do |review_month|
-          details_with_month_data = details_for_review.select do |detail|
-            target_present_for_review_month?(detail, review_month) &&
-              achievements_by_detail_and_month.dig(detail.id, review_month).present?
+          target_details = details_for_review.select do |detail|
+            target_present_for_review_month?(detail, review_month)
           end
-          month_achievements = details_with_month_data.flat_map do |detail|
+          submitted_details = target_details.select do |detail|
+            achievements_by_detail_and_month.dig(detail.id, review_month).present?
+          end
+          details_with_month_data = include_unsubmitted_target_rows ? target_details : submitted_details
+          month_achievements = submitted_details.flat_map do |detail|
             achievements_by_detail_and_month.dig(detail.id, review_month) || []
           end.select do |achievement|
 
@@ -2442,7 +2464,7 @@ end
               true
             end
           end
-          next if (approval_level == "l2" ? month_achievements.empty? : details_with_month_data.empty?)
+          next if month_achievements.empty?
 
           statuses = month_achievements.map { |achievement| achievement.status || "pending" }
           current_status = calculate_month_status(statuses, month_achievements, approval_level)
@@ -2451,9 +2473,8 @@ end
             next unless target_number.positive?
 
             achievement = (achievements_by_detail_and_month.dig(detail.id, review_month) || []).find { |record| record.achievement.present? }
-            next unless achievement
 
-            truncated_percentage(numeric_review_value(achievement.achievement), target_number)
+            truncated_percentage(numeric_review_value(achievement&.achievement), target_number)
           end
           progress_value = average_review_percentage(progress_values)
           key = [ emp.id, review_month, group_financial_year ].join("_")
