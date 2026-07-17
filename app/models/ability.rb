@@ -104,7 +104,11 @@ class Ability
     if user.employee? || user.l1_employer? || user.l2_employer?
       # Users can read, edit, update, and destroy their own user details
       can [ :read, :edit, :update, :destroy ], UserDetail do |ud|
-        ud.employee_detail&.employee_email == user.email
+        employee_detail = ud.employee_detail
+        employee_detail.present? &&
+          (code_matches?(employee_detail.employee_email, user.email) ||
+           code_matches?(employee_detail.employee_code, user.employee_code) ||
+           employee_detail.user_id == user.id)
       end
     end
   end

@@ -1,6 +1,11 @@
 class EmployeeDetail < ApplicationRecord
   DEFAULT_PORTAL_PASSWORD = "123456".freeze
   DEFAULT_PORTAL_ROLE = "employee".freeze
+  PORTAL_ROLE_OPTIONS = %w[employee hod].freeze
+  PORTAL_ROLE_LABELS = {
+    "employee" => "Employee",
+    "hod" => "HOD"
+  }.freeze
 
   has_many :user_details, dependent: :destroy
   has_many :target_submissions, dependent: :destroy
@@ -72,6 +77,20 @@ scope :l1_pending_records, -> { where(status: [ "pending", "returned" ]) }
     portal_active? ? "Active" : "Inactive"
   end
 
+  def self.portal_role_options_for_select
+    PORTAL_ROLE_OPTIONS.map { |role| [ PORTAL_ROLE_LABELS.fetch(role), role ] }
+  end
+
+  def portal_role
+    role = @portal_role.presence || user&.role.presence || DEFAULT_PORTAL_ROLE
+    PORTAL_ROLE_OPTIONS.include?(role) ? role : DEFAULT_PORTAL_ROLE
+  end
+
+  def portal_role=(value)
+    @portal_role = value
+    @portal_role_assigned = true
+  end
+
   def ensure_portal_user!
     return unless portal_account_ready?
 
@@ -82,6 +101,7 @@ scope :l1_pending_records, -> { where(status: [ "pending", "returned" ]) }
     if account
       account.email = normalized_email
       account.employee_code = normalized_code
+      account.role = normalized_portal_role if portal_role_assigned?
       account.role = DEFAULT_PORTAL_ROLE if account.role.blank?
       account.password = DEFAULT_PORTAL_PASSWORD if account.encrypted_password.blank?
       account.password_confirmation = DEFAULT_PORTAL_PASSWORD if account.encrypted_password.blank?
@@ -90,7 +110,7 @@ scope :l1_pending_records, -> { where(status: [ "pending", "returned" ]) }
       account = User.create!(
         email: normalized_email,
         employee_code: normalized_code,
-        role: DEFAULT_PORTAL_ROLE,
+        role: portal_role_assigned? ? normalized_portal_role : DEFAULT_PORTAL_ROLE,
         password: DEFAULT_PORTAL_PASSWORD,
         password_confirmation: DEFAULT_PORTAL_PASSWORD
       )
@@ -110,6 +130,17 @@ scope :l1_pending_records, -> { where(status: [ "pending", "returned" ]) }
 
   def portal_account_ready?
     employee_email.present? && employee_code.present?
+  end
+
+  def portal_role_assigned?
+    @portal_role_assigned == true
+  end
+
+  def normalized_portal_role
+    role = @portal_role.to_s.strip.downcase.tr(" ", "_")
+    return DEFAULT_PORTAL_ROLE if role.blank?
+
+    PORTAL_ROLE_OPTIONS.include?(role) ? role : DEFAULT_PORTAL_ROLE
   end
 
   def matching_portal_user(normalized_email, normalized_code)

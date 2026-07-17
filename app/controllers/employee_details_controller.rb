@@ -29,8 +29,12 @@ class EmployeeDetailsController < ApplicationController
   end
 
   def update
+    updating_portal_role = params.dig(:employee_detail, :portal_role).present?
+
     if @employee_detail.update(employee_detail_params)
-      redirect_to employee_details_path, notice: "Employee updated successfully."
+      @employee_detail.ensure_portal_user! if updating_portal_role
+      redirect_path = updating_portal_role ? employee_details_path(anchor: "employee-list") : employee_details_path
+      redirect_to redirect_path, notice: "Employee updated successfully."
     else
       render :edit, status: :unprocessable_entity
     end
@@ -1736,6 +1740,7 @@ end
   def employee_detail_params
     params.require(:employee_detail).permit(
       :employee_id, :employee_name, :employee_email, :employee_code, :mobile_number,
+      :portal_role,
       :l1_code, :l1_employer_name, :l2_code, :l2_employer_name,
       :obs_code1, :obs_code2, :obs_code3, :obs_code4,
       :post, :location, :department, :l1_remarks, :l1_percentage, :l2_remarks, :l2_percentage

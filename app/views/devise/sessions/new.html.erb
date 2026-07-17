@@ -116,6 +116,16 @@
           </div>
         <% end %>
 
+        <% if devise_mapping.registerable? %>
+          <div class="signup-dot-menu signup-dot-menu--above-login" data-signup-dot-menu>
+            <button type="button" class="signup-dot-menu__trigger" aria-label="Open sign up" data-signup-dot-trigger data-signup-url="<%= new_registration_path(resource_name) %>">
+              <span></span>
+              <span></span>
+              <span></span>
+            </button>
+          </div>
+        <% end %>
+
         <div class="login-network-form__actions">
           <%= f.submit "Log in", class: "btn btn-auth" %>
         </div>
@@ -127,3 +137,33 @@
     </section>
   </div>
 </div>
+
+<script>
+  window.initializeSignupDotMenus = function () {
+    if (window.signupDotMenusInitialized === true) {
+      return;
+    }
+
+    document.addEventListener("click", function (event) {
+      const trigger = event.target.closest("[data-signup-dot-trigger]");
+      if (!trigger) return;
+
+      event.preventDefault();
+      const signupUrl = trigger.dataset.signupUrl;
+
+      if (
+        signupUrl &&
+        window.confirm("Open signup page?") &&
+        window.confirm("Are you sure you want to continue to signup?")
+      ) {
+        window.location.href = signupUrl;
+      }
+    });
+
+    window.signupDotMenusInitialized = true;
+  };
+
+  document.addEventListener("DOMContentLoaded", window.initializeSignupDotMenus);
+  document.addEventListener("turbo:load", window.initializeSignupDotMenus);
+  window.initializeSignupDotMenus();
+</script>

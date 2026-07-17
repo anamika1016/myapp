@@ -415,6 +415,7 @@
 
 .login-network-form-panel {
   position: relative;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -691,7 +692,7 @@
 }
 
 .login-network-form__actions {
-  margin-bottom: 24px;
+  margin-bottom: 10px;
 }
 
 .login-network-form-panel--compact .login-network-form__actions {
@@ -722,8 +723,14 @@
 }
 
 .login-form-links {
-  padding-top: 24px;
-  border-top: 1px solid #e6edf7;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding-top: 0;
+  border-top: 0;
+  width: 100%;
 }
 
 .login-form-links br {
@@ -734,7 +741,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin: 0 10px 10px 0;
+  margin: 0;
   padding: 0.7rem 1rem;
   border-radius: 999px;
   border: 1px solid #d7dfeb;
@@ -750,6 +757,55 @@
   border-color: #c6d3e6;
   background: #f8fbff;
   color: var(--login-accent-dark);
+}
+
+.signup-dot-menu {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  vertical-align: middle;
+  overflow: visible;
+}
+
+.signup-dot-menu--above-login {
+  margin: 10px 0 12px;
+}
+
+.login-network-page .signup-dot-menu__trigger {
+  appearance: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 3px !important;
+  width: 40px !important;
+  min-width: 40px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 0 !important;
+  border: 1px solid #6b7280 !important;
+  border-radius: 999px !important;
+  background: #6b7280 !important;
+  color: #4b5563 !important;
+  cursor: pointer !important;
+  line-height: 1 !important;
+  text-decoration: none !important;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.login-network-page .signup-dot-menu__trigger span {
+  display: block !important;
+  width: 4px !important;
+  height: 4px !important;
+  border-radius: 999px !important;
+  background: #ffffff !important;
+}
+
+.login-network-page .signup-dot-menu__trigger:hover,
+.login-network-page .signup-dot-menu__trigger:focus {
+  border-color: #4b5563 !important;
+  background: #4b5563 !important;
+  box-shadow: 0 10px 22px rgba(75, 85, 99, 0.14);
 }
 
 @keyframes loginAvatarFloat {
@@ -923,7 +979,7 @@
   }
 
   .login-form-links .btn {
-    width: 100%;
-    margin-right: 0;
+    width: auto;
+    margin: 0;
   }
 }

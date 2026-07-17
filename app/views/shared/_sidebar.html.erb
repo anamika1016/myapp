@@ -272,40 +272,71 @@
 
           <% if has_observer_pli_responsibilities? %>
             <% observer_levels_for_current_user.each do |observer_level| %>
+              <% observer_menu_key = observer_menu_key_for(observer_level) %>
+              <% next unless sidebar_menu_visible_for_current_user?(observer_menu_key) %>
               <% observer_index_path = observer_pli_index_path(observer_level) %>
               <li class="hs-accordion" id="users-accordion">
-                <%= link_to observer_index_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if observer_menu_active?(observer_level)} text-base text-gray-800 rounded-lg" do %>
-                  <svg class="shrink-0 size-6 sidebar-nav-icon" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24">
-                    <path d="M4.5 12s2.8-5.5 7.5-5.5 7.5 5.5 7.5 5.5-2.8 5.5-7.5 5.5S4.5 12 4.5 12Z" />
-                    <circle cx="12" cy="12" r="2.5" />
-                    <path d="M18.5 5.5 20 4M20 8h-2" />
-                  </svg>
-                  <span class="font-semibold">
-                    <%= observer_menu_title_for(observer_level) %>
-                    <% if observer_pending_reviews?(observer_level) %>
-                      <span class="sidebar-pending-dot" title="Pending observer reviews" aria-label="Pending observer reviews"></span>
+                <div class="flex items-center rounded-lg #{'bg-gray-100' if observer_menu_active?(observer_level)}">
+                  <%= link_to observer_index_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 flex-1 min-w-0 text-base text-gray-800 rounded-lg" do %>
+                    <svg class="shrink-0 size-6 sidebar-nav-icon" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24">
+                      <path d="M4.5 12s2.8-5.5 7.5-5.5 7.5 5.5 7.5 5.5-2.8 5.5-7.5 5.5S4.5 12 4.5 12Z" />
+                      <circle cx="12" cy="12" r="2.5" />
+                      <path d="M18.5 5.5 20 4M20 8h-2" />
+                    </svg>
+                    <span class="font-semibold">
+                      <%= observer_menu_title_for(observer_level) %>
+                      <% if observer_pending_reviews?(observer_level) %>
+                        <span class="sidebar-pending-dot" title="Pending observer reviews" aria-label="Pending observer reviews"></span>
+                      <% end %>
+                    </span>
+                  <% end %>
+
+                  <% if current_user.hod? || current_user.admin? %>
+                    <% menu_enabled = sidebar_menu_enabled?(observer_menu_key) %>
+                    <% observer_title = observer_menu_title_for(observer_level) %>
+                    <% confirmation_message = menu_enabled ? "Hide #{observer_title} menu?" : "Show #{observer_title} menu?" %>
+                    <%= button_to toggle_sidebar_menu_settings_path(menu_key: observer_menu_key),
+                        method: :patch,
+                        form: { class: "m-0 pr-2", data: { turbo_confirm: confirmation_message }, onsubmit: "return confirm('#{j(confirmation_message)}')" },
+                        class: "quarterly-pli-visibility-toggle #{menu_enabled ? 'is-on' : 'is-off'}",
+                        title: menu_enabled ? "Visible" : "Hidden" do %>
+                      <span class="quarterly-pli-visibility-toggle__dot"></span>
                     <% end %>
-                  </span>
-                <% end %>
+                  <% end %>
+                </div>
               </li>
             <% end %>
           <% end %>
 
-          <% if has_l1_responsibilities? %>
+          <% if has_l1_responsibilities? && sidebar_menu_visible_for_current_user?("l1_employee_details") %>
             <li class="hs-accordion" id="users-accordion">
-              <%= link_to l1_employee_details_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 #{'bg-gray-100' if current_page?(l1_employee_details_path)} text-base text-gray-800 rounded-lg" do %>
-                <svg class="shrink-0 size-6 sidebar-nav-icon" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24">
-                  <path d="M12 4.5 14.3 9l4.9.7-3.5 3.4.8 4.9-4.5-2.4-4.5 2.4.8-4.9-3.5-3.4 4.9-.7Z" />
-                  <path d="M12 9.8v4.4" />
-                  <circle cx="12" cy="16.8" r=".7" fill="currentColor" stroke="none" />
-                </svg>
-                <span class="font-semibold">
-                  L1 Employee Details
-                  <% if l1_pending_reviews? %>
-                    <span class="sidebar-pending-dot" title="Pending L1 reviews" aria-label="Pending L1 reviews"></span>
+              <div class="flex items-center rounded-lg #{'bg-gray-100' if current_page?(l1_employee_details_path)}">
+                <%= link_to l1_employee_details_path, class: "flex items-center gap-x-3.5 py-2 px-2.5 flex-1 min-w-0 text-base text-gray-800 rounded-lg" do %>
+                  <svg class="shrink-0 size-6 sidebar-nav-icon" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24">
+                    <path d="M12 4.5 14.3 9l4.9.7-3.5 3.4.8 4.9-4.5-2.4-4.5 2.4.8-4.9-3.5-3.4 4.9-.7Z" />
+                    <path d="M12 9.8v4.4" />
+                    <circle cx="12" cy="16.8" r=".7" fill="currentColor" stroke="none" />
+                  </svg>
+                  <span class="font-semibold">
+                    L1 Employee Details
+                    <% if l1_pending_reviews? %>
+                      <span class="sidebar-pending-dot" title="Pending L1 reviews" aria-label="Pending L1 reviews"></span>
+                    <% end %>
+                  </span>
+                <% end %>
+
+                <% if current_user.hod? || current_user.admin? %>
+                  <% menu_enabled = sidebar_menu_enabled?("l1_employee_details") %>
+                  <% confirmation_message = menu_enabled ? "Hide L1 Employee Details menu?" : "Show L1 Employee Details menu?" %>
+                  <%= button_to toggle_sidebar_menu_settings_path(menu_key: "l1_employee_details"),
+                      method: :patch,
+                      form: { class: "m-0 pr-2", data: { turbo_confirm: confirmation_message }, onsubmit: "return confirm('#{j(confirmation_message)}')" },
+                      class: "quarterly-pli-visibility-toggle #{menu_enabled ? 'is-on' : 'is-off'}",
+                      title: menu_enabled ? "Visible" : "Hidden" do %>
+                    <span class="quarterly-pli-visibility-toggle__dot"></span>
                   <% end %>
-                </span>
-              <% end %>
+                <% end %>
+              </div>
             </li>
           <% end %>
 

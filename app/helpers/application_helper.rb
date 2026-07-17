@@ -116,6 +116,22 @@ module ApplicationHelper
     "Observer Menu #{observer_level_number(observer_level)}"
   end
 
+  def observer_menu_key_for(observer_level)
+    "observer_menu_#{observer_level_number(observer_level)}"
+  end
+
+  def sidebar_menu_enabled?(menu_key)
+    AppSetting.sidebar_menu_enabled?(menu_key)
+  rescue ActiveRecord::StatementInvalid, ActiveRecord::NoDatabaseError, ActiveRecord::ConnectionNotEstablished, KeyError
+    true
+  end
+
+  def sidebar_menu_visible_for_current_user?(menu_key)
+    return true if current_user&.hod? || current_user&.admin?
+
+    sidebar_menu_enabled?(menu_key)
+  end
+
   def observer_menu_observer_name_for(user = current_user)
     return nil if user.blank? || user.admin? || user.hod?
 

@@ -342,7 +342,7 @@ class UserDetailsController < ApplicationController
     set_financial_year_context
 
     if current_user.role == "employee" || current_user.role == "l1_employer" || current_user.role == "l2_employer"
-      employee_detail = EmployeeDetail.find_by(employee_email: current_user.email)
+      employee_detail = current_user_target_employee_detail
       @user_details = if employee_detail
         UserDetail.left_joins(:department, :activity)
                 .preload(:department, :activity, :employee_detail, achievements: :achievement_remark)
@@ -491,7 +491,7 @@ class UserDetailsController < ApplicationController
     set_financial_year_context
 
     if [ "employee", "l1_employer", "l2_employer" ].include?(current_user.role)
-      @employee_detail = EmployeeDetail.find_by(employee_email: current_user.email)
+      @employee_detail = current_user_target_employee_detail
 
       @user_details = if @employee_detail
         UserDetail.includes(:department, :activity, :employee_detail, achievements: :achievement_remark)
@@ -521,7 +521,7 @@ class UserDetailsController < ApplicationController
     set_financial_year_context
 
     if [ "employee", "l1_employer", "l2_employer" ].include?(current_user.role)
-      @employee_detail = EmployeeDetail.find_by(employee_email: current_user.email)
+      @employee_detail = current_user_target_employee_detail
 
       @user_details = if @employee_detail
         UserDetail.includes(:department, :activity, :employee_detail, achievements: :achievement_remark)
@@ -1813,7 +1813,7 @@ class UserDetailsController < ApplicationController
                      .where(financial_year: @selected_financial_year)
 
     if current_user.role == "employee" || current_user.role == "l1_employer" || current_user.role == "l2_employer"
-      employee_detail = EmployeeDetail.find_by(employee_email: current_user.email)
+      employee_detail = current_user_target_employee_detail
       if employee_detail
         base.where(employee_detail_id: employee_detail.id).order("user_details.id ASC")
       else
@@ -2150,8 +2150,12 @@ class UserDetailsController < ApplicationController
   end
 
   def current_user_target_employee_detail
-    EmployeeDetail.find_by(employee_email: current_user.email) ||
-      EmployeeDetail.find_by(id: params[:employee_detail_id])
+    return if current_user.blank?
+
+    current_user.employee_detail ||
+      EmployeeDetail.find_by("LOWER(TRIM(employee_email)) = ?", current_user.email.to_s.strip.downcase) ||
+      EmployeeDetail.find_by("LOWER(TRIM(employee_code)) = ?", current_user.employee_code.to_s.strip.downcase) ||
+      (EmployeeDetail.find_by(id: params[:employee_detail_id]) if current_user.hod? || current_user.admin?)
   end
 
   def achievement_entry_locked_for_month?(user_details, month)

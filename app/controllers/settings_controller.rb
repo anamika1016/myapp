@@ -1,7 +1,7 @@
 class SettingsController < ApplicationController
   before_action :authenticate_user!
   before_action :set_user
-  before_action :require_hod_or_admin!, only: [ :toggle_quarterly_pli_menu ]
+  before_action :require_hod_or_admin!, only: [ :toggle_quarterly_pli_menu, :toggle_sidebar_menu ]
 
   def show
     # Settings page - show user profile and settings
@@ -51,6 +51,17 @@ class SettingsController < ApplicationController
                   notice: "Quarterly PLI % menu is now #{status_text} for employee logins."
   end
 
+  def toggle_sidebar_menu
+    menu_key = params[:menu_key].to_s
+    enabled = AppSetting.toggle_sidebar_menu_enabled(menu_key)
+    status_text = enabled ? "visible" : "hidden"
+
+    redirect_back fallback_location: root_path,
+                  notice: "#{sidebar_menu_label(menu_key)} menu is now #{status_text}."
+  rescue KeyError
+    redirect_back fallback_location: root_path, alert: "Invalid menu setting."
+  end
+
   private
 
   def set_user
@@ -69,5 +80,15 @@ class SettingsController < ApplicationController
     return if current_user.hod? || current_user.admin?
 
     redirect_to root_path, alert: "You are not authorized to change menu visibility."
+  end
+
+  def sidebar_menu_label(menu_key)
+    {
+      "observer_menu_1" => "Observer Menu 1",
+      "observer_menu_2" => "Observer Menu 2",
+      "observer_menu_3" => "Observer Menu 3",
+      "observer_menu_4" => "Observer Menu 4",
+      "l1_employee_details" => "L1 Employee Details"
+    }.fetch(menu_key, "Sidebar")
   end
 end

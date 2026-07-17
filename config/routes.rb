@@ -146,6 +146,7 @@ Rails.application.routes.draw do
   patch "settings", to: "settings#update"
   patch "settings/password", to: "settings#update_password"
   patch "settings/toggle_quarterly_pli_menu", to: "settings#toggle_quarterly_pli_menu", as: :toggle_quarterly_pli_menu_settings
+  patch "settings/toggle_sidebar_menu/:menu_key", to: "settings#toggle_sidebar_menu", as: :toggle_sidebar_menu_settings
 
   # Keep your other routes
   devise_scope :user do
