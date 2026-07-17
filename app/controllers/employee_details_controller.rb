@@ -1760,15 +1760,18 @@ end
     return true if current_user.hod? || current_user.admin?
     return false unless quarterly_pli_menu_enabled?
 
-      EmployeeDetail.where(
-        "LOWER(TRIM(COALESCE(l1_code, ''))) = ? OR LOWER(TRIM(COALESCE(l1_employer_name, ''))) = ?",
-        current_user.employee_code.to_s.strip.downcase,
-        current_user.email.to_s.strip.downcase
-      ).exists? ||
+    code = current_user_identity_code.to_s.downcase
+    email = current_user_identity_email.to_s.downcase
+
+    EmployeeDetail.where(
+      "LOWER(TRIM(COALESCE(l1_code, ''))) = ? OR LOWER(TRIM(COALESCE(l1_employer_name, ''))) = ?",
+      code,
+      email
+    ).exists? ||
       EmployeeDetail.where(
         "LOWER(TRIM(COALESCE(l2_code, ''))) = ? OR LOWER(TRIM(COALESCE(l2_employer_name, ''))) = ?",
-        current_user.employee_code.to_s.strip.downcase,
-        current_user.email.to_s.strip.downcase
+        code,
+        email
       ).exists?
   end
 
@@ -1780,10 +1783,21 @@ end
     scope = EmployeeDetail.order(Arel.sql("LOWER(employee_name) ASC"))
     return scope if current_user.hod? || current_user.admin?
 
+    code = current_user_identity_code.to_s.downcase
+    email = current_user_identity_email.to_s.downcase
+
+    l1_scope = scope.where(
+      "LOWER(TRIM(COALESCE(l1_code, ''))) = :code OR LOWER(TRIM(COALESCE(l1_employer_name, ''))) = :email",
+      code: code,
+      email: email
+    )
+
+    return l1_scope if l1_scope.exists?
+
     scope.where(
-      "LOWER(TRIM(COALESCE(l1_code, ''))) = :code OR LOWER(TRIM(COALESCE(l1_employer_name, ''))) = :email OR LOWER(TRIM(COALESCE(l2_code, ''))) = :code OR LOWER(TRIM(COALESCE(l2_employer_name, ''))) = :email",
-      code: current_user.employee_code.to_s.strip.downcase,
-      email: current_user.email.to_s.strip.downcase
+      "LOWER(TRIM(COALESCE(l2_code, ''))) = :code OR LOWER(TRIM(COALESCE(l2_employer_name, ''))) = :email",
+      code: code,
+      email: email
     )
   end
 

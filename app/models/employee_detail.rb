@@ -82,7 +82,7 @@ scope :l1_pending_records, -> { where(status: [ "pending", "returned" ]) }
   end
 
   def portal_role
-    role = @portal_role.presence || user&.role.presence || DEFAULT_PORTAL_ROLE
+    role = @portal_role.presence || matching_portal_user_for_current_identifiers&.role.presence || DEFAULT_PORTAL_ROLE
     PORTAL_ROLE_OPTIONS.include?(role) ? role : DEFAULT_PORTAL_ROLE
   end
 
@@ -92,21 +92,23 @@ scope :l1_pending_records, -> { where(status: [ "pending", "returned" ]) }
   end
 
   def ensure_portal_user!
-    return unless portal_account_ready?
+    return unless portal_lookup_ready?
 
     normalized_email = employee_email.to_s.strip.downcase
     normalized_code = employee_code.to_s.strip
     account = matching_portal_user(normalized_email, normalized_code)
 
     if account
-      account.email = normalized_email
-      account.employee_code = normalized_code
+      account.email = normalized_email if normalized_email.present?
+      account.employee_code = normalized_code if normalized_code.present?
       account.role = normalized_portal_role if portal_role_assigned?
       account.role = DEFAULT_PORTAL_ROLE if account.role.blank?
       account.password = DEFAULT_PORTAL_PASSWORD if account.encrypted_password.blank?
       account.password_confirmation = DEFAULT_PORTAL_PASSWORD if account.encrypted_password.blank?
       account.save! if account.changed?
     else
+      return unless portal_account_create_ready?(normalized_email, normalized_code)
+
       account = User.create!(
         email: normalized_email,
         employee_code: normalized_code,
@@ -128,8 +130,12 @@ scope :l1_pending_records, -> { where(status: [ "pending", "returned" ]) }
     Rails.logger.error("EmployeeDetail##{id} portal account sync failed: #{e.message}")
   end
 
-  def portal_account_ready?
-    employee_email.present? && employee_code.present?
+  def portal_lookup_ready?
+    employee_email.present? || employee_code.present?
+  end
+
+  def portal_account_create_ready?(normalized_email, normalized_code)
+    normalized_email.present? && normalized_code.present?
   end
 
   def portal_role_assigned?
@@ -150,12 +156,19 @@ scope :l1_pending_records, -> { where(status: [ "pending", "returned" ]) }
       return linked_user
     end
 
-    User.find_by("lower(email) = ?", normalized_email) ||
-      User.find_by("lower(employee_code) = ?", normalized_code.downcase)
+    user_by_email = User.find_by("lower(email) = ?", normalized_email) if normalized_email.present?
+    user_by_email ||
+      (User.find_by("lower(employee_code) = ?", normalized_code.downcase) if normalized_code.present?)
   end
 
   def linked_user_matches?(linked_user, normalized_email, normalized_code)
-    linked_user.email.to_s.strip.downcase == normalized_email ||
-      linked_user.employee_code.to_s.strip.downcase == normalized_code.downcase
+    (normalized_email.present? && linked_user.email.to_s.strip.downcase == normalized_email) ||
+      (normalized_code.present? && linked_user.employee_code.to_s.strip.downcase == normalized_code.downcase)
+  end
+
+  def matching_portal_user_for_current_identifiers
+    return unless portal_lookup_ready?
+
+    matching_portal_user(employee_email.to_s.strip.downcase, employee_code.to_s.strip)
   end
 end
