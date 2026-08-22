@@ -78,23 +78,27 @@
                 <th class="target-kri-column px-5 py-4 text-left text-xs font-medium text-white tracking-wider border-r border-gray-600">Key result indicators</th>
                 <th class="px-5 py-4 text-left text-xs font-medium text-white tracking-wider border-r border-gray-600">Unit of measurement</th>
                 <th class="px-5 py-4 text-left text-xs font-medium text-white tracking-wider border-r border-gray-600"><%= annual_target_fy_label(@selected_financial_year) %></th>
-                <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">APR</th>
-                <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">MAY</th>
-                <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">JUN</th>
-                <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">JUL</th>
-                <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">AUG</th>
-                <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">SEP</th>
-                <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">OCT</th>
-                <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">NOV</th>
-                <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">DEC</th>
-                <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">JAN</th>
-                <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">FEB</th>
-                <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">MAR</th>
+                <% month_headers = %w[april may june july august september october november december january february march] %>
+                <% month_headers.each_with_index do |month, month_index| %>
+                  <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider border-r border-gray-600 bg-gray-700">
+                    <span class="month-heading-content">
+                      <%= short_month_label(month).upcase %>
+                      <% if month_index.zero? %>
+                        <button type="button" id="toggleMonthTargetActions" class="month-dots-toggle" title="Show monthly target edit options" aria-label="Show monthly target edit options">•••</button>
+                      <% end %>
+                      <button type="button" class="month-target-edit-trigger hidden" data-month="<%= month %>" data-month-label="<%= short_month_label(month) %>" title="Edit <%= short_month_label(month) %> targets" aria-label="Edit <%= short_month_label(month) %> targets">●</button>
+                    </span>
+                  </th>
+                <% end %>
+                <th class="px-5 py-4 text-center text-xs font-medium text-white tracking-wider bg-gray-700">Actions</th>
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
               <% @user_details.each_with_index do |detail, index| %>
-                <tr class="<%= index.even? ? 'bg-gray-50' : 'bg-white' %> hover:bg-gray-100 transition-colors duration-200">
+                <tr class="<%= index.even? ? 'bg-gray-50' : 'bg-white' %> hover:bg-gray-100 transition-colors duration-200 target-list-row"
+                    data-detail-id="<%= detail.id %>"
+                    data-activity-name="<%= detail.activity.activity_name %>"
+                    data-month-targets="<%= UserDetailsController::MONTH_ATTRIBUTES.index_with { |month| clean_spreadsheet_display_value(detail.public_send(month)) }.to_json %>">
                   <td class="px-5 py-4 text-sm text-gray-800 border-r border-gray-200 text-center"><%= index + 1 %></td>
                   <td class="target-kri-column px-5 py-4 text-sm text-gray-800 border-r border-gray-200 text-left" title="<%= detail.activity.activity_name %>"><%= detail.activity.activity_name %></td>
                   <td class="px-5 py-4 text-sm text-gray-800 border-r border-gray-200 text-center"><%= detail.activity.unit.present? ? detail.activity.unit : "" %></td>
@@ -107,14 +111,47 @@
                       </span>
                     </td>
                   <% end %>
+                  <td class="px-5 py-4 text-sm text-center">
+                    <% if can?(:edit, detail) %>
+                      <%= link_to edit_user_detail_path(detail),
+                          class: "inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-sm transition duration-200" do %>
+                        <i class="fas fa-edit"></i>
+                        Edit
+                      <% end %>
+                    <% else %>
+                      <span class="text-gray-400">-</span>
+                    <% end %>
+                  </td>
                 </tr>
               <% end %>
             </tbody>
           </table>
         </div>
       </div>
+  </div>
+
+  <div id="monthlyTargetModal" class="monthly-target-modal hidden" role="dialog" aria-modal="true" aria-labelledby="monthlyTargetModalTitle">
+    <div class="monthly-target-modal-backdrop" data-close-month-modal="true"></div>
+    <div class="monthly-target-modal-panel">
+      <div class="monthly-target-modal-header">
+        <div>
+          <h3 id="monthlyTargetModalTitle" class="text-xl font-bold text-gray-900">Edit monthly targets</h3>
+          <p id="monthlyTargetModalSubtitle" class="text-sm text-gray-500 mt-1"></p>
+        </div>
+        <button type="button" class="monthly-target-modal-close" data-close-month-modal="true" aria-label="Close">×</button>
+      </div>
+      <%= form_with url: update_monthly_targets_user_details_path, method: :patch, local: true, id: "monthlyTargetForm" do %>
+        <%= hidden_field_tag :financial_year, @selected_financial_year %>
+        <%= hidden_field_tag :month, "", id: "monthlyTargetMonth" %>
+        <div id="monthlyTargetActivityList" class="monthly-target-activity-list"></div>
+        <div class="monthly-target-modal-footer">
+          <button type="button" class="px-5 py-2.5 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50" data-close-month-modal="true">Cancel</button>
+          <button type="submit" class="px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-sm">Save targets</button>
+        </div>
+      <% end %>
     </div>
-  <% else %>
+  </div>
+<% else %>
     <div class="bg-white border border-gray-200 rounded-xl shadow-lg mt-4">
       <div class="bg-gray-100 px-6 py-4 border-b border-gray-200 rounded-t-xl">
         <div class="flex flex-wrap items-center justify-between gap-4">
@@ -219,6 +256,55 @@
   background-color: #f9fafb !important;
   transform: translateY(-1px);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.month-heading-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.month-dots-toggle,
+.month-target-edit-trigger {
+  border: 0;
+  color: #ffffff;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.month-dots-toggle {
+  padding: 0.1rem 0.35rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  letter-spacing: 0.08em;
+}
+
+.month-target-edit-trigger {
+  padding: 0.2rem;
+  background: transparent;
+  color: #93c5fd;
+  font-size: 0.72rem;
+}
+
+.month-target-edit-trigger:hover { color: #ffffff; transform: scale(1.2); }
+.monthly-target-modal.hidden, .month-target-edit-trigger.hidden { display: none !important; }
+.monthly-target-modal { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+.monthly-target-modal-backdrop { position: absolute; inset: 0; background: rgba(15, 23, 42, 0.68); backdrop-filter: blur(3px); }
+.monthly-target-modal-panel { position: relative; z-index: 1; width: min(760px, 96vw); max-height: 88vh; overflow: hidden; background: #fff; border-radius: 1.25rem; box-shadow: 0 24px 70px rgba(15, 23, 42, 0.35); }
+.monthly-target-modal-header, .monthly-target-modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.5rem; border-bottom: 1px solid #e5e7eb; }
+.monthly-target-modal-footer { justify-content: flex-end; border-top: 1px solid #e5e7eb; border-bottom: 0; }
+.monthly-target-modal-close { border: 0; background: #f3f4f6; color: #374151; width: 2.25rem; height: 2.25rem; border-radius: 999px; font-size: 1.5rem; line-height: 1; }
+.monthly-target-activity-list { padding: 1rem 1.5rem; max-height: 58vh; overflow-y: auto; }
+.monthly-target-activity-row { display: grid; grid-template-columns: minmax(0, 1fr) 11rem; gap: 1rem; align-items: center; padding: 0.85rem 0; border-bottom: 1px solid #eef2f7; }
+.monthly-target-activity-row:last-child { border-bottom: 0; }
+.monthly-target-activity-name { color: #1f2937; font-size: 0.9rem; line-height: 1.35; overflow-wrap: anywhere; }
+.monthly-target-input { width: 100%; border: 1px solid #cbd5e1; border-radius: 0.65rem; padding: 0.65rem 0.75rem; text-align: center; }
+.monthly-target-input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); }
+body.monthly-target-modal-open { overflow: hidden; }
+
+@media (max-width: 640px) {
+  .monthly-target-activity-row { grid-template-columns: 1fr; gap: 0.5rem; }
 }
 
 .main-content h2 {
@@ -338,3 +424,81 @@ tbody tr:hover {
   font-weight: 500;
 }
 </style>
+
+<script>
+function initializeMonthlyTargetEditor() {
+  const toggleButton = document.getElementById('toggleMonthTargetActions');
+  const modal = document.getElementById('monthlyTargetModal');
+  const form = document.getElementById('monthlyTargetForm');
+  if (!toggleButton || !modal || !form || toggleButton.dataset.bound === 'true') return;
+
+  toggleButton.dataset.bound = 'true';
+  const monthButtons = Array.from(document.querySelectorAll('.month-target-edit-trigger'));
+  const monthInput = document.getElementById('monthlyTargetMonth');
+  const title = document.getElementById('monthlyTargetModalTitle');
+  const subtitle = document.getElementById('monthlyTargetModalSubtitle');
+  const list = document.getElementById('monthlyTargetActivityList');
+
+  toggleButton.addEventListener('click', () => {
+    const willShow = monthButtons.some(button => button.classList.contains('hidden'));
+    monthButtons.forEach(button => button.classList.toggle('hidden', !willShow));
+    toggleButton.classList.toggle('bg-indigo-500', willShow);
+    toggleButton.setAttribute('aria-expanded', String(willShow));
+  });
+
+  function closeModal() {
+    modal.classList.add('hidden');
+    document.body.classList.remove('monthly-target-modal-open');
+  }
+
+  function addActivityInput(row, month) {
+    let targets = {};
+    try { targets = JSON.parse(row.dataset.monthTargets || '{}'); } catch (_error) { targets = {}; }
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'monthly-target-activity-row';
+
+    const activityName = document.createElement('label');
+    activityName.className = 'monthly-target-activity-name';
+    activityName.htmlFor = `monthly-target-${row.dataset.detailId}`;
+    activityName.textContent = row.dataset.activityName || 'Key result indicator';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.inputMode = 'decimal';
+    input.id = activityName.htmlFor;
+    input.name = `targets[${row.dataset.detailId}]`;
+    input.value = targets[month] == null ? '' : targets[month];
+    input.placeholder = 'Enter target';
+    input.className = 'monthly-target-input';
+    input.pattern = '-?\\d+(?:\\.\\d+)?%?';
+    input.title = 'Enter a number, optional decimal, or percentage';
+
+    wrapper.append(activityName, input);
+    list.appendChild(wrapper);
+  }
+
+  monthButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      const month = button.dataset.month;
+      const monthLabel = button.dataset.monthLabel;
+      monthInput.value = month;
+      title.textContent = `${monthLabel} activity-wise target edit`;
+      subtitle.textContent = 'Update targets for all key result indicators, then click Save targets.';
+      list.replaceChildren();
+      document.querySelectorAll('.target-list-row').forEach(row => addActivityInput(row, month));
+      modal.classList.remove('hidden');
+      document.body.classList.add('monthly-target-modal-open');
+      list.querySelector('input')?.focus();
+    });
+  });
+
+  modal.querySelectorAll('[data-close-month-modal="true"]').forEach(button => button.addEventListener('click', closeModal));
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+  });
+}
+
+document.addEventListener('DOMContentLoaded', initializeMonthlyTargetEditor);
+document.addEventListener('turbo:load', initializeMonthlyTargetEditor);
+</script>

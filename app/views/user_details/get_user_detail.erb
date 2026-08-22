@@ -213,7 +213,7 @@
                     selected_month_target = clean_spreadsheet_display_value(detail.send(selected_month_key.to_sym))
                     selected_month_target_text = selected_month_target.to_s.delete(",").delete("%").strip
                     selected_month_target_numeric = selected_month_target_text.match?(/\A-?\d+(?:\.\d+)?\z/)
-                    has_selected_month_target = selected_month_target.present? && (!selected_month_target_numeric || selected_month_target_text.to_f.positive?)
+                    has_selected_month_target = selected_month_target.present? && (!selected_month_target_numeric || selected_month_target_text.to_f >= 0)
 
                     if is_manual_kri
                       manual_kri_month = months.find do |month|
@@ -230,9 +230,11 @@
                       target_value = clean_spreadsheet_display_value(detail.send(month))
                       target_text_for_filter = target_value.to_s.delete(",").delete("%").strip
                       target_is_numeric_for_filter = target_text_for_filter.match?(/\A-?\d+(?:\.\d+)?\z/)
-                      # Consider a target valid if it is filled; numeric zero still counts as blank.
+                      # Preserve zero in the row data so the selected month remains visible
+                      # and the employee can replace that zero from the submission sheet.
                       is_valid_target = target_value.present? && (!target_is_numeric_for_filter || target_text_for_filter.to_f.positive?)
-                      target_data[month.to_s] = is_valid_target ? target_value.to_s : ''
+                      is_zero_target = target_is_numeric_for_filter && target_text_for_filter.to_f.zero?
+                      target_data[month.to_s] = (is_valid_target || is_zero_target) ? target_value.to_s : ''
                       has_any_target = true if is_valid_target
                     end
                   %>
@@ -260,6 +262,7 @@
                       <% target_number = target_is_numeric ? target_text.to_f : 0.0 %>
                       <% achievement_number = existing_achievement&.achievement.to_s.delete(",").delete("%").to_f %>
                       <% month_locked = (@achievement_entry_locked && month.to_s == @selected_month.to_s) || %w[l1_approved l2_approved].include?(existing_achievement&.status.to_s) %>
+                      <% target_is_editable_zero = target_is_numeric && target_text.to_f.zero? && month.to_s == selected_month_key && !month_locked %>
                       <% total_achievement_percentage = has_target && target_number.positive? && existing_achievement&.achievement.present? ? (((achievement_number / target_number) * 100.0 * 100).floor / 100.0) : nil %>
                       <%
                         if has_target && target_number.positive?
@@ -270,9 +273,20 @@
                       %>
                       
                       <td class="target-cell px-3 py-3 text-sm text-gray-800 text-center border-r border-gray-200 bg-gray-50 month-cell" data-month="<%= month %>" data-has-target="<%= has_target %>" <%= 'data-month-hidden="true"'.html_safe unless month.to_s == selected_month_key %>>
-                        <span class="<%= has_target ? 'target-static-value text-gray-800 font-medium' : 'target-static-value text-gray-400' %>">
-                          <%= target_value.presence || '-' %>
-                        </span>
+                        <% if target_is_editable_zero %>
+                          <input type="text"
+                                 name="target_updates[<%= detail.id %>][<%= month %>]"
+                                 value="<%= target_value %>"
+                                 data-original-value="<%= target_value %>"
+                                 data-month="<%= month %>"
+                                 inputmode="decimal"
+                                 class="target-input border border-amber-400 p-2 rounded-lg w-full bg-amber-50 focus:bg-white focus:border-indigo-500 focus:ring-indigo-200 transition-all duration-200 text-sm text-center"
+                                 placeholder="Enter target">
+                        <% else %>
+                          <span class="<%= has_target ? 'target-static-value text-gray-800 font-medium' : 'target-static-value text-gray-400' %>">
+                            <%= target_value.presence || '-' %>
+                          </span>
+                        <% end %>
                       </td>
                       <td class="achievement-cell px-3 py-3 text-sm text-center border-r border-gray-200 month-cell" data-month="<%= month %>" data-has-target="<%= has_target %>" <%= 'data-month-hidden="true"'.html_safe unless month.to_s == selected_month_key %>>
                         <input 
@@ -608,11 +622,11 @@ function initializeAchievementFilters() {
             }
 
             const monthTarget = targets[activeMonth];
-            const hasTarget = monthTarget && String(monthTarget).trim() !== '' && String(monthTarget).trim() !== '0';
+            const hasTarget = monthTarget !== undefined && monthTarget !== null && String(monthTarget).trim() !== '';
             const numericTarget = String(monthTarget || '').replace(/,/g, '');
-            const isPositiveTarget = hasTarget && (!/^-?\d+(?:\.\d+)?$/.test(numericTarget) || parseFloat(numericTarget) > 0);
+            const isVisibleTarget = hasTarget && (!/^-?\d+(?:\.\d+)?$/.test(numericTarget) || parseFloat(numericTarget) >= 0);
 
-            if (isPositiveTarget) {
+            if (isVisibleTarget) {
                 row.removeAttribute('data-filtered-hidden');
             } else {
                 row.setAttribute('data-filtered-hidden', 'true');

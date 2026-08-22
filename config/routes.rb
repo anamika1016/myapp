@@ -54,6 +54,7 @@ Rails.application.routes.draw do
       get :view_sms_logs
       get :export_department_activity_data
       get :submitted_achievements
+      patch :update_monthly_targets
     end
   end
 

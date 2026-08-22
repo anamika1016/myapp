@@ -1767,12 +1767,7 @@ end
       "LOWER(TRIM(COALESCE(l1_code, ''))) = ? OR LOWER(TRIM(COALESCE(l1_employer_name, ''))) = ?",
       code,
       email
-    ).exists? ||
-      EmployeeDetail.where(
-        "LOWER(TRIM(COALESCE(l2_code, ''))) = ? OR LOWER(TRIM(COALESCE(l2_employer_name, ''))) = ?",
-        code,
-        email
-      ).exists?
+    ).exists?
   end
 
   def pli_dashboard_authorized?
@@ -1786,16 +1781,8 @@ end
     code = current_user_identity_code.to_s.downcase
     email = current_user_identity_email.to_s.downcase
 
-    l1_scope = scope.where(
-      "LOWER(TRIM(COALESCE(l1_code, ''))) = :code OR LOWER(TRIM(COALESCE(l1_employer_name, ''))) = :email",
-      code: code,
-      email: email
-    )
-
-    return l1_scope if l1_scope.exists?
-
     scope.where(
-      "LOWER(TRIM(COALESCE(l2_code, ''))) = :code OR LOWER(TRIM(COALESCE(l2_employer_name, ''))) = :email",
+      "LOWER(TRIM(COALESCE(l1_code, ''))) = :code OR LOWER(TRIM(COALESCE(l1_employer_name, ''))) = :email",
       code: code,
       email: email
     )

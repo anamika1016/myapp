@@ -107,6 +107,50 @@ class EmployeeDetailsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "50.00", rows.first.dig(:detail_payload, :months, 0, :achievement_percentage)
   end
 
+  test "quarterly pli scope only includes employees mapped to current users l1 code" do
+    matching_employee = EmployeeDetail.create!(
+      employee_name: "Mapped Employee",
+      employee_code: "PAPL032",
+      l1_code: "PAPL063",
+      l1_employer_name: "nishchal@ploughmanagro.com"
+    )
+    EmployeeDetail.create!(
+      employee_name: "L2 Only Employee",
+      employee_code: "PAPL040",
+      l2_code: "PAPL063",
+      l2_employer_name: "nishchal@ploughmanagro.com"
+    )
+
+    controller = EmployeeDetailsController.new
+    current_user = User.new(employee_code: "PAPL063", email: "nishchal@ploughmanagro.com", role: "employee")
+    controller.define_singleton_method(:current_user) { current_user }
+    controller.define_singleton_method(:quarterly_pli_menu_enabled?) { true }
+    controller.define_singleton_method(:current_user_identity_code) { current_user.employee_code }
+    controller.define_singleton_method(:current_user_identity_email) { current_user.email }
+
+    scoped_ids = controller.send(:quarterly_pli_employee_scope).pluck(:id)
+
+    assert_equal [ matching_employee.id ], scoped_ids
+  end
+
+  test "quarterly pli authorization does not allow l2-only mapping" do
+    EmployeeDetail.create!(
+      employee_name: "L2 Only Employee",
+      employee_code: "PAPL040",
+      l2_code: "PAPL063",
+      l2_employer_name: "nishchal@ploughmanagro.com"
+    )
+
+    controller = EmployeeDetailsController.new
+    current_user = User.new(employee_code: "PAPL063", email: "nishchal@ploughmanagro.com", role: "employee")
+    controller.define_singleton_method(:current_user) { current_user }
+    controller.define_singleton_method(:quarterly_pli_menu_enabled?) { true }
+    controller.define_singleton_method(:current_user_identity_code) { current_user.employee_code }
+    controller.define_singleton_method(:current_user_identity_email) { current_user.email }
+
+    assert_not controller.send(:quarterly_pli_authorized?)
+  end
+
   test "pli dashboard rows compare calculated and final pli percentages" do
     employee_detail = create_partial_month_submission_source(status: "l1_approved", observer_code: nil)
     QuarterlyPliReview.create!(

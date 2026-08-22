@@ -26,7 +26,7 @@ class UserDetailsController < ApplicationController
   end
 
   before_action :set_user_detail, only: [ :show, :edit, :update, :destroy ]
-  load_and_authorize_resource except: [ :index, :new, :create, :get_user_detail, :get_activities, :bulk_create, :submit_achievements, :export, :import, :quarterly_edit_all, :update_quarterly_achievements, :test_sms, :view_sms_logs, :submitted_achievements ]
+  load_and_authorize_resource except: [ :index, :new, :create, :get_user_detail, :get_activities, :bulk_create, :submit_achievements, :export, :import, :quarterly_edit_all, :update_quarterly_achievements, :update_monthly_targets, :test_sms, :view_sms_logs, :submitted_achievements ]
 
   def index
     set_financial_year_context
@@ -182,6 +182,48 @@ class UserDetailsController < ApplicationController
                     alert: "An error occurred while updating the user detail."
       end
     end
+  end
+
+  def update_monthly_targets
+    set_financial_year_context
+    month = params[:month].to_s.downcase
+
+    unless MONTH_ATTRIBUTES.map(&:to_s).include?(month)
+      redirect_to user_details_path(financial_year: @selected_financial_year), alert: "Please select a valid month."
+      return
+    end
+
+    submitted_targets = params[:targets].presence || {}
+    editable_details = target_details_scope.where(id: submitted_targets.keys).index_by { |detail| detail.id.to_s }
+    errors = []
+    updated_count = 0
+
+    ActiveRecord::Base.transaction do
+      submitted_targets.each do |detail_id, raw_value|
+        detail = editable_details[detail_id.to_s]
+        next unless detail
+
+        normalized_value = normalize_import_display_value(raw_value)
+        if normalized_value.present? && !valid_numeric_percent_value?(normalized_value)
+          errors << "#{detail.activity&.activity_name || "Activity #{detail.id}"}: enter a valid numeric target."
+          next
+        end
+
+        current_value = normalize_import_display_value(detail.public_send(month))
+        next if current_value.to_s == normalized_value.to_s
+
+        detail.update!(month => normalized_value.presence)
+        updated_count += 1
+      end
+    end
+
+    if errors.any?
+      redirect_to user_details_path(financial_year: @selected_financial_year), alert: errors.first(3).join(" ")
+    else
+      redirect_to user_details_path(financial_year: @selected_financial_year), notice: "#{short_month_label(month)} targets updated successfully (#{updated_count} activities)."
+    end
+  rescue ActiveRecord::RecordInvalid => e
+    redirect_to user_details_path(financial_year: @selected_financial_year), alert: e.record.errors.full_messages.to_sentence
   end
 
 
@@ -582,9 +624,13 @@ class UserDetailsController < ApplicationController
         selected_submission_month = params[:month].to_s.downcase
         submitted_user_detail_ids = (achievement_data.keys + target_update_data.keys).map(&:to_s).uniq
         submitted_months = selected_submission_month.present? ? [ selected_submission_month ] : MONTH_ATTRIBUTES.map(&:to_s)
-        user_details_by_id = UserDetail.includes(:activity, :employee_detail)
-                                       .where(id: submitted_user_detail_ids)
-                                       .index_by { |detail| detail.id.to_s }
+        submitted_details_scope = UserDetail.includes(:activity, :employee_detail)
+                                            .where(id: submitted_user_detail_ids, financial_year: financial_year_for_lock)
+        unless current_user.hod?
+          employee_detail_id = current_user_target_employee_detail&.id
+          submitted_details_scope = employee_detail_id.present? ? submitted_details_scope.where(employee_detail_id: employee_detail_id) : submitted_details_scope.none
+        end
+        user_details_by_id = submitted_details_scope.index_by { |detail| detail.id.to_s }
         achievements_by_detail_month = Achievement.where(user_detail_id: submitted_user_detail_ids, month: submitted_months)
                                                    .index_by { |achievement| [ achievement.user_detail_id.to_s, achievement.month.to_s.downcase ] }
         locked_month_cache = {}
@@ -1184,18 +1230,18 @@ class UserDetailsController < ApplicationController
 
 
 
-            employee_name = row["employee_name"]
-            employee_email = row["employee_email"]
+            employee_name = normalize_import_text_value(row["employee_name"])
+            employee_email = normalize_import_email_value(row["employee_email"])
             employee_code = row["employee_code"]
-            post = row["post"] || row["designation"]
-            location = row["location"] || row["posting_location"] || row["work_location"]
+            post = normalize_import_text_value(row["post"] || row["designation"])
+            location = normalize_import_text_value(row["location"] || row["posting_location"] || row["work_location"])
 
             mobile_number = extract_employee_mobile_number(row)
 
             l1_code = row["l1_code"] || row["l1_employer_code"] || row["l1_role"]
-            l1_employer_name = row["l1_employer_name"] || row["l1_employee_name"]
+            l1_employer_name = normalize_import_text_value(row["l1_employer_name"] || row["l1_employee_name"])
             l2_code = row["l2_code"] || row["l2_employer_code"]
-            l2_employer_name = row["l2_employer_name"]
+            l2_employer_name = normalize_import_text_value(row["l2_employer_name"])
             obs_code1 = row["obs_code_1"] || row["obs_code1"] || row["observer_code_1"] || row["observer1_code"] || row["observer_1_code"] || row["bw_code_1"] || row["bw_code1"]
             obs_code2 = row["obs_code_2"] || row["obs_code2"] || row["observer_code_2"] || row["observer2_code"] || row["observer_2_code"] || row["bw_code_2"] || row["bw_code2"]
             obs_code3 = row["obs_code_3"] || row["obs_code3"] || row["observer_code_3"] || row["observer3_code"] || row["observer_3_code"] || row["bw_code_3"] || row["bw_code3"]
@@ -1205,12 +1251,12 @@ class UserDetailsController < ApplicationController
             l1_employer_name = manager_values[:l1_employer_name]
             l2_code = manager_values[:l2_code]
             l2_employer_name = manager_values[:l2_employer_name]
-            department_type = row["department"] || row["department_region"] || row["department_/_region"]
+            department_type = normalize_import_text_value(row["department"] || row["department_region"] || row["department_/_region"])
             financial_year_value = row["financial_year"]
             raw_activity_name = row["key_result_indicator"] || row["key_result_indicators"] || row["activity_name"]
             activity_name = import_activity_name_from_columns(financial_year_value, raw_activity_name)
-            activity_theme_name = row["theme_name"] || row["theme"] || row["activity_theme"]
-            unit = row["unit_of_measurement"] || row["unit"] || row["unit_of_measure"]
+            activity_theme_name = normalize_import_text_value(row["theme_name"] || row["theme"] || row["activity_theme"])
+            unit = normalize_import_text_value(row["unit_of_measurement"] || row["unit"] || row["unit_of_measure"])
             annual_target_fy = normalize_import_display_value(
               extract_annual_target_fy(row),
               percent_context: unit.to_s.strip == "%"
@@ -1282,7 +1328,7 @@ class UserDetailsController < ApplicationController
               financial_year: financial_year
             )
 
-            normalized_activity_name = activity_name.to_s.strip
+            normalized_activity_name = normalize_import_text_value(activity_name)
             occurrence_key = [ employee.id, department.id, financial_year, normalized_activity_name.downcase ]
             occurrence_index = import_row_occurrences[occurrence_key]
             import_row_occurrences[occurrence_key] += 1
@@ -1665,10 +1711,10 @@ class UserDetailsController < ApplicationController
   end
 
   def import_activity_name_from_columns(financial_year_value, activity_name_value)
-    cleaned_activity_name = activity_name_value.to_s.strip
+    cleaned_activity_name = normalize_import_text_value(activity_name_value)
     return cleaned_activity_name if cleaned_activity_name.present? && !placeholder_import_value?(cleaned_activity_name)
 
-    possible_activity_name = financial_year_value.to_s.strip
+    possible_activity_name = normalize_import_text_value(financial_year_value)
     return possible_activity_name if possible_activity_name.present? && normalize_import_financial_year(possible_activity_name).blank?
 
     cleaned_activity_name
@@ -1681,9 +1727,9 @@ class UserDetailsController < ApplicationController
   def normalize_import_manager_values(l1_code, l1_employer_name, l2_code, l2_employer_name)
     values = {
       l1_code: l1_code.to_s.strip,
-      l1_employer_name: l1_employer_name.to_s.strip,
+      l1_employer_name: normalize_import_text_value(l1_employer_name).to_s,
       l2_code: l2_code.to_s.strip,
-      l2_employer_name: l2_employer_name.to_s.strip,
+      l2_employer_name: normalize_import_text_value(l2_employer_name).to_s,
       financial_year: nil
     }
 
@@ -1733,6 +1779,16 @@ class UserDetailsController < ApplicationController
     return "100%" if percent_context && cleaned_value.match?(/\A1(?:\.0+)?\z/)
 
     suffix.present? && !cleaned_value.end_with?(suffix) ? "#{cleaned_value}#{suffix}" : cleaned_value
+  end
+
+  def normalize_import_text_value(value)
+    normalized_value = normalize_import_display_value(value)
+    normalized_value.present? ? normalized_value.downcase : nil
+  end
+
+  def normalize_import_email_value(value)
+    normalized_value = normalize_import_display_value(value)
+    normalized_value.present? ? normalized_value.downcase : nil
   end
 
   def strip_import_markup(value)
@@ -2231,10 +2287,10 @@ class UserDetailsController < ApplicationController
   end
 
   def target_editable_for_month?(user_detail, month_key)
-    return false unless manual_kri_target_editable?(user_detail)
-
     current_value = normalize_import_display_value(user_detail.public_send(month_key))
-    current_value.blank? || current_value.to_s == "0"
+    target_text = current_value.to_s.delete(",").delete("%").strip
+
+    target_text.match?(/\A-?\d+(?:\.\d+)?\z/) && target_text.to_f.zero?
   end
 
   def department_for_new_target(employee_detail, financial_year)
