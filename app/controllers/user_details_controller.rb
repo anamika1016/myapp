@@ -512,7 +512,7 @@ class UserDetailsController < ApplicationController
       end
 
       # Test with Q1 quarter
-      result = send_sms_to_l1(test_employee, "Q1 (APR-JUN)", nil)
+      result = send_sms_to_l1(test_employee, "Q1 (APR-JUN)", nil, "april")
 
       if result[:success]
         flash[:notice] = "✅ Test SMS sent successfully! Message ID: #{result[:message_id]}"
@@ -2062,7 +2062,7 @@ class UserDetailsController < ApplicationController
   end
 
   # SMS functionality for quarterly notifications
-  def send_sms_to_l1(employee_detail, quarter, user_detail)
+  def send_sms_to_l1(employee_detail, quarter, user_detail, month = nil)
     begin
       # Get L1 manager's mobile number (not the employee's mobile number)
       l1_code = employee_detail.l1_code
@@ -2075,7 +2075,7 @@ class UserDetailsController < ApplicationController
       l1_mobile = l1_manager.mobile_number
       return { success: false, error: "L1 manager mobile number not found" } unless l1_mobile.present?
 
-      message = "Emp-Code: #{employee_detail.employee_code}, Emp-Name: #{employee_detail.employee_name} has submitted his #{quarter} Qtr KRA MIS. Please review and approve in the system. Ploughman Agro Private Limited"
+      message = kra_submission_sms_message(employee_detail, quarter, month)
 
       SmsNotificationService.send_message(l1_mobile, message)
 
@@ -2093,7 +2093,7 @@ class UserDetailsController < ApplicationController
     else
       return { success: true, message: "L1 SMS already sent" } if check_sms_already_sent(employee_detail.id, quarter, month)
 
-      result = send_sms_to_l1(employee_detail, quarter, user_detail)
+      result = send_sms_to_l1(employee_detail, quarter, user_detail, month)
       mark_sms_as_sent(employee_detail.id, quarter, month) if result[:success]
       result
     end
@@ -2158,8 +2158,7 @@ class UserDetailsController < ApplicationController
       return { success: false, error: error, observer_level: observer_level, observer_code: observer_code, observer_name: observer.employee_name }
     end
 
-    month_text = month.present? ? " #{short_month_label(month)}" : ""
-    message = "Emp-Code: #{employee_detail.employee_code}, Emp-Name: #{employee_detail.employee_name} has submitted his#{month_text} #{quarter} Qtr KRA MIS. Please review and approve in the system. Ploughman Agro Private Limited"
+    message = kra_submission_sms_message(employee_detail, quarter, month)
     result = SmsNotificationService.send_message(observer.mobile_number, message)
 
     if result[:success]
@@ -2180,6 +2179,16 @@ class UserDetailsController < ApplicationController
 
   def observer_label(observer_level)
     "OB#{observer_level.to_s.gsub(/\D/, '')}"
+  end
+
+  def kra_submission_sms_message(employee_detail, quarter, month)
+    submission_label = if month.present?
+      "#{quarter.to_s[/\AQ\d+/] || quarter} (#{short_month_label(month)}) Qtr"
+    else
+      "#{quarter} Qtr"
+    end
+
+    "Emp-Code: #{employee_detail.employee_code}, Emp-Name: #{employee_detail.employee_name} has submitted his #{submission_label} KRA MIS. Please review and approve in the system. Ploughman Agro Private Limited"
   end
 
   def employee_detail_for_code(employee_code)

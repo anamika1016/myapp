@@ -195,6 +195,36 @@ class EmployeeDetailsControllerTest < ActionDispatch::IntegrationTest
     assert_equal 1, summary[:returned]
   end
 
+  test "l1 sms after observer approval keeps quarter template with submitted month" do
+    employee_detail = EmployeeDetail.create!(
+      employee_name: "Anamika Vishwakarma",
+      employee_code: "PAPL126-SMS",
+      l1_code: "PAPL999-SMS"
+    )
+    EmployeeDetail.create!(
+      employee_name: "L1 Manager",
+      employee_code: "PAPL999-SMS",
+      mobile_number: "9999999999"
+    )
+    captured_message = nil
+
+    SmsNotificationService.stub(:send_message, ->(_mobile_number, message) {
+      captured_message = message
+      { success: true }
+    }) do
+      EmployeeDetailsController.new.send(
+        :send_sms_to_l1_after_observers,
+        employee_detail,
+        "Q2 (JUL-SEP)",
+        "july"
+      )
+    end
+
+    assert_includes captured_message, "has submitted his Q2 (JUL) Qtr KRA MIS"
+    assert_not_includes captured_message, "Q2 (JUL-SEP) Qtr KRA MIS"
+    assert_not_includes captured_message, "Monthly KRA MIS"
+  end
+
   private
 
   def create_quarterly_pli_source(source_time: 1.day.ago)
