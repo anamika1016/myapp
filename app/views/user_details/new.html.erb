@@ -284,11 +284,13 @@
                       <td>
                         <% if detail %>
                           <%= link_to "Edit", edit_user_detail_path(detail), class: "btn btn-sm btn-outline-gray me-1" %>
-                          <%= button_to "Delete", user_detail_path(detail),
-                              method: :delete,
+                          <%= link_to "Delete",
+                              user_detail_path(detail, financial_year: @selected_financial_year),
                               class: "btn btn-sm btn-outline-danger",
-                              form: { style: 'display: inline;' },
-                              onclick: "return confirm('Are you sure you want to delete this record?');" %>
+                              data: {
+                                turbo_method: :delete,
+                                turbo_confirm: "Are you sure you want to delete this record?"
+                              } %>
                         <% else %>
                           -
                         <% end %>

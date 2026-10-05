@@ -100,6 +100,9 @@ class Ability
       end
     end
 
+    # Administrators manage the target records shown in the data entry screen.
+    can [ :read, :edit, :update, :destroy ], UserDetail if user.admin?
+
     # UserDetail permissions
     if user.employee? || user.l1_employer? || user.l2_employer?
       # Users can read, edit, update, and destroy their own user details

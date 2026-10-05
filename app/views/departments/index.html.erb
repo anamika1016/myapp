@@ -278,7 +278,7 @@
                         </td>
                         <td class="px-8 py-5 text-sm font-medium text-gray-700">
                           <div class="flex items-center space-x-3">
-                            <button type="button" class="edit-btn inline-flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-sm hover:shadow-md" data-employee-id="<%= data[:employee_id] %>">
+                            <button type="button" class="edit-btn inline-flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-sm hover:shadow-md" data-employee-id="<%= data[:employee_detail_id] %>">
                               <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                               </svg>
@@ -355,8 +355,11 @@
 </div>
 
 <script>
-// Check if DepartmentManager class already exists to prevent duplicate declaration
-if (typeof DepartmentManager === 'undefined') {
+// Each Turbo visit gets listeners bound to the current page.
+(() => {
+  window.departmentPageListeners?.abort();
+  const pageListeners = new AbortController();
+  window.departmentPageListeners = pageListeners;
   // Initialize variables first
   window.departmentManagerInstance = null;
   var isInitializing = false;
@@ -557,30 +560,34 @@ class DepartmentManager {
         this.removeActivity(e.target.closest('.activity-fields'));
       }
 
-      if (e.target.classList.contains('edit-btn')) {
+      if (e.target.closest('.edit-btn')) {
+        const button = e.target.closest('.edit-btn');
         e.preventDefault();
         e.stopPropagation();
-        this.editDepartment(e.target.dataset.employeeId);
+        this.editDepartment(button.dataset.employeeId);
       }
 
-      if (e.target.classList.contains('delete-btn')) {
+      if (e.target.closest('.delete-btn')) {
+        const button = e.target.closest('.delete-btn');
         e.preventDefault();
         e.stopPropagation();
-        this.deleteDepartment(e.target.dataset.departmentId);
+        this.deleteDepartment(button.dataset.departmentId);
       }
 
-      if (e.target.classList.contains('delete-user-btn')) {
+      if (e.target.closest('.delete-user-btn')) {
+        const button = e.target.closest('.delete-user-btn');
         e.preventDefault();
         e.stopPropagation();
-        this.deleteUserActivities(e.target.dataset.departmentId, e.target.dataset.employeeId);
+        this.deleteUserActivities(button.dataset.departmentId, button.dataset.employeeId);
       }
 
-      if (e.target.classList.contains('delete-dept-btn')) {
+      if (e.target.closest('.delete-dept-btn')) {
+        const button = e.target.closest('.delete-dept-btn');
         e.preventDefault();
         e.stopPropagation();
-        this.deleteDepartment(e.target.dataset.departmentId);
+        this.deleteDepartment(button.dataset.departmentId);
       }
-    });
+    }, { signal: pageListeners.signal });
   }
 
   removeEventListeners() {
@@ -944,7 +951,7 @@ class DepartmentManager {
         formData.append('_method', 'PATCH');
         
         // If editing, use the update_employee_activity_data endpoint
-        const editUrl = `/departments/${this.editingId}/update_employee_activity_data`;
+        const editUrl = `/departments/${encodeURIComponent(this.editingId)}/update_employee_activity_data?employee_detail_id=${encodeURIComponent(this.editingId)}`;
         const response = await fetch(editUrl, {
           method: 'PATCH', // Use PATCH method directly
           body: formData,
@@ -957,12 +964,6 @@ class DepartmentManager {
         
         console.log('Edit response status:', response.status);
         console.log('Edit response headers:', response.headers);
-        
-        // If the custom endpoint fails, try the regular update method
-        if (!response.ok) {
-          console.log('Custom endpoint failed, trying regular update method...');
-          return this.handleRegularUpdate(formData);
-        }
         
         return this.handleResponse(response);
       }
@@ -1023,8 +1024,8 @@ class DepartmentManager {
       
       // Add cache-busting parameter to ensure fresh data
       const timestamp = Date.now();
-      const selectedFinancialYear = document.getElementById('department_financial_year')?.value || new URL(window.location).searchParams.get('financial_year') || '';
-      const response = await fetch(`/departments/${employeeId}/edit_data?t=${timestamp}&financial_year=${encodeURIComponent(selectedFinancialYear)}`, {
+      const selectedFinancialYear = this.selectedFinancialYear();
+      const response = await fetch(`/departments/${encodeURIComponent(employeeId)}/edit_data?employee_detail_id=${encodeURIComponent(employeeId)}&t=${timestamp}&financial_year=${encodeURIComponent(selectedFinancialYear)}`, {
         headers: {
           'X-CSRF-Token': csrfToken,
           'Accept': 'application/json', // Request JSON response
@@ -1381,7 +1382,7 @@ class DepartmentManager {
       // Reload the page to show updated data
       setTimeout(() => {
         console.log('Reloading page to show updated data...');
-        const selectedFinancialYear = document.getElementById('department_financial_year')?.value || new URL(window.location).searchParams.get('financial_year') || '';
+        const selectedFinancialYear = this.selectedFinancialYear();
         const nextUrl = new URL(window.location);
         if (selectedFinancialYear) nextUrl.searchParams.set('financial_year', selectedFinancialYear);
         window.location.href = nextUrl.toString();
@@ -1595,27 +1596,21 @@ class DepartmentManager {
     }
   }
 
-  // Use only one event listener to prevent duplicates
-  document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM Content Loaded event fired');
-    initializeDepartmentManager();
-  });
-
-  // Global function to clear employee filter
-  function clearEmployeeFilter() {
+  window.clearEmployeeFilter = function() {
     const currentUrl = new URL(window.location);
     currentUrl.searchParams.delete('employee_id');
     currentUrl.searchParams.delete('employee_code');
     window.location.href = currentUrl.toString();
-  }
+  };
 
-  // For Turbo compatibility, but only if not already initialized
-  document.addEventListener('turbo:load', () => {
-    if (!window.departmentManagerInstance) {
-      initializeDepartmentManager();
-    }
-  });
-} // End of if (typeof DepartmentManager === 'undefined')
+  document.addEventListener('DOMContentLoaded', initializeDepartmentManager, { signal: pageListeners.signal });
+  document.addEventListener('turbo:load', initializeDepartmentManager, { signal: pageListeners.signal });
+  document.addEventListener('turbo:before-cache', () => {
+    pageListeners.abort();
+    window.departmentManagerInstance?.destroy();
+  }, { signal: pageListeners.signal });
+  if (document.readyState !== 'loading') initializeDepartmentManager();
+})();
 
 // Remove turbo:render listener as it's not needed and causes duplicates
 </script>

@@ -110,7 +110,7 @@ class DepartmentsController < ApplicationController
     # We need to find the employee and their activities based on the department ID
 
     # First try to find the department
-    department = Department.find_by(id: params[:id])
+    department = Department.find_by(id: params[:id]) unless params[:employee_detail_id].present? || params[:employee_reference].present?
 
     if department
       # If department exists, get its activities and employee info
@@ -164,7 +164,11 @@ class DepartmentsController < ApplicationController
     else
       # If department doesn't exist, try to find employee activities by employee ID
       # This handles the case where the ID might actually be an employee ID
-      employee = find_employee_by_reference(params[:id])
+      employee = if params[:employee_detail_id].present?
+        EmployeeDetail.find_by(id: params[:employee_detail_id])
+      else
+        find_employee_by_reference(params[:employee_reference].presence || params[:id])
+      end
 
       if employee
         # Get activities for this employee using UserDetail
@@ -190,7 +194,7 @@ class DepartmentsController < ApplicationController
         department_type = user_details.first&.department&.department_type || employee.department
 
         render json: {
-          id: employee_reference_value(employee), # Use employee ID/code as the identifier
+          id: params[:employee_detail_id].present? ? employee.id : employee_reference_value(employee),
           department_type: department_type,
           theme_name: "", # No theme name for employee activities
           employee_reference: employee_reference_value(employee),
@@ -465,6 +469,19 @@ class DepartmentsController < ApplicationController
   # New action to handle updating employee activity data from the edit form
   def update_employee_activity_data
     set_financial_year_context
+
+    # Explicit employee references avoid collisions with numeric department IDs.
+    if params[:employee_detail_id].present? || params[:employee_reference].present?
+      employee = if params[:employee_detail_id].present?
+        EmployeeDetail.find_by(id: params[:employee_detail_id])
+      else
+        find_employee_by_reference(params[:employee_reference])
+      end
+      return render json: { error: "Employee not found" }, status: :not_found unless employee
+
+      handle_employee_activity_update(employee)
+      return
+    end
 
     # The ID could be either a department ID or employee ID
     id = params[:id]
@@ -1340,6 +1357,7 @@ class DepartmentsController < ApplicationController
       activities_hash[key] ||= {
         id: department.id, # Use department.id for Edit functionality
         employee_id: employee_reference_value(employee),
+        employee_detail_id: employee.id,
         employee_name: employee.employee_name,
         employee_code: employee_display_code(employee),
         department: employee.department, # Employee's department
@@ -1395,6 +1413,7 @@ class DepartmentsController < ApplicationController
         activities_hash[key] ||= {
           id: department.id, # Use department.id for Edit functionality
           employee_id: employee_reference_value(employee),
+          employee_detail_id: employee.id,
           employee_name: employee.employee_name,
           employee_code: employee_display_code(employee),
           department: employee.department, # Employee's department

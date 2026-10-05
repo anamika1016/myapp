@@ -38,6 +38,9 @@ Rails.application.routes.draw do
   end
 
   resources :user_details do
+    member do
+      delete :delete_month_data
+    end
     collection do
       get :get_activities
       post :bulk_create

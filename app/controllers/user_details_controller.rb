@@ -26,7 +26,7 @@ class UserDetailsController < ApplicationController
   end
 
   before_action :set_user_detail, only: [ :show, :edit, :update, :destroy ]
-  load_and_authorize_resource except: [ :index, :new, :create, :get_user_detail, :get_activities, :bulk_create, :submit_achievements, :export, :import, :quarterly_edit_all, :update_quarterly_achievements, :update_monthly_targets, :test_sms, :view_sms_logs, :submitted_achievements ]
+  load_and_authorize_resource except: [ :index, :new, :create, :get_user_detail, :get_activities, :bulk_create, :submit_achievements, :export, :import, :quarterly_edit_all, :update_quarterly_achievements, :update_monthly_targets, :test_sms, :view_sms_logs, :submitted_achievements, :delete_month_data ]
 
   def index
     set_financial_year_context
@@ -424,28 +424,29 @@ class UserDetailsController < ApplicationController
       # Store the current context before deletion
       department_id = @user_detail.department_id
       employee_detail_id = @user_detail.employee_detail_id
+      financial_year = @user_detail.financial_year
 
       if @user_detail.destroy
         # Clear any existing flash messages
         flash.clear
 
         # Role-based redirect
-        if current_user.hod?
+        if current_user.hod? || current_user.admin?
           # HOD redirects to new user detail form
-          redirect_to new_user_detail_path(department_id: department_id, employee_detail_id: employee_detail_id),
-                      notice: "User detail was successfully deleted."
+          redirect_to new_user_detail_path(department_id: department_id, employee_detail_id: employee_detail_id, financial_year: financial_year),
+                      status: :see_other, notice: "User detail was successfully deleted."
         else
           # Employee/L1/L2 redirects to HOD TARGET FORM (index page)
           redirect_to user_details_path,
-                      notice: "User detail was successfully deleted."
+                      status: :see_other, notice: "User detail was successfully deleted."
         end
       else
         # Clear any existing flash messages
         flash.clear
 
         # Role-based error redirect
-        if current_user.hod?
-          redirect_to new_user_detail_path,
+        if current_user.hod? || current_user.admin?
+          redirect_to new_user_detail_path(department_id: department_id, employee_detail_id: employee_detail_id, financial_year: financial_year),
                       alert: "Failed to delete user detail."
         else
           redirect_to user_details_path,
@@ -457,8 +458,8 @@ class UserDetailsController < ApplicationController
       flash.clear
 
       # Role-based error redirect
-      if current_user.hod?
-        redirect_to new_user_detail_path,
+      if current_user.hod? || current_user.admin?
+        redirect_to new_user_detail_path(department_id: department_id, employee_detail_id: employee_detail_id, financial_year: financial_year),
                     alert: "User detail not found."
       else
         redirect_to user_details_path,
@@ -471,8 +472,8 @@ class UserDetailsController < ApplicationController
       flash.clear
 
       # Role-based error redirect
-      if current_user.hod?
-        redirect_to new_user_detail_path,
+      if current_user.hod? || current_user.admin?
+        redirect_to new_user_detail_path(department_id: department_id, employee_detail_id: employee_detail_id, financial_year: financial_year),
                     alert: "An error occurred while deleting the user detail."
       else
         redirect_to user_details_path,
@@ -604,6 +605,62 @@ class UserDetailsController < ApplicationController
     end
     @achievement_entry_locked = current_user.role != "hod" && achievement_entry_locked_for_month?(@user_details, @selected_month)
     @achievement_entry_lock_message = "This month is locked because L1 has approved it." if @achievement_entry_locked
+  end
+
+  def delete_month_data
+    month = params[:month].to_s.downcase
+    financial_year = normalize_financial_year(params[:financial_year])
+    user_detail = UserDetail.includes(:employee_detail).find(params[:id])
+
+    unless MONTH_ATTRIBUTES.map(&:to_s).include?(month) &&
+           financial_year.present? &&
+           user_detail.financial_year == financial_year
+      redirect_to submitted_achievements_user_details_path(
+        financial_year: financial_year,
+        month: month
+      ), alert: "Invalid month or financial year. Nothing was deleted."
+      return
+    end
+
+    unless allowed_to_delete_month_data?(user_detail)
+      redirect_to submitted_achievements_user_details_path(
+        financial_year: financial_year,
+        month: month
+      ), alert: "You are not allowed to delete this activity."
+      return
+    end
+
+    UserDetail.transaction do
+      deleted_achievements = user_detail.achievements
+                                        .where("LOWER(month) = ?", month)
+                                        .destroy_all
+      deleted_submissions = user_detail.target_submissions
+                                       .where("LOWER(month) = ?", month)
+                                       .destroy_all
+      user_detail.update!(month => nil)
+
+      Rails.logger.info(
+        "Deleted month data user_detail_id=#{user_detail.id} month=#{month} " \
+        "achievements=#{deleted_achievements.size} target_submissions=#{deleted_submissions.size}"
+      )
+    end
+
+    redirect_to submitted_achievements_user_details_path(
+      financial_year: financial_year,
+      month: month
+    ), status: :see_other,
+       notice: "#{month.titleize} data for the selected activity was deleted."
+  rescue ActiveRecord::RecordNotFound
+    redirect_to submitted_achievements_user_details_path(
+      financial_year: financial_year,
+      month: month
+    ), alert: "Activity was not found. Nothing was deleted."
+  rescue ActiveRecord::RecordInvalid, ActiveRecord::StatementInvalid => e
+    Rails.logger.error("Month data deletion failed: #{e.class}: #{e.message}")
+    redirect_to submitted_achievements_user_details_path(
+      financial_year: financial_year,
+      month: month
+    ), alert: "The activity could not be deleted. Please try again."
   end
 
   def submit_achievements
@@ -2221,6 +2278,20 @@ class UserDetailsController < ApplicationController
       EmployeeDetail.find_by("LOWER(TRIM(employee_email)) = ?", current_user.email.to_s.strip.downcase) ||
       EmployeeDetail.find_by("LOWER(TRIM(employee_code)) = ?", current_user.employee_code.to_s.strip.downcase) ||
       (EmployeeDetail.find_by(id: params[:employee_detail_id]) if current_user.hod? || current_user.admin?)
+  end
+
+  def allowed_to_delete_month_data?(user_detail)
+    return true if current_user.hod? || current_user.admin?
+
+    employee = user_detail.employee_detail
+    email = current_user.email.to_s.strip
+    employee_code = current_user.employee_code.to_s.strip
+
+    employee.present? && (
+      employee.user_id == current_user.id ||
+      (email.present? && employee.employee_email.to_s.strip.casecmp?(email)) ||
+      (employee_code.present? && employee.employee_code.to_s.strip.casecmp?(employee_code))
+    )
   end
 
   def achievement_entry_locked_for_month?(user_details, month)
