@@ -1489,6 +1489,29 @@ end
                               observer_chain_approved_for_selection?(@employee_detail, @selected_financial_year, @selected_quarter, @selected_month)
     @can_observer_approve_or_return = @observer_context && @observer_review&.status != "approved"
     load_observer_summary_reviews
+    load_achievement_attachments_for_review
+  end
+
+  # Attachments the employee uploaded for the month(s) under review, so L1/Observer
+  # reviewers can see whatever was submitted alongside the achievement values.
+  def load_achievement_attachments_for_review
+    attachment_months = if @selected_month.present?
+                          [ @selected_month ]
+                        elsif @selected_quarter.present?
+                          get_quarter_months(@selected_quarter)
+                        else
+                          []
+                        end
+
+    @achievement_attachments = if @employee_detail && @selected_financial_year.present? && attachment_months.any?
+      AchievementAttachment.where(
+        employee_detail_id: @employee_detail.id,
+        financial_year: @selected_financial_year,
+        month: attachment_months
+      ).index_by(&:month)
+    else
+      {}
+    end
   end
 
   def load_observer_summary_reviews
@@ -2722,15 +2745,31 @@ end
 
           statuses = month_achievements.map { |achievement| achievement.status || "pending" }
           current_status = calculate_month_status(statuses, month_achievements, approval_level)
-          progress_values = details_with_month_data.filter_map do |detail|
-            target_number = numeric_review_value(detail.public_send(review_month))
-            next unless target_number.positive?
 
-            achievement = (achievements_by_detail_and_month.dig(detail.id, review_month) || []).find { |record| record.achievement.present? }
+          # A reviewer's saved percentage (entered/edited while approving or returning) is the
+          # final value once it exists — it must win over the raw achievement-based calculation,
+          # otherwise an L1/L2 override would never show up in this list.
+          saved_percentage_field = approval_level == "l2" ? :l2_percentage : :l1_percentage
+          saved_review_percentage = month_achievements
+                                     .filter_map(&:achievement_remark)
+                                     .select { |remark| remark.public_send(saved_percentage_field).present? }
+                                     .max_by(&:updated_at)
+                                     &.public_send(saved_percentage_field)
+                                     &.to_f
 
-            truncated_percentage(numeric_review_value(achievement&.achievement), target_number)
+          progress_value = if saved_review_percentage
+            saved_review_percentage
+          else
+            progress_values = details_with_month_data.filter_map do |detail|
+              target_number = numeric_review_value(detail.public_send(review_month))
+              next unless target_number.positive?
+
+              achievement = (achievements_by_detail_and_month.dig(detail.id, review_month) || []).find { |record| record.achievement.present? }
+
+              truncated_percentage(numeric_review_value(achievement&.achievement), target_number)
+            end
+            average_review_percentage(progress_values)
           end
-          progress_value = average_review_percentage(progress_values)
           key = [ emp.id, review_month, group_financial_year ].join("_")
 
           monthly_employee_data[key] = {

@@ -12,6 +12,7 @@ class EmployeeDetail < ApplicationRecord
   has_many :sms_logs, dependent: :destroy
   has_many :quarterly_pli_reviews, dependent: :destroy
   has_many :observer_pli_reviews, dependent: :destroy
+  has_many :achievement_attachments, dependent: :destroy
   belongs_to :user, optional: true
   has_many :l1_pulse_assessments, dependent: :destroy
   has_many :user_training_assignments, dependent: :destroy

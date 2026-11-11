@@ -558,6 +558,13 @@ class UserDetailsController < ApplicationController
     set_manual_kri_month_context
     @achievement_entry_locked = current_user.role != "hod" && @selected_month.present? && achievement_entry_locked_for_month?(@user_details, @selected_month)
     @achievement_entry_lock_message = "This month is locked because L1 has approved it." if @achievement_entry_locked
+    @achievement_attachment = if @employee_detail && @selected_month.present?
+      AchievementAttachment.find_by(
+        employee_detail_id: @employee_detail.id,
+        financial_year: @selected_financial_year,
+        month: @selected_month
+      )
+    end
   end
 
   def submitted_achievements
@@ -671,6 +678,7 @@ class UserDetailsController < ApplicationController
       success_count = 0
       target_count = 0
       target_update_count = 0
+      attachment_saved = false
       sms_results = []
       processed_employees = Set.new
       errors = []
@@ -679,6 +687,30 @@ class UserDetailsController < ApplicationController
       ActiveRecord::Base.transaction do
         financial_year_for_lock = normalize_financial_year(params[:financial_year]) || @selected_financial_year || current_financial_year
         selected_submission_month = params[:month].to_s.downcase
+        # Validate evidence before saving targets, achievements, or sending notifications.
+        attachment_files = Array(params[:attachment_files]).reject(&:blank?)
+        attachment_employee_detail = current_user_target_employee_detail
+        saved_attachment = AchievementAttachment.find_by(
+          employee_detail_id: attachment_employee_detail&.id,
+          financial_year: financial_year_for_lock,
+          month: selected_submission_month
+        )
+        attachment_error = if selected_submission_month.blank?
+          "Please select a month before submitting achievements."
+        elsif attachment_files.empty? && !saved_attachment&.files&.attached?
+          "Please upload an Excel attachment before submitting achievements."
+        elsif attachment_files.size > AchievementAttachment::MAX_FILES
+          "You can upload a maximum of #{AchievementAttachment::MAX_FILES} attachment(s) per submission."
+        elsif attachment_files.any? { |file| !AchievementAttachment::ALLOWED_EXTENSIONS.include?(File.extname(file.original_filename.to_s).delete(".").downcase) }
+          "Please upload a valid Excel attachment (.xlsx or .xls)."
+        elsif attachment_employee_detail.blank?
+          "Employee detail not found for attachment upload."
+        end
+        if attachment_error
+          render json: { success: false, message: attachment_error }, status: :unprocessable_entity
+          return
+        end
+
         submitted_user_detail_ids = (achievement_data.keys + target_update_data.keys).map(&:to_s).uniq
         submitted_months = selected_submission_month.present? ? [ selected_submission_month ] : MONTH_ATTRIBUTES.map(&:to_s)
         submitted_details_scope = UserDetail.includes(:activity, :employee_detail)
@@ -948,10 +980,49 @@ class UserDetailsController < ApplicationController
             end
           end
         end
+
+        attachment_files = Array(params[:attachment_files]).reject(&:blank?)
+        if attachment_files.any?
+          if selected_submission_month.blank?
+            errors << "Please select a month before uploading attachments."
+          elsif attachment_files.size > AchievementAttachment::MAX_FILES
+            errors << "You can upload a maximum of #{AchievementAttachment::MAX_FILES} attachment(s) per submission."
+          else
+            disallowed_files = attachment_files.reject do |file|
+              AchievementAttachment::ALLOWED_EXTENSIONS.include?(File.extname(file.original_filename.to_s).delete(".").downcase)
+            end
+
+            if disallowed_files.any?
+              errors << "Unsupported file type for: #{disallowed_files.map(&:original_filename).join(', ')}. Allowed types: #{AchievementAttachment::ALLOWED_EXTENSIONS.join(', ')}."
+            else
+              attachment_employee_detail = current_user_target_employee_detail
+
+              if attachment_employee_detail.blank?
+                errors << "Employee detail not found for attachment upload."
+              elsif achievement_locked.call(attachment_employee_detail.id, financial_year_for_lock, selected_submission_month)
+                errors << "#{short_month_label(selected_submission_month)}: This month is locked after L1 approval"
+              else
+                attachment_record = AchievementAttachment.find_or_initialize_by(
+                  employee_detail_id: attachment_employee_detail.id,
+                  financial_year: financial_year_for_lock,
+                  month: selected_submission_month
+                )
+                attachment_record.files.purge if attachment_record.persisted?
+                attachment_record.files.attach(attachment_files)
+
+                if attachment_record.save
+                  attachment_saved = true
+                else
+                  errors << "Attachment error: #{attachment_record.errors.full_messages.join(', ')}"
+                end
+              end
+            end
+          end
+        end
       end
 
       # Prepare response message
-      if errors.any? && success_count.zero? && target_count.zero? && target_update_count.zero?
+      if errors.any? && success_count.zero? && target_count.zero? && target_update_count.zero? && !attachment_saved
         render json: {
           success: false,
           message: errors.first(5).join(", ")
@@ -962,6 +1033,7 @@ class UserDetailsController < ApplicationController
       response_message = "Achievements submitted successfully. #{success_count} records updated."
       response_message += " #{target_count} new key result indicator target row(s) saved." if target_count.positive?
       response_message += " #{target_update_count} target value(s) updated." if target_update_count.positive?
+      response_message += " Attachment(s) uploaded." if attachment_saved
       response_message += " Warnings: #{errors.first(3).join(', ')}" if errors.any?
       if sms_results.any?
         successful_sms = sms_results.select { |r| r[:success] }

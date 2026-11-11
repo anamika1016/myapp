@@ -1,0 +1,26 @@
+<%
+  achievement_attachment_icon = lambda do |filename|
+    case File.extname(filename.to_s).delete(".").downcase
+    when "xlsx", "xls", "csv" then "fa-file-excel text-green-600"
+    when "rar" then "fa-file-archive text-amber-600"
+    when "jpg", "jpeg", "png" then "fa-file-image text-blue-600"
+    else "fa-file text-gray-500"
+    end
+  end
+%>
+<% if attachment&.files&.attached? %>
+  <ul class="achievement-attachment-list">
+    <% attachment.files.each do |file| %>
+      <li class="achievement-attachment-item">
+        <%= link_to rails_blob_path(file, disposition: "attachment"), target: "_blank", rel: "noopener", class: "achievement-attachment-link" do %>
+          <i class="fas <%= achievement_attachment_icon.call(file.filename) %> achievement-attachment-icon"></i>
+          <span class="achievement-attachment-name"><%= file.filename.to_s %></span>
+          <span class="achievement-attachment-size"><%= number_to_human_size(file.byte_size) %></span>
+          <i class="fas fa-download achievement-attachment-download"></i>
+        <% end %>
+      </li>
+    <% end %>
+  </ul>
+<% else %>
+  <p class="achievement-attachment-empty">No attachments uploaded.</p>
+<% end %>

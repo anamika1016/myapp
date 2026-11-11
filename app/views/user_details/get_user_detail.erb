@@ -58,7 +58,7 @@
 
   <% if @user_details.any? && @selected_month.present? %>
     <!-- ======================== FORM TO SUBMIT ACHIEVEMENTS ======================== -->
-    <%= form_with url: submit_achievements_user_details_path, method: :post, local: true, id: "achievementForm" do %>
+    <%= form_with url: submit_achievements_user_details_path, method: :post, local: true, id: "achievementForm", html: { multipart: true } do %>
       <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
       <%= hidden_field_tag :financial_year, @selected_financial_year %>
       <%= hidden_field_tag :month, @selected_month, id: "selectedSubmissionMonth" %>
@@ -344,6 +344,23 @@
             </table>
           </div>
         </div>
+      </div>
+
+      <div class="mt-6 bg-white border border-gray-200 rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-2">Attachments <span class="text-red-600">*</span></h3>
+        <p class="text-sm text-gray-500 mb-3">
+          An attachment is required to submit achievements. Upload <%= AchievementAttachment::MAX_FILES %> Excel file
+          (<%= AchievementAttachment::ALLOWED_EXTENSIONS.join(", ") %>).
+          Uploading a new file will replace the attachment already saved for this month.
+        </p>
+        <div id="currentAttachments"><%= render "shared/achievement_attachment_list", attachment: @achievement_attachment %></div>
+        <input type="file" name="attachment_files[]" id="attachmentFiles"
+               accept=".xlsx,.xls"
+               data-saved-attachment="<%= @achievement_attachment&.files&.attached? ? 'true' : 'false' %>"
+               <%= 'required' unless @achievement_attachment&.files&.attached? %>
+               class="mt-3 block w-full text-sm text-gray-700 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none"
+               <%= 'disabled' if @achievement_entry_locked %>>
+        <p id="attachmentError" class="hidden mt-2 text-sm text-red-600"></p>
       </div>
 
       <div class="mt-6 flex justify-center">
@@ -1162,6 +1179,64 @@ input[type="submit"] {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+.achievement-attachment-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.achievement-attachment-link {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.6rem;
+  background: #f9fafb;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.achievement-attachment-link:hover {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+
+.achievement-attachment-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.achievement-attachment-name {
+  flex: 1;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1f2937;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.achievement-attachment-size {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.achievement-attachment-download {
+  color: #6366f1;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.achievement-attachment-empty {
+  font-size: 0.875rem;
+  color: #9ca3af;
+}
 </style>
 
 <script>
@@ -1735,7 +1810,22 @@ function handleAchievementFormSubmission() {
         hasAnyData = true;
       }
     });
-    
+
+    const attachmentInput = document.getElementById('attachmentFiles');
+    if (attachmentInput && attachmentInput.files && attachmentInput.files.length > 0) {
+      hasAnyData = true;
+    }
+
+    if (attachmentInput && !attachmentInput.files.length && attachmentInput.dataset.savedAttachment !== 'true') {
+      const attachmentError = document.getElementById('attachmentError');
+      attachmentError.textContent = 'Please upload an Excel attachment before submitting achievements.';
+      attachmentError.classList.remove('hidden');
+      showMessage('warning', 'Attachment required', attachmentError.textContent);
+      attachmentInput.focus();
+      resetSubmitButton();
+      return;
+    }
+
     if (!hasAnyData) {
       showMessage('warning', 'No Data Entered', 'Please enter at least one achievement, employee remark, or new key result indicator target before submitting.');
       resetSubmitButton();
@@ -1859,9 +1949,44 @@ function initializeAchievementForm() {
   initializeNewKriRows();
   initializeTotalAchievementCalculations();
   initializeAchievementRemarksRequirements();
-  
+  initializeAttachmentValidation();
+
   // Check for flash messages from controller
   checkForFlashMessages();
+}
+
+function initializeAttachmentValidation() {
+  const input = document.getElementById('attachmentFiles');
+  const errorEl = document.getElementById('attachmentError');
+  if (!input || !errorEl || input.dataset.validationBound === 'true') return;
+
+  input.dataset.validationBound = 'true';
+  const maxFiles = <%= AchievementAttachment::MAX_FILES %>;
+  const allowedExtensions = <%== AchievementAttachment::ALLOWED_EXTENSIONS.to_json %>;
+
+  input.addEventListener('change', () => {
+    errorEl.classList.add('hidden');
+    errorEl.textContent = '';
+
+    const files = Array.from(input.files || []);
+    if (files.length > maxFiles) {
+      errorEl.textContent = `You can upload a maximum of ${maxFiles} ${maxFiles === 1 ? 'file' : 'files'}.`;
+      errorEl.classList.remove('hidden');
+      input.value = '';
+      return;
+    }
+
+    const invalidFile = files.find(file => {
+      const extension = file.name.split('.').pop().toLowerCase();
+      return !allowedExtensions.includes(extension);
+    });
+
+    if (invalidFile) {
+      errorEl.textContent = `Unsupported file type: ${invalidFile.name}. Allowed: ${allowedExtensions.join(', ')}.`;
+      errorEl.classList.remove('hidden');
+      input.value = '';
+    }
+  });
 }
 
 function checkForFlashMessages() {

@@ -504,8 +504,11 @@
       saved_l1_average = l1_percentages.any? ? (l1_percentages.sum / l1_percentages.size).round(1) : 0.0
       saved_l2_average = l2_percentages.any? ? (l2_percentages.sum / l2_percentages.size).round(1) : 0.0
 
-      final_l1_average = review_progress_percentage || latest_l1_remark_record&.l1_percentage.presence&.to_f || saved_l1_average
-      final_l2_average = review_progress_percentage || latest_l2_remark_record&.l2_percentage.presence&.to_f || saved_l2_average
+      # A reviewer's saved percentage (entered/edited while approving or returning) is the
+      # final value once it exists — it must win over the raw achievement-based calculation,
+      # otherwise an L1/L2 override would never actually show up anywhere.
+      final_l1_average = latest_l1_remark_record&.l1_percentage.presence&.to_f || review_progress_percentage || saved_l1_average
+      final_l2_average = latest_l2_remark_record&.l2_percentage.presence&.to_f || review_progress_percentage || saved_l2_average
       final_l1_average_display = format('%.2f', final_l1_average.to_f)
       final_l2_average_display = format('%.2f', final_l2_average.to_f)
 
@@ -677,6 +680,21 @@
   <% end %>
 <% end %>
 
+<% if @achievement_attachments.present? && @achievement_attachments.values.any? { |attachment| attachment.files.attached? } %>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm mt-8 p-6">
+    <h2 class="text-xl font-bold text-gray-800 mb-4">
+      <i class="fas fa-paperclip mr-2 text-gray-600"></i>Attachments
+    </h2>
+    <% @achievement_attachments.each do |month, attachment| %>
+      <% next unless attachment.files.attached? %>
+      <div class="achievement-attachment-group">
+        <span class="achievement-attachment-month-label"><%= short_month_label(month) %></span>
+        <%= render "shared/achievement_attachment_list", attachment: attachment %>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
   <!-- FIXED: Quarterly Approval/Return Process -->
 <% if @can_approve_or_return && @user_details.any? && params[:quarter].present? %>
   <%
@@ -749,7 +767,7 @@
       </div>
       <div class="mb-4">
         <label for="percentage" class="block font-semibold mb-1">Percentage</label>
-        <input type="number" id="percentage" name="percentage" step="0.01" min="0" max="100" class="w-full border border-gray-300 rounded-md p-2 bg-gray-100 cursor-not-allowed" readonly required>
+        <input type="number" id="percentage" name="percentage" step="0.01" min="0" max="100" class="w-full border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-gray-500" required>
       </div>
 
       <% if params[:user_detail_id].present? %>
@@ -2089,6 +2107,82 @@ button:disabled {
 /* Hide scrollbar when modal is open */
 body.modal-open {
   overflow: hidden;
+}
+
+.achievement-attachment-group + .achievement-attachment-group {
+  margin-top: 1rem;
+}
+
+.achievement-attachment-month-label {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #4338ca;
+  background: #eef2ff;
+  border-radius: 999px;
+  padding: 0.15rem 0.65rem;
+  margin-bottom: 0.5rem;
+}
+
+.achievement-attachment-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.achievement-attachment-link {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.6rem;
+  background: #f9fafb;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.achievement-attachment-link:hover {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+
+.achievement-attachment-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.achievement-attachment-name {
+  flex: 1;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1f2937;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.achievement-attachment-size {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.achievement-attachment-download {
+  color: #6366f1;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.achievement-attachment-empty {
+  font-size: 0.875rem;
+  color: #9ca3af;
 }
 </style>
 
