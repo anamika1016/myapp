@@ -77,6 +77,38 @@ class EmployeeDetailsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "50.00", rows.values.first[:progress]
   end
 
+  test "quarterly pli keeps calculated percentage and latest l1 percentage separate" do
+    employee_detail, _, _, remark = create_quarterly_pli_source
+    remark.update!(l1_percentage: 0, l1_remarks: "Revised L1 remarks")
+
+    row = EmployeeDetailsController.new.send(
+      :build_quarterly_pli_rows,
+      [ employee_detail.reload ],
+      financial_year: "2026-2027",
+      quarter: "Q1"
+    ).first
+
+    assert_equal "97.00", row[:calculated_percentage]
+    assert_equal "0.00", row[:l1_percentage]
+    assert_equal "0.00", row.dig(:detail_payload, :months, 0, :l1_percentage)
+    assert_equal [ "Revised L1 remarks" ], row.dig(:detail_payload, :months, 0, :l1_remarks)
+  end
+
+  test "quarterly pli falls back to calculated percentage when l1 percentage is absent" do
+    employee_detail = create_partial_month_submission_source(status: "l1_approved", observer_code: nil)
+
+    row = EmployeeDetailsController.new.send(
+      :build_quarterly_pli_rows,
+      [ employee_detail ],
+      financial_year: "2026-2027",
+      quarter: "Q1"
+    ).first
+
+    assert_equal "50.00", row[:calculated_percentage]
+    assert_equal "50.00", row[:l1_percentage]
+    assert_equal "50.00", row.dig(:detail_payload, :months, 0, :l1_percentage)
+  end
+
   test "observer calculated percentage matches monthly submission footer" do
     employee_detail = create_partial_month_submission_source
     controller = EmployeeDetailsController.new

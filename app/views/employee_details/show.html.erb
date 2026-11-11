@@ -327,6 +327,21 @@
   end
 %>
 
+<% if @achievement_attachments.present? && @achievement_attachments.values.any? { |attachment| attachment.files.attached? } %>
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm mt-8 p-6">
+    <h2 class="text-xl font-bold text-gray-800 mb-4">
+      <i class="fas fa-paperclip mr-2 text-gray-600"></i>Attachments
+    </h2>
+    <% @achievement_attachments.each do |month, attachment| %>
+      <% next unless attachment.files.attached? %>
+      <div class="achievement-attachment-group">
+        <span class="achievement-attachment-month-label"><%= short_month_label(month) %></span>
+        <%= render "shared/achievement_attachment_list", attachment: attachment %>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
 <!-- FIXED: Single Overall Status Display for Quarter -->
 <% if params[:quarter].present? %>
   <%
@@ -680,21 +695,6 @@
   <% end %>
 <% end %>
 
-<% if @achievement_attachments.present? && @achievement_attachments.values.any? { |attachment| attachment.files.attached? } %>
-  <div class="bg-white border border-gray-200 rounded-xl shadow-sm mt-8 p-6">
-    <h2 class="text-xl font-bold text-gray-800 mb-4">
-      <i class="fas fa-paperclip mr-2 text-gray-600"></i>Attachments
-    </h2>
-    <% @achievement_attachments.each do |month, attachment| %>
-      <% next unless attachment.files.attached? %>
-      <div class="achievement-attachment-group">
-        <span class="achievement-attachment-month-label"><%= short_month_label(month) %></span>
-        <%= render "shared/achievement_attachment_list", attachment: attachment %>
-      </div>
-    <% end %>
-  </div>
-<% end %>
-
   <!-- FIXED: Quarterly Approval/Return Process -->
 <% if @can_approve_or_return && @user_details.any? && params[:quarter].present? %>
   <%
@@ -747,7 +747,8 @@
   <%= render "observer_review_panel" %>
 <% end %>
 
-<!-- FIXED Modal with Correct Positioning - Modal will show OVER Quarter Overall Status -->
+<% if @can_approve_or_return %>
+<!-- L1 percentage editing is available only in the authorized L1 review flow. -->
 <div id="decisionModal" class="hidden fixed inset-0 flex items-start justify-center z-50 pt-20">
   <div class="bg-white rounded-xl p-6 shadow-xl w-full max-w-md relative mx-4" style="margin-top: 0;">
     <!-- Loading overlay -->
@@ -788,6 +789,8 @@
     </form>
   </div>
 </div>
+
+<% end %>
 
 <!-- FIXED JavaScript with Correct Modal Positioning Logic -->
 <script>

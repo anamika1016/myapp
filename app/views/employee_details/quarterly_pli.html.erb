@@ -50,6 +50,7 @@
               <th class="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider border-r border-gray-600">Financial Year</th>
               <th class="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider border-r border-gray-600">Quarter</th>
               <th class="px-6 py-4 text-center text-xs font-semibold text-white uppercase tracking-wider border-r border-gray-600">Calculated %</th>
+              <th class="px-6 py-4 text-center text-xs font-semibold text-white uppercase tracking-wider border-r border-gray-600">Changed by L1 %</th>
               <th class="px-6 py-4 text-center text-xs font-semibold text-white uppercase tracking-wider border-r border-gray-600">Final PLI %</th>
               <th class="px-6 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider border-r border-gray-600">Status</th>
               <th class="px-6 py-4 text-center text-xs font-semibold text-white uppercase tracking-wider">Action</th>
@@ -72,6 +73,9 @@
                   <div class="mt-1 text-xs text-gray-500">
                     <%= pluralize(row.dig(:detail_payload, :quarter_month_count).to_i, "month") %>
                   </div>
+                </td>
+                <td class="px-6 py-4 text-sm text-center border-r border-gray-200">
+                  <span class="inline-flex items-center px-3 py-1 rounded bg-blue-50 text-blue-700 font-semibold"><%= row[:l1_percentage] %>%</span>
                 </td>
                 <td class="px-6 py-4 text-sm text-center border-r border-gray-200">
                   <% if review.present? %>

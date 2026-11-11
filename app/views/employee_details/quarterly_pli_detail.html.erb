@@ -29,9 +29,15 @@
           <div class="quarterly-pli-month-card">
             <div class="quarterly-pli-month-card-header"><%= month[:label] %></div>
             <div class="quarterly-pli-month-card-body">
-              <div class="quarterly-pli-percent-hero">
-                <div class="quarterly-pli-percent-hero-label">Achievement %</div>
-                <div class="quarterly-pli-percent-hero-value"><%= month[:achievement_percentage] || month[:progress] %>%</div>
+              <div class="quarterly-pli-percent-hero quarterly-pli-percent-columns">
+                <div>
+                  <div class="quarterly-pli-percent-hero-label">Calculated %</div>
+                  <div class="quarterly-pli-percent-hero-value"><%= month[:achievement_percentage] || month[:progress] %>%</div>
+                </div>
+                <div>
+                  <div class="quarterly-pli-percent-hero-label">Changed by L1 %</div>
+                  <div class="quarterly-pli-percent-hero-value"><%= month[:l1_percentage] %>%</div>
+                </div>
               </div>
               <div class="quarterly-pli-remarks-block l1-remarks">
                 <div class="quarterly-pli-remarks-label l1">
@@ -199,6 +205,19 @@
     text-align: center; padding: 1.25rem;
     background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
     border-radius: 0.75rem; border: 1px solid #a7f3d0;
+  }
+  .quarterly-pli-percent-columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    padding: 1.25rem 0.75rem;
+  }
+  .quarterly-pli-percent-columns > div + div {
+    border-left: 1px solid #a7f3d0;
+    padding-left: 0.75rem;
+  }
+  .quarterly-pli-percent-columns .quarterly-pli-percent-hero-value {
+    font-size: clamp(1.25rem, 2.5vw, 2rem);
   }
   .quarterly-pli-percent-hero-label {
     font-size: 0.75rem; font-weight: 600;

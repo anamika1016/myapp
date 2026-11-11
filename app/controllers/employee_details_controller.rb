@@ -781,6 +781,7 @@ end
         "Financial Year",
         "Quarter",
         "Calculated %",
+        "Changed by L1 %",
         "Final PLI %",
         "Final L1 Remarks"
       ], style: header_style
@@ -796,12 +797,13 @@ end
           row[:financial_year].presence || "-",
           row[:quarter_label].presence || row[:quarter].presence || "-",
           quarterly_pli_export_percentage(row[:calculated_percentage]),
+          quarterly_pli_export_percentage(row[:l1_percentage]),
           review&.final_percentage.present? ? "#{format('%.2f', review.final_percentage.to_f)}%" : "-",
           quarterly_pli_export_l1_remarks(row)
         ], style: cell_style
       end
 
-      sheet.column_widths 18, 28, 24, 18, 24, 16, 16, 60
+      sheet.column_widths 18, 28, 24, 18, 24, 16, 18, 16, 60
     end
 
     filename_parts = [ "quarterly_pli", selected_year, selected_quarter.presence ].compact
@@ -2093,6 +2095,7 @@ end
           quarter: quarter_name,
           quarter_label: "#{quarter_name} (#{payload[:months].map { |month| month[:label] }.join('-')})",
           calculated_percentage: payload[:quarter_percentage],
+          l1_percentage: payload[:quarter_l1_percentage],
           review: review,
           detail_payload: payload
         }
@@ -2343,9 +2346,12 @@ end
       month_progress_values = items.filter_map { |item| item[:progress_value] }
       month_progress = average_review_percentage(month_progress_values)
 
-      l1_percentages = items.filter_map { |item| item[:l1_percentage] == "-" ? nil : item[:l1_percentage].to_f }
       l2_percentages = items.filter_map { |item| item[:l2_percentage] == "-" ? nil : item[:l2_percentage].to_f }
       month_remarks = detail_achievements.filter_map { |_detail, achievement| achievement.achievement_remark }
+      latest_l1_percentage = month_remarks
+                              .select { |remark| remark.l1_percentage.present? }
+                              .max_by(&:updated_at)&.l1_percentage
+      l1_percentage = latest_l1_percentage.nil? ? month_progress : latest_l1_percentage.to_f
 
       {
         key: month,
@@ -2358,7 +2364,8 @@ end
         achievement_percentage: format_pli_percentage(month_progress),
         employee_remarks: items.map { |item| item[:employee_remarks] }.reject { |text| text == "-" }.uniq,
         l1_remarks: month_final_remarks_for(month_remarks, :l1_remarks),
-        l1_percentage: format_pli_percentage(average_review_percentage(l1_percentages)),
+        l1_percentage_value: l1_percentage,
+        l1_percentage: format_pli_percentage(l1_percentage),
         obs_code1_remarks: observer_month_remarks_for(employee_detail, financial_year, quarter, month, "obs_code1"),
         obs_code2_remarks: observer_month_remarks_for(employee_detail, financial_year, quarter, month, "obs_code2"),
         obs_code3_remarks: observer_month_remarks_for(employee_detail, financial_year, quarter, month, "obs_code3"),
@@ -2381,6 +2388,7 @@ end
       quarter: quarter,
       quarter_percentage: format_pli_percentage(quarter_percentage),
       quarter_percentage_value: quarter_percentage,
+      quarter_l1_percentage: format_pli_percentage(average_review_percentage(month_payloads.map { |payload| payload[:l1_percentage_value] })),
       quarter_month_count: month_payloads.size,
       target_total: display_review_number(quarter_target_total),
       achievement_total: display_review_number(quarter_achievement_total),
