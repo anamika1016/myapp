@@ -24,6 +24,15 @@
                 onchange: "this.form.submit();" %>
           <% end %>
 
+          <% if @selected_month.present? %>
+            <%= link_to "Export Month Excel",
+                submitted_achievements_user_details_path(format: :xlsx, financial_year: @selected_financial_year, month: @selected_month),
+                class: "bg-green-700 hover:bg-green-800 text-white px-4 py-2 rounded-lg font-semibold" %>
+          <% end %>
+          <%= link_to "Export All Months Excel",
+              submitted_achievements_user_details_path(format: :xlsx, financial_year: @selected_financial_year, all_months: "1"),
+              class: "bg-green-700 hover:bg-green-800 text-white px-4 py-2 rounded-lg font-semibold" %>
+
           <% if @has_submitted_achievements %>
             <%= link_to quarterly_edit_all_user_details_path(financial_year: @selected_financial_year, month: @selected_month),
                         class: "bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center shadow-md hover:shadow-lg" do %>

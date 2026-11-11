@@ -612,6 +612,12 @@ class UserDetailsController < ApplicationController
     end
     @achievement_entry_locked = current_user.role != "hod" && achievement_entry_locked_for_month?(@user_details, @selected_month)
     @achievement_entry_lock_message = "This month is locked because L1 has approved it." if @achievement_entry_locked
+
+    if request.format.xlsx?
+      @export_months = params[:all_months] == "1" ? MONTH_ATTRIBUTES.map(&:to_s) : [ @selected_month ].compact
+      filename_month = params[:all_months] == "1" ? "all_months" : @selected_month
+      response.headers["Content-Disposition"] = "attachment; filename=\"submitted_achievements_#{@selected_financial_year}_#{filename_month}.xlsx\""
+    end
   end
 
   def delete_month_data

@@ -1,0 +1,58 @@
+workbook = xlsx_package.workbook
+styles = workbook.styles
+header_style = styles.add_style(bg_color: "1F2937", fg_color: "FFFFFF", b: true,
+  alignment: { horizontal: :center, vertical: :center, wrap_text: true })
+body_style = styles.add_style(alignment: { vertical: :top, wrap_text: true })
+summary_cache = {}
+
+@export_months.each do |month|
+  visible_details = @user_details.select { |detail| submitted_month_row_visible?(detail, month) }
+  workbook.add_worksheet(name: short_month_label(month)) do |sheet|
+    headers = [ "S.No", "Financial year", "Employee code", "Employee name", "Department",
+      "Key result indicators", "Unit of measurement", annual_target_fy_label(@selected_financial_year),
+      "#{short_month_label(month)} Target", "#{short_month_label(month)} Achievement", "% Progress",
+      employee_remarks_column_label, manager_remarks_column_label("L1") ]
+    headers += @display_observer_levels.map { |level| manager_remarks_column_label(observer_column_label(level)) }
+    headers += [ "Calculated %", "L1 %", "L1 Final Remarks" ]
+    headers += @display_observer_levels.map { |level| "#{observer_column_label(level)} Final Remarks" }
+    headers += [ "Final PLI %", "Quality PLI Final Remarks", "Status" ]
+    sheet.add_row headers, style: header_style, height: 45
+
+    visible_details.each_with_index do |detail, index|
+      achievement = detail.achievements.find { |record| record.month.to_s.downcase == month }
+      remark = achievement&.achievement_remark
+      target = clean_spreadsheet_display_value(detail.public_send(month))
+      target_number = target.to_s.delete(",").delete("%").to_f
+      progress = if target_number.positive? && achievement&.achievement.present?
+        "#{format('%.2f', (achievement.achievement.to_s.delete(',').delete('%').to_f / target_number * 100).round(2))}%"
+      else
+        "-"
+      end
+      summary = summary_cache[[detail.employee_detail_id, month]] ||= submitted_month_review_summary(
+        detail.employee_detail, @user_details, month, @selected_financial_year)
+      row_levels = observer_levels_for_display(detail.employee_detail)
+      values = [ index + 1, @selected_financial_year, detail.employee_detail&.employee_code,
+        detail.employee_detail&.employee_name, detail.employee_detail&.department,
+        detail.activity&.activity_name, detail.activity&.unit.presence || "-", annual_target_display(detail.activity),
+        target.presence || "-", achievement&.achievement.presence || "-", progress,
+        achievement&.employee_remarks.presence || "-", remark&.reporting_manager_remarks.presence || "-" ]
+      values += @display_observer_levels.map do |level|
+        row_levels.include?(level) ? remark&.public_send(observer_remark_column(level)).presence || "-" : "-"
+      end
+      values += [ summary[:calculated_percentage], summary[:l1_percentage], summary[:l1_final_remarks] ]
+      values += @display_observer_levels.map do |level|
+        summary.fetch(:observer_summaries, []).find { |observer| observer[:level] == level }&.dig(:final_remarks)
+      end
+      values += [ summary.dig(:quarterly_pli, :final_percentage), summary.dig(:quarterly_pli, :final_remarks), achievement&.status ]
+      # Preserve user-entered text as text, including leading '=' characters.
+      sheet.add_row values, types: values.map { |value| value.is_a?(Numeric) ? :float : :string }, style: body_style
+    end
+    sheet.column_widths(*headers.map { |header| header.include?("Remarks") || header == "Key result indicators" ? 45 : 20 })
+    sheet.auto_filter = "A1:#{Axlsx::col_ref(headers.size - 1)}#{visible_details.size + 1}"
+    sheet.sheet_view.pane do |pane|
+      pane.state = :frozen
+      pane.y_split = 1
+      pane.top_left_cell = "A2"
+    end
+  end
+end
